@@ -3,8 +3,12 @@
 [versions]
 #Gradle Addons
 shadow              = "8.1.1"
-architectury        = "3.4-SNAPSHOT"
-architectury-loom   = "1.11-SNAPSHOT"
+architectury        = "3.5-SNAPSHOT"
+# Pinned to the 1.14 line on purpose: loom jumps 1.14 -> 1.17 (no 1.15/1.16) and 1.17
+# is built against the Gradle 9 API (Configuration.extendsFrom(Provider[])), which
+# Gradle 8.14.3 does not have. Moving to 1.17 means bumping the wrapper to Gradle 9 and
+# replacing com.github.johnrengelman.shadow, which is abandoned and Gradle-9-incompatible.
+architectury-loom   = "1.14-SNAPSHOT"
 
 
 #Annotations
@@ -12,26 +16,30 @@ lombok                 = "1.18.46"
 jetbrains              = "26.1.0"
 
 #Core
-minecraftVersion       = "1.21.4"
-parchment              = "2025.03.23"
+minecraftVersion       = "1.21.11"
+parchment              = "2025.12.20"
 lwjgl                  = "3.3.6"
 atum-vr                = "1.13.0beta"
 atum-config            = '1.2.0pre3'
 
 #Fabric
-fabric-loader          = "0.16.14"
-fabric_api             = "0.119.4"
-mixinExtras            = "0.4.1"
+fabric-loader          = "0.19.3"
+fabric_api             = "0.141.6"
+mixinExtras            = "0.5.4"
 
 #Forge
-forgeVersion           = "54.1.18"
+forgeVersion           = "61.2.1"
 
 #NeoForge
-neoforgeVersion        = "21.4.157"
+neoforgeVersion        = "21.11.45"
 
 #Other mods
-mods_sodium                 = "mc1.21.4-0.6.13-fabric"
-mods_iris                   = "1.8.8+1.21.4-fabric"
+# 0.8.7 is the newest sodium build for 1.21.11 made with loom 1.13.4; everything from
+# 0.8.11 up is built with loom 1.16.1, which loom 1.14 refuses to consume ("Mod was built
+# with a newer version of Loom"). This is modCompileOnly, so it only sets what the sodium
+# compat mixins compile against -- revisit together with the Gradle 9 / loom 1.17 move.
+mods_sodium                 = "mc1.21.11-0.8.7-fabric"
+mods_iris                   = "1.10.7+1.21.11-fabric"
 
 
 [plugins]
