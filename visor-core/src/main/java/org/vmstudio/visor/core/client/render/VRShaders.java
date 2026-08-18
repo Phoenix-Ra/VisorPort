@@ -3,6 +3,7 @@ package org.vmstudio.visor.core.client.render;
 
 import lombok.Getter;
 import me.phoenixra.atumvr.api.utils.GLUtils;
+import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import org.vmstudio.visor.core.client.render.shaders.*;
 
 
@@ -28,26 +29,67 @@ public class VRShaders {
 
     }
 
+    /**
+     * (Re)allocates every Visor shader resource.
+     * <p>
+     * Called from {@code VRRendererBase.reinitTargets()}, which runs whenever the eye targets
+     * change - so unlike the old link-once model this has to release what a previous run
+     * allocated, hence the leading {@link #close()}.
+     */
     public static void setup() throws Exception {
-        postProcess = new VRShaderPostProcessEye();
-        postProcess.init();
-        GLUtils.checkGLError("init PostProcess shader");
+        close();
 
-        mixedReality = new VRShaderMixedReality();
-        mixedReality.init();
-        GLUtils.checkGLError("init MixedReality shader");
+        RenderShaderHelper.setup();
 
-        teleportPoint = new VRShaderTeleportPoint();
-        teleportPoint.init();
-        GLUtils.checkGLError("init TeleportPoint shader");
+        postProcess = init(new VRShaderPostProcessEye(), "PostProcess");
+        mixedReality = init(new VRShaderMixedReality(), "MixedReality");
+        teleportPoint = init(new VRShaderTeleportPoint(), "TeleportPoint");
+        endPortal = init(new VRShaderEndPortal(), "EndPortal");
+        inBlockVignette = init(new VRShaderInBlockVignette(), "InBlockVignette");
+    }
 
-        endPortal = new VRShaderEndPortal();
-        endPortal.init();
-        GLUtils.checkGLError("init EndPortal shader");
+    private static <T extends VRShader> T init(T shader, String label) throws Exception {
+        shader.init();
+        GLUtils.checkGLError("init " + label + " shader");
+        return shader;
+    }
 
-        inBlockVignette = new VRShaderInBlockVignette();
-        inBlockVignette.init();
-        GLUtils.checkGLError("init InBlockVignette shader");
+
+    /** Releases every GPU buffer Visor owns here. Safe to call when nothing is allocated. */
+    public static void close() {
+        postProcess = closeOne(postProcess);
+        mixedReality = closeOne(mixedReality);
+        teleportPoint = closeOne(teleportPoint);
+        endPortal = closeOne(endPortal);
+        inBlockVignette = closeOne(inBlockVignette);
+        RenderShaderHelper.close();
+    }
+
+    private static <T extends VRShader> T closeOne(T shader) {
+        if (shader != null) {
+            shader.close();
+        }
+        return null;
+    }
+
+
+    /**
+     * Rotates every uniform ring buffer. Must be called once per VR frame; without it the CPU
+     * blocks on a buffer the GPU is still reading, which shows up as a headset-only stutter
+     * that never reproduces on the desktop mirror.
+     */
+    public static void endFrame() {
+        endFrameOf(postProcess);
+        endFrameOf(mixedReality);
+        endFrameOf(teleportPoint);
+        endFrameOf(endPortal);
+        endFrameOf(inBlockVignette);
+    }
+
+    private static void endFrameOf(VRShader shader) {
+        if (shader != null) {
+            shader.endFrame();
+        }
     }
 
 

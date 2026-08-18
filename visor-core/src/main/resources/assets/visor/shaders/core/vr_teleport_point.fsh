@@ -1,8 +1,13 @@
-#version 330 core
+#version 330
 
+// 1.21.9 removed loose uniforms. vec4 rather than vec3 because std140 pads a vec3 to 16
+// bytes anyway; keep this order in step with the Std140Builder put order in Java.
+layout(std140) uniform VisorTeleportPoint {
+    vec4  uColorPad;
+    float uTime;
+};
 
-uniform float uTime;
-uniform vec3 uColor;
+#define uColor (uColorPad.rgb)
 
 
 in vec2 texCoordinates;

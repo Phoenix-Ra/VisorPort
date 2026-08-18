@@ -1,71 +1,90 @@
 package org.vmstudio.visor.core.client.render.shaders;
 
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.Std140Builder;
+import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.shaders.AbstractUniform;
+import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import lombok.Getter;
 import me.phoenixra.atumvr.api.enums.EyeType;
+import net.minecraft.client.renderer.MappableRingBuffer;
+import com.mojang.blaze3d.shaders.UniformType;
+import org.jetbrains.annotations.NotNull;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
 import org.vmstudio.visor.core.client.ClientContext;
-import org.vmstudio.visor.extensions.client.WindowExtension;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.helpers.MirrorHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
-import net.minecraft.client.renderer.CompiledShaderProgram;
-import net.minecraft.client.renderer.ShaderDefines;
-import net.minecraft.client.renderer.ShaderProgram;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
-import com.mojang.blaze3d.opengl.GlStateManager;
 
-public class VRShaderMixedReality implements VRShader{
+public class VRShaderMixedReality implements VRShader {
 
-    public static final ShaderProgram PROGRAM = new ShaderProgram(
-            McVersionUtils.newResourceLoc("core/vr_mixed_reality"),
-            DefaultVertexFormat.POSITION_TEX,
-            ShaderDefines.EMPTY
-    );
+    public static final RenderPipeline PIPELINE = RenderPipeline.builder()
+            .withLocation(McVersionUtils.newResourceLoc("visor", "pipeline/vr_mixed_reality"))
+            .withVertexShader(McVersionUtils.newResourceLoc("visor", "core/vr_mixed_reality"))
+            .withFragmentShader(McVersionUtils.newResourceLoc("visor", "core/vr_mixed_reality"))
+            .withSampler("SamplerColor")
+            .withSampler("SamplerDepth")
+            .withUniform("VisorMixedReality", UniformType.UNIFORM_BUFFER)
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            // PORT-1.21.11: this used to inherit whatever blend state was already set, which is
+            // no longer expressible - blend is baked into the pipeline. It writes an opaque
+            // full-screen composite, so no blend is the intended behaviour; verify on screen.
+            .withoutBlend()
+            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+            .withDepthWrite(false)
+            .withCull(false)
+            .build();
 
-    @Getter
-    private CompiledShaderProgram handle;
+    /** Must match the VisorMixedReality block in the fragment shader, member for member. */
+    private static final int UBO_SIZE = new Std140SizeCalculator()
+            .putMat4f()
+            .putVec4()
+            .putVec4()
+            .putVec4()
+            .putInt()
+            .putInt()
+            .align(16)
+            .get();
 
-
-    private AbstractUniform uHmdViewPosition;
-    private AbstractUniform uHmdPlaneNormal;
-    private AbstractUniform uInverseProjectionView;
-
-    private AbstractUniform uAsGrid2x2;
-    private AbstractUniform uKeyColor;
-    private AbstractUniform uAlphaMode;
+    private MappableRingBuffer ubo;
 
 
     @Override
-    public void init() throws Exception {
-        handle = VRShader.link(PROGRAM);
+    public @NotNull RenderPipeline getPipeline() {
+        return PIPELINE;
+    }
 
-        uAsGrid2x2 = handle.safeGetUniform("uAsGrid2x2");
-        uAlphaMode = handle.safeGetUniform("uAlphaMode");
+    @Override
+    public void init() {
+        ubo = new MappableRingBuffer(() -> "Visor MixedReality UBO",
+                GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_MAP_WRITE, UBO_SIZE);
+    }
 
-        uHmdViewPosition = handle.safeGetUniform("uHmdViewPosition");
-        uHmdPlaneNormal = handle.safeGetUniform("uHmdPlaneNormal");
-        uInverseProjectionView = handle.safeGetUniform("uInverseProjectionView");
-        uKeyColor = handle.safeGetUniform("uKeyColor");
+    @Override
+    public void close() {
+        if (ubo != null) {
+            ubo.close();
+            ubo = null;
+        }
+    }
 
+    @Override
+    public void endFrame() {
+        if (ubo != null) {
+            ubo.rotate();
+        }
     }
 
 
-    public void drawMirror(){
-        var mcWindow = ((WindowExtension) (Object) MC.getWindow());
-        GlStateManager._viewport(0, 0,
-                mcWindow.visor$getActualScreenWidth(),
-                mcWindow.visor$getActualScreenHeight()
-        );
-
+    public void drawMirror() {
         // --- Prepare ---
         boolean asGrid2x2 = VRClientSettings.isMixedRealityAsGrid2x2();
         boolean alphaMask = asGrid2x2
@@ -82,46 +101,50 @@ public class VRShaderMixedReality implements VRShader{
         var cameraRotation = cameraElement.getRotation().transpose(new Matrix4f());
         var cameraDir = cameraElement.getDirection();
 
-
-        // --- Update Uniforms ---
-
         var proj = ((GameRendererExtension) MC.gameRenderer).visor$getThirdPersonProjection();
         Matrix4f invProjView = new Matrix4f(proj)
                 .mul(cameraRotation)
                 .invert();
-        uInverseProjectionView.set(invProjView);
 
-        uAlphaMode.set(alphaMask ? 1 : 0);
-        uAsGrid2x2.set(asGrid2x2 ? 1 : 0);
-
-        uHmdViewPosition.set(cameraPos.x, cameraPos.y, cameraPos.z);
-        uHmdPlaneNormal.set(-cameraDir.x(), 0.0F, -cameraDir.z());
-
+        float keyR = 0f;
+        float keyG = 0f;
+        float keyB = 0f;
         if (!alphaMask) {
             var color = VRClientSettings.getMixedRealityKeyColor();
-            uKeyColor.set(
-                    color.getRed(),
-                    color.getGreen(),
-                    color.getBlue()
-            );
-        } else {
-            uKeyColor.set(0F, 0F, 0F);
+            keyR = color.getRed();
+            keyG = color.getGreen();
+            keyB = color.getBlue();
         }
 
 
-        // --- Textures ---
-        var target = ClientContext.renderer.thirdPersonTarget.getTarget();
-        handle.bindSampler("SamplerColor", target.getColorTextureId());
-        handle.bindSampler("SamplerDepth", target.getDepthTextureId());
+        // --- Update Uniforms ---
+        // Put order here is load-bearing: it has to match the std140 block declaration exactly.
+        try (GpuBuffer.MappedView view = RenderSystem.getDevice().createCommandEncoder()
+                .mapBuffer(ubo.currentBuffer(), false, true)) {
+            Std140Builder.intoBuffer(view.data())
+                    .putMat4f(invProjView)
+                    .putVec4(cameraPos.x, cameraPos.y, cameraPos.z, 0f)
+                    .putVec4(-cameraDir.x(), 0.0F, -cameraDir.z(), 0f)
+                    .putVec4(keyR, keyG, keyB, 0f)
+                    .putInt(asGrid2x2 ? 1 : 0)
+                    .putInt(alphaMask ? 1 : 0);
+        }
 
 
         // --- Render ---
-        // No blend management here on purpose: the "blend" block the 1.21.1 json carried was
-        // only ever read by EffectInstance (post-chain effects), never by ShaderInstance, so
-        // core shaders like this one always drew with whatever blend state was already set.
-        handle.apply();
-        RenderShaderHelper.renderFullscreenQuad(PROGRAM.vertexFormat());
-        handle.clear();
+        // The pass viewport comes from the target texture, so the explicit _viewport() call the
+        // old path needed is gone; during VR_MIRROR the main target is already the mirror target.
+        RenderTarget thirdPerson = ClientContext.renderer.thirdPersonTarget.getTarget();
+        RenderShaderHelper.renderFullscreenQuad(
+                () -> "visor mixed reality",
+                PIPELINE,
+                pass -> {
+                    pass.setUniform("VisorMixedReality", ubo.currentBuffer());
+                    RenderShaderHelper.bindColor(pass, "SamplerColor", thirdPerson);
+                    RenderShaderHelper.bindDepth(pass, "SamplerDepth", thirdPerson);
+                },
+                MC.mainRenderTarget.getColorTextureView()
+        );
 
         if (asGrid2x2) {
             RenderTarget source;

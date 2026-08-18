@@ -1,9 +1,17 @@
 package org.vmstudio.visor.core.client.render.shaders;
 
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.Std140Builder;
+import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.shaders.AbstractUniform;
+import com.mojang.blaze3d.platform.DepthTestFunction;
+import com.mojang.blaze3d.shaders.UniformType;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import lombok.Getter;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.renderer.MappableRingBuffer;
+import org.jetbrains.annotations.NotNull;
 import me.phoenixra.atumvr.api.enums.EyeType;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import me.phoenixra.atumvr.api.utils.GLUtils;
@@ -12,15 +20,13 @@ import net.minecraft.world.item.component.CustomModelData;
 import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import net.minecraft.util.Util;
-import net.minecraft.client.renderer.CompiledShaderProgram;
-import net.minecraft.client.renderer.ShaderDefines;
-import net.minecraft.client.renderer.ShaderProgram;
 import net.minecraft.util.Mth;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
+import net.minecraft.world.entity.EquipmentSlot;
 
 
 public class VRShaderPostProcessEye implements VRShader{
@@ -28,48 +34,82 @@ public class VRShaderPostProcessEye implements VRShader{
     private static final AtumColor PUMPKIN_VIGNETTE_COLOR
             = AtumColor.ORANGE.blend(AtumColor.BLACK, 0.5f);
 
-    public static final ShaderProgram PROGRAM = new ShaderProgram(
-            McVersionUtils.newResourceLoc("core/vr_post_process_eye"),
-            DefaultVertexFormat.POSITION_TEX,
-            ShaderDefines.EMPTY
-    );
+    public static final RenderPipeline PIPELINE = RenderPipeline.builder()
+            .withLocation(McVersionUtils.newResourceLoc("visor", "pipeline/vr_post_process_eye"))
+            .withVertexShader(McVersionUtils.newResourceLoc("visor", "core/vr_post_process_eye"))
+            .withFragmentShader(McVersionUtils.newResourceLoc("visor", "core/vr_post_process_eye"))
+            .withSampler("Sampler0")
+            .withUniform("VisorPostProcess", UniformType.UNIFORM_BUFFER)
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .withoutBlend()
+            .withColorWrite(true, false)
+            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+            .withDepthWrite(false)
+            .withCull(false)
+            .build();
 
-    @Getter
-    private CompiledShaderProgram handle;
+    /** Must match the VisorPostProcess block in the fragment shader, member for member. */
+    private static final int UBO_SIZE = new Std140SizeCalculator()
+            .putInt()
+            .putFloat().putFloat().putFloat()
+            .putFloat().putFloat().putFloat()
+            .putVec4()
+            .get();
 
-    private AbstractUniform uniformEye;
+    // One ring buffer per eye. A UBO cannot be partially patched, so the whole block is
+    // re-emitted per eye; separate buffers keep each rotated exactly once per frame.
+    private MappableRingBuffer uboLeft;
+    private MappableRingBuffer uboRight;
 
-    private AbstractUniform uVignetteRadius;
-    private AbstractUniform uVignetteOffset;
-    private AbstractUniform uVignetteBorder;
-    private AbstractUniform uVignetteColor;
-
-    private AbstractUniform uTintRed;
-    private AbstractUniform uTintBlue;
-    private AbstractUniform uTintBlack;
-
+    // Computed once per frame on the left eye and replayed for the right, which is what the
+    // single updateUniforms() call used to guarantee.
+    private float redTint;
+    private float blueTint;
+    private float blackTint;
+    private float vignetteRadius;
+    private float vignetteOffset;
+    private float vignetteBorder;
+    private float vignetteR;
+    private float vignetteG;
+    private float vignetteB;
+    private float vignetteA;
 
 
     @Override
-    public void init() throws Exception {
-        handle = VRShader.link(PROGRAM);
+    public @NotNull RenderPipeline getPipeline() {
+        return PIPELINE;
+    }
 
-        uniformEye = handle.safeGetUniform("uEye");
+    @Override
+    public void init() {
+        uboLeft = new MappableRingBuffer(() -> "Visor PostProcess UBO left",
+                GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_MAP_WRITE, UBO_SIZE);
+        uboRight = new MappableRingBuffer(() -> "Visor PostProcess UBO right",
+                GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_MAP_WRITE, UBO_SIZE);
+    }
 
-        uTintRed = handle.safeGetUniform("uTintRed");
-        uTintBlue = handle.safeGetUniform("uTintBlue");
-        uTintBlack = handle.safeGetUniform("uTintBlack");
+    @Override
+    public void close() {
+        if (uboLeft != null) {
+            uboLeft.close();
+            uboLeft = null;
+        }
+        if (uboRight != null) {
+            uboRight.close();
+            uboRight = null;
+        }
+    }
 
-        uVignetteRadius = handle.safeGetUniform("uVignetteRadius");
-        uVignetteOffset = handle.safeGetUniform("uVignetteOffset");
-        uVignetteBorder = handle.safeGetUniform("uVignetteBorder");
-        uVignetteColor = handle.safeGetUniform("uVignetteColor");
-
+    @Override
+    public void endFrame() {
+        if (uboLeft != null) uboLeft.rotate();
+        if (uboRight != null) uboRight.rotate();
     }
 
 
     public void finishEye(EyeType eye,
                           RenderTarget source,
+                          RenderTarget dest,
                           float partialTicks) {
         if (eye == EyeType.LEFT) {
             // update state only for the first rendered eye,
@@ -77,10 +117,29 @@ public class VRShaderPostProcessEye implements VRShader{
             updateUniforms(partialTicks);
         }
 
-        uniformEye.set(eye == EyeType.LEFT ? 1 : -1);
+        MappableRingBuffer ubo = (eye == EyeType.LEFT) ? uboLeft : uboRight;
+        try (GpuBuffer.MappedView view = RenderSystem.getDevice().createCommandEncoder()
+                .mapBuffer(ubo.currentBuffer(), false, true)) {
+            Std140Builder.intoBuffer(view.data())
+                    .putInt(eye == EyeType.LEFT ? 1 : -1)
+                    .putFloat(redTint)
+                    .putFloat(blueTint)
+                    .putFloat(blackTint)
+                    .putFloat(vignetteRadius)
+                    .putFloat(vignetteOffset)
+                    .putFloat(vignetteBorder)
+                    .putVec4(vignetteR, vignetteG, vignetteB, vignetteA);
+        }
 
-
-        RenderShaderHelper.renderFullscreenQuad(handle, PROGRAM.vertexFormat(), source);
+        RenderShaderHelper.renderFullscreenQuad(
+                () -> "visor post process eye",
+                PIPELINE,
+                pass -> {
+                    pass.setUniform("VisorPostProcess", ubo.currentBuffer());
+                    RenderShaderHelper.bindColor(pass, "Sampler0", source);
+                },
+                dest.getColorTextureView()
+        );
 
         GLUtils.checkGLError("post process eye: "+ eye.name());
     }
@@ -145,7 +204,7 @@ public class VRShaderPostProcessEye implements VRShader{
 
 
             // --- Vignette ---
-            ItemStack headItem = MC.player.getInventory().getArmor(3);
+            ItemStack headItem = MC.player.getItemBySlot(EquipmentSlot.HEAD);
 
             if(VRClientSettings.isPumpkinEffectEnabled()) {
                 boolean hasPumpkin = headItem.getItem() == Blocks.CARVED_PUMPKIN.asItem()
@@ -161,22 +220,22 @@ public class VRShaderPostProcessEye implements VRShader{
         }
 
         // --- Finalize ---
+        // Held as fields rather than pushed straight at the GPU: the block is written once per
+        // eye in finishEye(), because a UBO has to be re-emitted whole.
 
         //tints
-        uTintRed.set(redTint);
-        uTintBlue.set(blueTint);
-        uTintBlack.set(blackTint);
+        this.redTint = redTint;
+        this.blueTint = blueTint;
+        this.blackTint = blackTint;
 
         //vignette
-        uVignetteRadius.set(vignetteRadius);
-        uVignetteBorder.set(vignetteBorder);
-        uVignetteOffset.set(0.1f);
-        uVignetteColor.set(
-                vignetteColor.getRed(),
-                vignetteColor.getGreen(),
-                vignetteColor.getBlue(),
-                vignetteColor.getAlpha()
-        );
+        this.vignetteRadius = vignetteRadius;
+        this.vignetteBorder = vignetteBorder;
+        this.vignetteOffset = 0.1f;
+        this.vignetteR = vignetteColor.getRed();
+        this.vignetteG = vignetteColor.getGreen();
+        this.vignetteB = vignetteColor.getBlue();
+        this.vignetteA = vignetteColor.getAlpha();
     }
 
 }

@@ -1,18 +1,24 @@
-#version 330 core
+#version 330
 
 uniform sampler2D SamplerColor;
 uniform sampler2D SamplerDepth;
 
+// 1.21.9 dropped loose uniforms; everything custom travels in one std140 block.
+// vec3 is padded to 16 bytes in std140, so these are declared vec4 to keep the
+// Java-side put order and the GLSL layout trivially in agreement. bool is not a
+// legal std140 member either, hence the ints.
+layout(std140) uniform VisorMixedReality {
+    mat4 uInverseProjectionView;
+    vec4 uHmdViewPositionPad;
+    vec4 uHmdPlaneNormalPad;
+    vec4 uKeyColorPad;
+    int  uAsGrid2x2;
+    int  uAlphaMode;
+};
 
-uniform mat4 uInverseProjectionView;
-
-uniform bool uAsGrid2x2;
-uniform bool uAlphaMode;
-
-uniform vec3 uHmdViewPosition;
-uniform vec3 uHmdPlaneNormal;
-
-uniform vec3 uKeyColor;
+#define uHmdViewPosition (uHmdViewPositionPad.xyz)
+#define uHmdPlaneNormal  (uHmdPlaneNormalPad.xyz)
+#define uKeyColor        (uKeyColorPad.rgb)
 
 
 in vec2 texCoordinates;
@@ -45,7 +51,7 @@ void main(void) {
     // default fill = keyColor
     fragColor = vec4(uKeyColor, 1.0);
 
-    if (uAsGrid2x2) {
+    if (uAsGrid2x2 != 0) {
         // --- 2×2 GRID ---
         vec2 sampleUV = fract(texCoordinates * 2.0);
 
@@ -61,10 +67,10 @@ void main(void) {
                 // left-top = color (+ possible key-avoid)
                 if (texCoordinates.x < 0.5) {
                     vec3 col = texture(SamplerColor, sampleUV).rgb;
-                    if (!uAlphaMode) col = avoidKeyColor(col);
+                    if (uAlphaMode == 0) col = avoidKeyColor(col);
                     fragColor.rgb = col;
 
-                } else if (uAlphaMode) {
+                } else if (uAlphaMode != 0) {
                     // right-top = white mask
                     fragColor.rgb = vec3(1.0);
                 }

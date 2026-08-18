@@ -1,13 +1,11 @@
-#version 150
+#version 330
 
-
-#moj_import <matrix.glsl>
+#moj_import <minecraft:globals.glsl>
+#moj_import <minecraft:matrix.glsl>
 
 uniform sampler2D Sampler0;
 uniform sampler2D Sampler1;
 
-uniform float GameTime;
-uniform int EndPortalLayers;
 
 in vec3 pos;
 
@@ -69,7 +67,7 @@ tmppos = proj_3d_to_2d(tmppos);
 
 outColor.rgb = texture(Sampler0, tmppos.xy).rgb * COLORS[0];
 
-for (int i = 0; i < EndPortalLayers; i++) {
+for (int i = 0; i < PORTAL_LAYERS; i++) {
 float layer = float(i) + 1.0;
 tmppos = proj_3d_to_2d(mat3(mat2_rotate_z(radians((layer * layer * 4321.0 + layer * 9.0) * 2.0))) * normalize(pos));
 outColor.rgb += texture(Sampler1, (tmppos * end_portal_layer(float(i + 1))).xy).rgb * COLORS[i];

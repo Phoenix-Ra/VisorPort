@@ -1,6 +1,9 @@
-#version 150 core
+#version 330
 
-uniform float uInBlockProximity;
+// 1.21.9 removed loose uniforms; custom values travel in a std140 block.
+layout(std140) uniform VisorInBlockVignette {
+    float uInBlockProximity;
+};
 
 in vec2 texCoordinates;
 out vec4 fragColor;

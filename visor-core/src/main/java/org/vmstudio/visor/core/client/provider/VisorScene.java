@@ -173,18 +173,17 @@ public class VisorScene implements AtumVRScene {
 
         if (renderPass.isEye()) {
 
-            if (renderPass == VRRenderPass.EYE_LEFT) {
-                ClientContext.renderer.getTextureLeftEye()
-                        .getRenderTarget().bindWrite(true);
-            } else {
-                ClientContext.renderer.getTextureRightEye()
-                        .getRenderTarget().bindWrite(true);
-            }
+            // PORT-1.21.11: there is no framebuffer to bind any more - the destination is the
+            // texture handed to the render pass, so the eye target is passed to finishEye().
+            RenderTarget eyeTarget = (renderPass == VRRenderPass.EYE_LEFT)
+                    ? ClientContext.renderer.getTextureLeftEye().getRenderTarget()
+                    : ClientContext.renderer.getTextureRightEye().getRenderTarget();
 
             VRShaders.getPostProcess().finishEye(
                     renderPass == VRRenderPass.EYE_LEFT
                             ? EyeType.LEFT : EyeType.RIGHT,
                     MC.mainRenderTarget,
+                    eyeTarget,
                     context.partialTicks()
             );
 

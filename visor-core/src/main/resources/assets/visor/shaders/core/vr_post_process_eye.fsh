@@ -1,18 +1,19 @@
-#version 150 core
+#version 330
 
 uniform sampler2D Sampler0;
 
-uniform int uEye = 0;
-
-
-uniform float uTintRed;
-uniform float uTintBlue;
-uniform float uTintBlack;
-
-uniform float uVignetteRadius;
-uniform float uVignetteOffset = 0.1;
-uniform float uVignetteBorder;
-uniform vec4 uVignetteColor;
+// 1.21.9 removed loose uniforms. Member order here is the contract with the Java-side
+// Std140Builder put order in VRShaderPostProcessEye - keep them in step.
+layout(std140) uniform VisorPostProcess {
+    int   uEye;
+    float uTintRed;
+    float uTintBlue;
+    float uTintBlack;
+    float uVignetteRadius;
+    float uVignetteOffset;
+    float uVignetteBorder;
+    vec4  uVignetteColor;
+};
 
 
 const vec4 BLACK = vec4(0.0, 0.0, 0.0, 1.0);

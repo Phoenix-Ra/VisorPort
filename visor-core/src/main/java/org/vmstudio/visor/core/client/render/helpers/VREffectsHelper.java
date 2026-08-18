@@ -70,41 +70,12 @@ public class VREffectsHelper {
     public static void renderInBlockVignette(float proximity) {
         if (proximity <= 0.0f) return;
 
-        VRRenderPass pass = VRRenderState.getRenderPass();
-        EyeType eye = (pass == VRRenderPass.EYE_LEFT) ? EyeType.LEFT : EyeType.RIGHT;
-
         VRShaderInBlockVignette wrap = VRShaders.getInBlockVignette();
         if (wrap == null) return;
-        wrap.prepare(proximity);
-        CompiledShaderProgram shader = wrap.getHandle();
 
-        // --- Prepare variables ---
-        Tesselator tesselator = Tesselator.getInstance();
-        Matrix4f mat = new Matrix4f();
-        mat.m00(1.0F);
-        mat.m11(1.0F);
-        mat.m22(-1.0F);
-        mat.m33(1.0F);
-        mat.m32(-1.0F);
-
-        // --- Setup ---
-        RenderSystem.setShader(shader);
-        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
-        GlStateManager._depthMask(false);
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GlStateManager._disableCull();
-
-        // --- Render ---
-        BufferBuilder bufferbuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-        bufferbuilder.addVertex(mat, -1.5F, -1.5F, 0.0F).setUv(-0.25F, -0.25F);
-        bufferbuilder.addVertex(mat,  1.5F, -1.5F, 0.0F).setUv( 1.25F, -0.25F);
-        bufferbuilder.addVertex(mat,  1.5F,  1.5F, 0.0F).setUv( 1.25F,  1.25F);
-        bufferbuilder.addVertex(mat, -1.5F,  1.5F, 0.0F).setUv(-0.25F,  1.25F);
-        BufferUploader.drawWithShader(bufferbuilder.buildOrThrow());
-
-        // --- Restore ---
-        RenderStateHelper.restoreAfterExternalRender();
+        // PORT-1.21.11: blend/depth/cull are pipeline properties now, so the GL sandwich that
+        // used to wrap this draw is gone - leaving it would just be overwritten by the pass.
+        wrap.draw(proximity, MC.mainRenderTarget.getColorTextureView());
     }
 
 
