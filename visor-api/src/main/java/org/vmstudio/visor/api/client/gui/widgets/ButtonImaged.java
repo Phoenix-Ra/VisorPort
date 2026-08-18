@@ -16,6 +16,10 @@ import org.vmstudio.visor.api.client.gui.overlays.framework.VROverlayScreen;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 
 import java.util.function.Consumer;
+import net.minecraft.client.input.InputWithModifiers;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
+import com.mojang.blaze3d.platform.InputConstants;
 
 public class ButtonImaged extends AbstractButton {
 
@@ -61,7 +65,6 @@ public class ButtonImaged extends AbstractButton {
         this.tooltipOverride = tooltip;
     }
 
-    @Override
     public @Nullable Tooltip getTooltip() {
         return tooltipOverride != null ? tooltipOverride : widgetInfo.getTooltip();
     }
@@ -74,7 +77,7 @@ public class ButtonImaged extends AbstractButton {
 
 
     @Override
-    public void onPress() {
+    public void onPress(InputWithModifiers input) {
         pressed = true;
         if (this.onPress != null) {
             this.onPress.accept(this);
@@ -82,7 +85,9 @@ public class ButtonImaged extends AbstractButton {
     }
 
     @Override
-    public void onRelease(double mouseX, double mouseY) {
+    public void onRelease(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         if (!pressed) return;
         pressed = false;
         if (this.onRelease != null) {
@@ -91,7 +96,9 @@ public class ButtonImaged extends AbstractButton {
     }
 
     public void forceRelease() {
-        onRelease(getX(), getY());
+        // synthetic release at the widget's own position; left button, no modifiers
+        onRelease(new MouseButtonEvent(getX(), getY(),
+                new MouseButtonInfo(InputConstants.MOUSE_BUTTON_LEFT, 0)));
     }
 
     /**
@@ -103,14 +110,17 @@ public class ButtonImaged extends AbstractButton {
                         && Minecraft.getInstance().getLastInputType().isKeyboard());
     }
     @Override
-    public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderContents(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         if (visorShouldShowTooltip()) {
-            var screen = getTooltipScreen();
             var tooltip = getTooltip();
-            if(screen != null && tooltip != null){
-                screen.setTooltipForNextRenderPass(
-                        tooltip,
+            if (tooltip != null) {
+                // 1.21.9: tooltips are queued on the GuiGraphics being rendered rather than on
+                // Minecraft's current screen, so an overlay's tooltip lands in the overlay itself.
+                guiGraphics.setTooltipForNextFrame(
+                        Minecraft.getInstance().font,
+                        tooltip.toCharSequence(Minecraft.getInstance()),
                         ClampedTooltipPositioner.INSTANCE,
+                        mouseX, mouseY,
                         this.isFocused()
                 );
             }

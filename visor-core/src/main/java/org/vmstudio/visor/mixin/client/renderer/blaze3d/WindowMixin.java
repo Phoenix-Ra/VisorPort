@@ -40,7 +40,7 @@ public abstract class WindowMixin implements WindowExtension {
                 );
             } else {
                 cir.setReturnValue(
-                        MC.mainRenderTarget.viewWidth
+                        MC.mainRenderTarget.width
                 );
             }
         }
@@ -56,7 +56,7 @@ public abstract class WindowMixin implements WindowExtension {
                 );
             } else {
                 cir.setReturnValue(
-                        MC.mainRenderTarget.viewHeight
+                        MC.mainRenderTarget.height
                 );
             }
         }

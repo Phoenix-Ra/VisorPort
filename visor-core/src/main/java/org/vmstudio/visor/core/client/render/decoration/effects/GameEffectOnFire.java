@@ -16,13 +16,15 @@ import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import net.minecraft.client.renderer.CoreShaders;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.ModelBakery;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11C;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import org.lwjgl.opengl.GL11;
 
 
 @RegisterVRGameEffect
@@ -50,7 +52,7 @@ public class GameEffectOnFire extends VRGameEffect {
                 .getY());
 
         TextureAtlasSprite sprite = ModelBakery.FIRE_1.sprite();
-        ResourceLocation atlas = sprite.atlasLocation();
+        Identifier atlas = sprite.atlasLocation();
         float uMin = sprite.getU0();
         float uMax = sprite.getU1();
         float vMin = sprite.getV0();
@@ -65,14 +67,14 @@ public class GameEffectOnFire extends VRGameEffect {
         float v1 = Mth.lerp(shrink, vMax, midV);
 
         // --- GL setup ---
-        RenderSystem.depthFunc(
+        GlStateManager._depthFunc(
                 renderPass == VRRenderPass.THIRD_PERSON
                         ? GL11C.GL_LEQUAL
                         : GL11C.GL_ALWAYS
         );
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager._enableDepthTest();
 
         RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
         RenderSystem.setShaderTexture(0, atlas);
@@ -108,8 +110,8 @@ public class GameEffectOnFire extends VRGameEffect {
         }
 
         // --- Restore GL & pose ---
-        RenderSystem.depthFunc(GL11C.GL_LEQUAL);
-        RenderSystem.disableBlend();
+        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
+        GlStateManager._disableBlend();
         stack.popPose();
     }
 

@@ -25,8 +25,8 @@ public class VRRenderTarget extends RenderTarget {
                           Supplier<Integer> textureSupplier,
                           boolean linearFilter,
                           boolean useStencil) {
-        super(usedepth);
-        RenderSystem.assertOnRenderThreadOrInit();
+        super(name, usedepth);
+        RenderSystem.assertOnRenderThread();
 
         this.textureSupplier = textureSupplier;
         this.name = name;
@@ -39,7 +39,6 @@ public class VRRenderTarget extends RenderTarget {
                 ((RenderTargetExtension) this).visor$setUseStencil(true);
             }
         }
-        this.setClearColor(0, 0, 0, 0);
 
         ShadersHelper.bridge().onRenderTargetCreated(this);
     }
@@ -53,12 +52,10 @@ public class VRRenderTarget extends RenderTarget {
         return String.format(
                 "Name:   %s%n" +
                         "Size:   %d x %d%n" +
-                        "FB ID:  %d%n" +
                         "Tex ID: %d",
                 displayName,
-                viewWidth, viewHeight,
-                frameBufferId,
-                colorTextureId
+                width, height,
+                ((RenderTargetExtension) this).visor$getColorTextureId()
         );
     }
 

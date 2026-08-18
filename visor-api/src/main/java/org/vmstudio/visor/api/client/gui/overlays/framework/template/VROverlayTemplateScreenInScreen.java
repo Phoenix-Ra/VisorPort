@@ -8,6 +8,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import org.jetbrains.annotations.NotNull;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 
 
 /**
@@ -32,9 +35,7 @@ public abstract class VROverlayTemplateScreenInScreen<T extends Screen> extends 
     @Override
     protected void init() {
         if(screen!=null){
-            screen.init(
-                    Minecraft.getInstance(),
-                    width,
+            screen.init(width,
                     height
             );
         }
@@ -46,22 +47,28 @@ public abstract class VROverlayTemplateScreenInScreen<T extends Screen> extends 
                             float partialTicks) {
 
         if(screen!=null) {
-            screen.renderWithTooltip(guiGraphics, mouseX, mouseY, partialTicks);
+            screen.renderWithTooltipAndSubtitles(guiGraphics, mouseX, mouseY, partialTicks);
         }
 
     }
 
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if(screen==null) return true;
-        return screen.mouseClicked(mouseX, mouseY, buttonType);
+        return screen.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if(screen==null) return true;
-        return screen.mouseReleased(mouseX, mouseY, buttonType);
+        return screen.mouseReleased(event);
     }
 
     @Override
@@ -71,12 +78,12 @@ public abstract class VROverlayTemplateScreenInScreen<T extends Screen> extends 
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY,
-                                int buttonType,
-                                double dragX, double dragY
-    ) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if(screen==null) return true;
-        return screen.mouseDragged(mouseX, mouseY, buttonType, dragX, dragY);
+        return screen.mouseDragged(event, dragX, dragY);
     }
 
 
@@ -87,21 +94,29 @@ public abstract class VROverlayTemplateScreenInScreen<T extends Screen> extends 
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int keyScan, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
+        int keyScan = event.scancode();
+        int modifiers = event.modifiers();
         if(screen==null) return true;
-        return screen.keyPressed(keyCode, keyScan, modifiers);
+        return screen.keyPressed(event);
     }
 
     @Override
-    public boolean keyReleased(int keyCode, int keyScan, int modifiers) {
+    public boolean keyReleased(KeyEvent event) {
+        int keyCode = event.key();
+        int keyScan = event.scancode();
+        int modifiers = event.modifiers();
         if(screen==null) return true;
-        return screen.keyReleased(keyCode, keyScan, modifiers);
+        return screen.keyReleased(event);
     }
 
     @Override
-    public boolean charTyped(char chr, int modifiers) {
+    public boolean charTyped(CharacterEvent event) {
+        char chr = (char) event.codepoint();
+        int modifiers = event.modifiers();
         if(screen==null) return true;
-        return screen.charTyped(chr, modifiers);
+        return screen.charTyped(event);
     }
 
     @Override

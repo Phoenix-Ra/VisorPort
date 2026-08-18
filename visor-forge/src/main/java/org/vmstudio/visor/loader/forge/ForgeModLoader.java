@@ -4,7 +4,7 @@ package org.vmstudio.visor.loader.forge;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.netty.buffer.Unpooled;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraftforge.event.network.CustomPayloadEvent;
 import net.minecraftforge.network.ChannelBuilder;
@@ -218,13 +218,13 @@ public class ForgeModLoader implements ModLoader {
     }
 
     @Override
-    public @NotNull Packet<?> createPacketToClient(@NotNull ResourceLocation channelId,
+    public @NotNull Packet<?> createPacketToClient(@NotNull Identifier channelId,
                                                    @NotNull VisorPayloadToClient payload) {
         return NetworkProtocol.PLAY.buildPacket(PacketFlow.CLIENTBOUND, channelId, payload::write);
     }
 
     @Override
-    public @NotNull Packet<?> createPacketToServer(@NotNull ResourceLocation channelId,
+    public @NotNull Packet<?> createPacketToServer(@NotNull Identifier channelId,
                                                    @NotNull VisorPayloadToServer payload) {
         return NetworkProtocol.PLAY.buildPacket(PacketFlow.SERVERBOUND, channelId, payload::write);
     }

@@ -6,12 +6,13 @@ import net.minecraft.world.item.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import net.minecraft.tags.ItemTags;
 
 public enum ItemClassifier {
     FARMING_TOOL((itemStack) -> itemStack.getItem() instanceof HoeItem),
     SHIELD((itemStack) -> itemStack.getItem() instanceof ShieldItem
             || itemStack.is(VisorItemTags.SHIELDS)),
-    SWORD((itemStack) -> itemStack.getItem() instanceof SwordItem),
+    SWORD((itemStack) -> itemStack.is(ItemTags.SWORDS)),
     SPEAR((itemStack) -> itemStack.getItem() instanceof TridentItem),
     FOOD_STICK((itemStack) -> itemStack.getItem() instanceof FoodOnAStickItem),
     THROWABLE((itemStack) -> {

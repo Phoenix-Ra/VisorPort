@@ -1,9 +1,9 @@
 package org.vmstudio.visor.core.client.render.player.model.simple;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.HumanoidArm;
 import org.vmstudio.visor.api.client.player.VRClientPlayer;
@@ -29,7 +29,7 @@ public class VRPlayerModelSimple extends PlayerModel {
     }
 
     @Override
-    public void setupAnim(PlayerRenderState renderState) {
+    public void setupAnim(AvatarRenderState renderState) {
         // no crouch hip movement when roomscale crawling.
         // PlayerModel.crouching is gone; the flag lives on the render state now.
         renderState.isCrouching &= !renderState.isVisuallySwimming;
@@ -71,7 +71,7 @@ public class VRPlayerModelSimple extends PlayerModel {
     }
 
     private static void animateThirdPersonVRModel(VRPlayerModelSimple model,
-                                                  PlayerRenderState renderState,
+                                                  AvatarRenderState renderState,
                                                   VRClientPlayer vrPlayer) {
         var poseRender = vrPlayer.getPoseData(PlayerPoseType.RENDER);
         VRBody vrBody = poseRender.getBody();
@@ -109,7 +109,7 @@ public class VRPlayerModelSimple extends PlayerModel {
     }
 
     private static void applyVanillaSwingPose(VRPlayerModelSimple model,
-                                              PlayerRenderState renderState) {
+                                              AvatarRenderState renderState) {
         float attackTime = renderState.attackTime;
         if (attackTime <= 0.0F) {
             return;

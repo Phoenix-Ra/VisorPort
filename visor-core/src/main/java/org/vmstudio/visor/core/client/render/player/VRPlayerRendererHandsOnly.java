@@ -1,6 +1,6 @@
 package org.vmstudio.visor.core.client.render.player;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -11,11 +11,11 @@ import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.PlayerModelPart;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
@@ -26,11 +26,12 @@ import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.render.player.model.CenteredArmsPlayerMesh;
 import org.vmstudio.visor.core.client.render.player.model.simple.VRPlayerModelSimple;
 import org.vmstudio.visor.core.client.utils.ScaleHelper;
-import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import org.vmstudio.visor.extensions.client.entity.EntityRenderStateExtension;
 import org.vmstudio.visor.extensions.client.entity.PlayerRendererExtension;
+import org.lwjgl.opengl.GL11;
 
-public class VRPlayerRendererHandsOnly extends PlayerRenderer {
+public class VRPlayerRendererHandsOnly extends AvatarRenderer {
     private static LayerDefinition VR_LAYER_DEFAULT;
     private static LayerDefinition VR_LAYER_SLIM;
     static {
@@ -57,7 +58,7 @@ public class VRPlayerRendererHandsOnly extends PlayerRenderer {
 
     @Override
     public void extractRenderState(AbstractClientPlayer player,
-                                   PlayerRenderState renderState,
+                                   AvatarRenderState renderState,
                                    float partialTick) {
         super.extractRenderState(player, renderState, partialTick);
 
@@ -69,7 +70,7 @@ public class VRPlayerRendererHandsOnly extends PlayerRenderer {
     }
 
     @Override
-    public void render(PlayerRenderState renderState, PoseStack poseStack, MultiBufferSource buffer,
+    public void render(AvatarRenderState renderState, PoseStack poseStack, MultiBufferSource buffer,
                        int packedLight)
     {
 
@@ -100,7 +101,7 @@ public class VRPlayerRendererHandsOnly extends PlayerRenderer {
         }
 
         // Not super.render(...): on Forge/NeoForge that binds to a synthetic bridge in
-        // PlayerRenderer and recurses back into this method. See PlayerRenderMixins.
+        // AvatarRenderer and recurses back into this method. See PlayerRenderMixins.
         ((PlayerRendererExtension) this).visor$renderVanilla(renderState, poseStack, buffer, packedLight);
 
         poseStack.popPose();
@@ -116,7 +117,7 @@ public class VRPlayerRendererHandsOnly extends PlayerRenderer {
 
     @Override
     protected void setupRotations(
-            PlayerRenderState renderState, PoseStack poseStack, float bodyRot, float scale)
+            AvatarRenderState renderState, PoseStack poseStack, float bodyRot, float scale)
     {
         if (VRRenderState.getPhase().isVRGui()) {
             if (renderState.isFallFlying || renderState.isVisuallySwimming || renderState.isAutoSpinAttack) {
@@ -141,7 +142,7 @@ public class VRPlayerRendererHandsOnly extends PlayerRenderer {
 
     @Override
     public void renderRightHand(
-            PoseStack poseStack, MultiBufferSource buffer, int combinedLight, ResourceLocation skin,
+            PoseStack poseStack, MultiBufferSource buffer, int combinedLight, Identifier skin,
             boolean isSleeveVisible)
     {
         this.renderHand(ControllerType.RIGHT, poseStack, buffer, combinedLight, skin, isSleeveVisible,
@@ -150,7 +151,7 @@ public class VRPlayerRendererHandsOnly extends PlayerRenderer {
 
     @Override
     public void renderLeftHand(
-            PoseStack poseStack, MultiBufferSource buffer, int combinedLight, ResourceLocation skin,
+            PoseStack poseStack, MultiBufferSource buffer, int combinedLight, Identifier skin,
             boolean isSleeveVisible)
     {
         this.renderHand(ControllerType.LEFT, poseStack, buffer, combinedLight, skin, isSleeveVisible,
@@ -160,14 +161,14 @@ public class VRPlayerRendererHandsOnly extends PlayerRenderer {
 
     private void renderHand(
             ControllerType side, PoseStack poseStack, MultiBufferSource buffer, int combinedLight,
-            ResourceLocation playerSkin, boolean isSleeveVisible,
+            Identifier playerSkin, boolean isSleeveVisible,
             ModelPart rendererArm, ModelPart rendererArmwear)
     {
-        RenderSystem.enableBlend();
-        RenderSystem.enableCull();
-        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA,
-                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SourceFactor.ONE,
-                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+        GlStateManager._enableBlend();
+        GlStateManager._enableCull();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA,
+                GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE,
+                GL11.GL_ONE_MINUS_SRC_ALPHA);
 
         boolean slim = this.getModel().slim;
         boolean left = side == ControllerType.LEFT;
@@ -185,7 +186,7 @@ public class VRPlayerRendererHandsOnly extends PlayerRenderer {
         rendererArm.render(poseStack, buffer.getBuffer(RenderType.entityTranslucent(playerSkin)), combinedLight,
                 OverlayTexture.NO_OVERLAY);
 
-        RenderSystem.disableBlend();
+        GlStateManager._disableBlend();
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 }

@@ -17,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import net.minecraft.client.input.MouseButtonEvent;
 
 
 /**
@@ -127,7 +128,6 @@ public class WidgetSetList implements GuiEventListener, Renderable, NarratableEn
         }
 
         renderScrollbar(guiGraphics);
-        RenderSystem.disableBlend();
     }
 
     private void renderScrollbar(@NotNull GuiGraphics guiGraphics) {
@@ -282,7 +282,10 @@ public class WidgetSetList implements GuiEventListener, Renderable, NarratableEn
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (!isMouseOver(mouseX, mouseY)) return false;
 
         if (button == 0 && getMaxScroll() > 0) {
@@ -299,7 +302,7 @@ public class WidgetSetList implements GuiEventListener, Renderable, NarratableEn
                 continue;
             }
             for (var widget : entry.getWidgets()) {
-                if (widget.mouseClicked(mouseX, mouseY, button)) {
+                if (widget.mouseClicked(event, doubleClick)) {
                     return true;
                 }
             }
@@ -309,7 +312,10 @@ public class WidgetSetList implements GuiEventListener, Renderable, NarratableEn
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (button == 0) {
             scrolling = false;
         }
@@ -318,15 +324,17 @@ public class WidgetSetList implements GuiEventListener, Renderable, NarratableEn
                 continue;
             }
             for (var widget : entry.getWidgets()) {
-                widget.mouseReleased(mouseX, mouseY, button);
+                widget.mouseReleased(event);
             }
         }
         return false;
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY,
-                                int button, double dragX, double dragY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (scrolling && button == 0) {
             lastDragCall = System.currentTimeMillis();
             int maxScroll = getMaxScroll();

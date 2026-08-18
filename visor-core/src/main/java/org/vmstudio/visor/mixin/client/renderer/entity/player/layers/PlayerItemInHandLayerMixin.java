@@ -5,7 +5,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.layers.PlayerItemInHandLayer;
-import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.world.entity.HumanoidArm;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,14 +22,14 @@ import org.vmstudio.visor.extensions.client.entity.EntityRenderStateExtension;
 public class PlayerItemInHandLayerMixin {
 
     private static final String RENDER_ARM_WITH_ITEM =
-            "renderArmWithItem(Lnet/minecraft/client/renderer/entity/state/PlayerRenderState;"
+            "renderArmWithItem(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;"
                     + "Lnet/minecraft/client/renderer/item/ItemStackRenderState;"
                     + "Lnet/minecraft/world/entity/HumanoidArm;"
                     + "Lcom/mojang/blaze3d/vertex/PoseStack;"
                     + "Lnet/minecraft/client/renderer/MultiBufferSource;I)V";
 
     @Inject(method = RENDER_ARM_WITH_ITEM, at = @At("HEAD"), cancellable = true)
-    private void visor$noItemInGui(PlayerRenderState renderState, ItemStackRenderState itemState,
+    private void visor$noItemInGui(AvatarRenderState renderState, ItemStackRenderState itemState,
                                    HumanoidArm arm, PoseStack poseStack, MultiBufferSource buffer,
                                    int packedLight, CallbackInfo ci)
     {
@@ -59,7 +59,7 @@ public class PlayerItemInHandLayerMixin {
                     target = "Lnet/minecraft/client/renderer/item/ItemStackRenderState;isEmpty()Z",
                     ordinal = 1))
     private boolean visor$noHeldToEye(
-            boolean isEmpty, @Local(argsOnly = true) PlayerRenderState renderState)
+            boolean isEmpty, @Local(argsOnly = true) AvatarRenderState renderState)
     {
         return isEmpty
                 || ((EntityRenderStateExtension) renderState).visor$isSelfModelHandsRender();

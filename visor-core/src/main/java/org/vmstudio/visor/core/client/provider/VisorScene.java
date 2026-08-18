@@ -25,6 +25,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import org.jetbrains.annotations.NotNull;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.*;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 
 public class VisorScene implements AtumVRScene {
@@ -52,7 +53,7 @@ public class VisorScene implements AtumVRScene {
         RenderSystem.getModelViewStack().popMatrix();
 
 
-        RenderSystem.depthMask(true);
+        GlStateManager._depthMask(true);
 
 
         profiler.push("prepare VROverlays and cursor");
@@ -145,8 +146,8 @@ public class VisorScene implements AtumVRScene {
 
         MC.mainRenderTarget.bindWrite(true);
         RenderSystem.clearColor(0.0F, 0.0F, 0.0F, 1.0F);
-        RenderSystem.clear(16384);
-        RenderSystem.enableDepthTest();
+        GlStateManager._clear(16384);
+        GlStateManager._enableDepthTest();
 
         ShadersHelper.bridge().beginEye(renderPass.getEyeOrLeft());
 

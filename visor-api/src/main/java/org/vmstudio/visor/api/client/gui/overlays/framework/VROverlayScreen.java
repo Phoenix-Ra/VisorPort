@@ -31,6 +31,10 @@ import org.vmstudio.visor.api.common.player.VRPose;
 
 import java.io.IOException;
 import java.util.*;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 
 /**
  * {@link VROverlay} that is rendered
@@ -146,7 +150,6 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
         this.priority = priority;
         this.pose = new VROverlayPose(this, overlayScale);
 
-        this.minecraft = Minecraft.getInstance();
 
         optionsMap = new LinkedHashMap<>();
         List<OverlayOptionGroup<?>> preOptions = createOptions();
@@ -368,7 +371,6 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
                 getRequestedHeight()
         );
         init(
-                Minecraft.getInstance(),
                 getRequestedWidthScaled(),
                 getRequestedHeightScaled()
         );
@@ -521,7 +523,8 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
         }
         pressedDragMouseButtons[buttonType] = true;
         mouseDragDelay = System.currentTimeMillis();
-        mouseDragged(getMouseX(), getMouseY(), buttonType, 0, 0);
+        mouseDragged(new MouseButtonEvent(getMouseX(), getMouseY(),
+                new MouseButtonInfo(buttonType, 0)), 0, 0);
     }
     public void finishDragMouse(int buttonType){
         if (buttonType < 0 || buttonType >= pressedDragMouseButtons.length) {
@@ -580,9 +583,8 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
             int deltaY = cursorData.getCursorY() - oldMouseY;
             for (int buttonType = 0; buttonType < pressedDragMouseButtons.length; buttonType++) {
                 if (pressedDragMouseButtons[buttonType]) {
-                    mouseDragged(
-                            cursorData.getCursorX(), cursorData.getCursorY(),
-                            buttonType,
+                    mouseDragged(new MouseButtonEvent(cursorData.getCursorX(), cursorData.getCursorY(),
+                                    new MouseButtonInfo(buttonType, 0)),
                             deltaX, deltaY
                     );
                 }
@@ -611,7 +613,10 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
 
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if (buttonType == 0 && isCursorOnResizeHandle(getRawMouseX(), getRawMouseY())) {
             startResizing();
             return true;
@@ -620,10 +625,13 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
             startDragging();
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, buttonType);
+        return super.mouseClicked(event, doubleClick);
     }
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if (buttonType == 0 && isBeingResized()) {
             stopResizing();
             return true;
@@ -632,7 +640,7 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
             stopDragging();
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, buttonType);
+        return super.mouseReleased(event);
     }
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollDelta) {
@@ -650,19 +658,25 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
         super.mouseMoved(mouseX, mouseY);
     }
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY,
-                                int buttonType,
-                                double deltaX, double deltaY) {
-        return super.mouseDragged(mouseX, mouseY, buttonType, deltaX, deltaY);
+    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
+        return super.mouseDragged(event, deltaX, deltaY);
     }
 
     @Override
-    public boolean keyReleased(int i, int j, int k) {
-        return super.keyReleased(i, j, k);
+    public boolean keyReleased(KeyEvent event) {
+        int i = event.key();
+        int j = event.scancode();
+        int k = event.modifiers();
+        return super.keyReleased(event);
     }
     @Override
-    public boolean charTyped(char chr, int modifiers) {
-        return super.charTyped(chr, modifiers);
+    public boolean charTyped(CharacterEvent event) {
+        char chr = (char) event.codepoint();
+        int modifiers = event.modifiers();
+        return super.charTyped(event);
     }
 
     @Override

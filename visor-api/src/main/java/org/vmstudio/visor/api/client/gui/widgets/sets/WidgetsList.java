@@ -18,6 +18,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import net.minecraft.client.input.MouseButtonEvent;
 
 
 public class WidgetsList extends DynamicWidgetSet {
@@ -284,7 +285,9 @@ public class WidgetsList extends DynamicWidgetSet {
         }
 
         @Override
-        public void onClick(double mouseX, double mouseY) {
+        public void onClick(MouseButtonEvent event, boolean doubleClick) {
+            double mouseX = event.x();
+            double mouseY = event.y();
             if (maxScroll <= 0) return;
             int ty = thumbY();
             int th = thumbHeight();
@@ -299,12 +302,16 @@ public class WidgetsList extends DynamicWidgetSet {
         }
 
         @Override
-        public void onRelease(double mouseX, double mouseY) {
+        public void onRelease(MouseButtonEvent event) {
+            double mouseX = event.x();
+            double mouseY = event.y();
             dragging = false;
         }
 
         @Override
-        protected void onDrag(double mouseX, double mouseY, double dragX, double dragY) {
+        protected void onDrag(MouseButtonEvent event, double dragX, double dragY) {
+            double mouseX = event.x();
+            double mouseY = event.y();
             if (!dragging || maxScroll <= 0) return;
             int vh = viewH();
             int th = thumbHeight();

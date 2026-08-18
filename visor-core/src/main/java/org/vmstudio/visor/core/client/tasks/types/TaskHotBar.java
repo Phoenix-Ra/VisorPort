@@ -71,7 +71,7 @@ public class TaskHotBar extends VisorTask {
     @Override
     public void onRun(@Nullable LocalPlayer player) {
         var inventory = player.getInventory();
-        int slotMainNew = inventory.selected;
+        int slotMainNew = inventory.getSelectedSlot();
         if (resetData || slotMainNew != slotMain) {
             slotMain = slotMainNew;
             resetData = false;
@@ -115,7 +115,7 @@ public class TaskHotBar extends VisorTask {
                                 && slotOffhand != slotMainBack) {
                             //switching back
                             slotMain = slotMainBack;
-                            inventory.selected = slotMain;
+                            inventory.setSelectedSlot(slotMain);
                             slotMainBack = NULL;
                         } else if (slotOffhand == slotMain) {
                             //switching if collide
@@ -162,7 +162,7 @@ public class TaskHotBar extends VisorTask {
                 slotMain = hotBarMainHand.getSelectedSlice();
 
                 if (slotMain != NOT_SELECTED) {
-                    inventory.selected = slotMain;
+                    inventory.setSelectedSlot(slotMain);
 
                     //if selected item in offhand
                     if (slotOffhandBack != NULL
@@ -200,10 +200,10 @@ public class TaskHotBar extends VisorTask {
             if(switchableBack){
                 slotMainBack = slotMain;
             }
-            inventory.selected = slotOffhand == 8
+            inventory.setSelectedSlot(slotOffhand == 8
                     ? 0
-                    : slotOffhand + 1;
-            slotMain = inventory.selected;
+                    : slotOffhand + 1);
+            slotMain = inventory.getSelectedSlot();
         }else{
             if(switchableBack) {
                 slotOffhandBack = slotOffhand;

@@ -4,29 +4,31 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.CoreShaders;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11C;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import org.lwjgl.opengl.GL11;
 
 
 public class VRMenuPanorama {
-    private static final ResourceLocation cubeFront = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaFront());
-    private static final ResourceLocation cubeBack = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaBack());
-    private static final ResourceLocation cubeRight = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaRight());
-    private static final ResourceLocation cubeLeft = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaLeft());
-    private static final ResourceLocation cubeUp = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaUp());
-    private static final ResourceLocation cubeBelow = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaBelow());
+    private static final Identifier cubeFront = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaFront());
+    private static final Identifier cubeBack = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaBack());
+    private static final Identifier cubeRight = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaRight());
+    private static final Identifier cubeLeft = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaLeft());
+    private static final Identifier cubeUp = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaUp());
+    private static final Identifier cubeBelow = McVersionUtils.newResourceLoc(VRClientSettings.getPanoramaBelow());
 
     public static void render(PoseStack poseStack) {
         BufferBuilder bufferbuilder;
 
         RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-        RenderSystem.clear(GL11C.GL_COLOR_BUFFER_BIT | GL11C.GL_DEPTH_BUFFER_BIT);
-        RenderSystem.depthMask(true);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._clear(GL11C.GL_COLOR_BUFFER_BIT | GL11C.GL_DEPTH_BUFFER_BIT);
+        GlStateManager._depthMask(true);
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         RenderSystem.setShaderColor(1, 1, 1, 1);
 
         poseStack.pushPose();

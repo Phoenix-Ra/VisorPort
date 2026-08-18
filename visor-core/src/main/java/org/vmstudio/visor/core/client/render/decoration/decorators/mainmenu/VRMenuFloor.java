@@ -3,7 +3,7 @@ package org.vmstudio.visor.core.client.render.decoration.decorators.mainmenu;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.renderer.CoreShaders;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
@@ -14,7 +14,7 @@ import org.vmstudio.visor.core.client.utils.ClientUtils;
  * Renders the play-area floor
  */
 public final class VRMenuFloor {
-    private static final ResourceLocation floorTexture =
+    private static final Identifier floorTexture =
             McVersionUtils.newResourceLoc(VRClientSettings.getMainMenuFloor());
 
     private VRMenuFloor() {

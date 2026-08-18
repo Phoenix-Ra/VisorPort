@@ -1,6 +1,6 @@
 package org.vmstudio.visor.core.client.render.decoration.effects;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
@@ -72,10 +72,10 @@ public class GameEffectShadow extends VRGameEffect {
                 .add(0, 0.005, 0);
 
         // --- GL setup ---
-        RenderSystem.disableCull();
+        GlStateManager._disableCull();
         setupPolygonGlState(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11C.GL_ALWAYS);
+        GlStateManager._enableDepthTest();
+        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
 
         RenderSystem.setShader(CoreShaders.POSITION_COLOR);
         RenderSystem.setShaderTexture(0, TexturesHelper.getWhiteTexture());
@@ -100,9 +100,9 @@ public class GameEffectShadow extends VRGameEffect {
         );
 
         // --- Restore GL & pose ---
-        RenderSystem.depthFunc(GL11C.GL_LEQUAL);
+        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
         setupPolygonGlState(false);
-        RenderSystem.enableCull();
+        GlStateManager._enableCull();
 
         poseStack.popPose();
     }
@@ -117,20 +117,20 @@ public class GameEffectShadow extends VRGameEffect {
             glCacheBlendDstRGB = GlStateManager.BLEND.dstRgb;
             glCacheBlend = GL43C.glIsEnabled(GL11.GL_BLEND);
             glCacheCull = true;
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            RenderSystem.disableCull();
+            GlStateManager._enableBlend();
+            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+            GlStateManager._disableCull();
 
         } else {
-            RenderSystem.blendFuncSeparate(glCacheBlendSrcRGB, glCacheBlendDstRGB, glCacheBlendSrcA,
+            GlStateManager._blendFuncSeparate(glCacheBlendSrcRGB, glCacheBlendDstRGB, glCacheBlendSrcA,
                     glCacheBlendDstA);
 
             if (!glCacheBlend) {
-                RenderSystem.disableBlend();
+                GlStateManager._disableBlend();
             }
 
             if (glCacheCull) {
-                RenderSystem.enableCull();
+                GlStateManager._enableCull();
             }
 
 

@@ -10,7 +10,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import me.phoenixra.atumvr.api.misc.color.AtumColorImmutable;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.renderer.CoreShaders;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,6 +43,8 @@ import org.vmstudio.visor.api.client.settings.enums.MainMenuSceneMode;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import org.lwjgl.opengl.GL11;
 
 //@TODO IT IS PROTOTYPE! REWORK FROM SCRATCH AFTER 0.7.0
 public final class VRMenuSkyCanvas implements VREventListener {
@@ -237,12 +239,12 @@ public final class VRMenuSkyCanvas implements VREventListener {
         Matrix4f poseMatrix = poseStack.last().pose();
 
         // --- GL setup ---
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11C.GL_ALWAYS);
-        RenderSystem.depthMask(false);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
+        GlStateManager._enableDepthTest();
+        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
+        GlStateManager._depthMask(false);
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager._disableCull();
         RenderSystem.setShader(CoreShaders.POSITION_COLOR);
         RenderSystem.setShaderColor(1, 1, 1, 1);
         if (MC.getOverlay() == null) {
@@ -293,9 +295,9 @@ public final class VRMenuSkyCanvas implements VREventListener {
         }
 
         // --- restore GL ---
-        RenderSystem.enableCull();
-        RenderSystem.depthFunc(GL11C.GL_LEQUAL);
-        RenderSystem.depthMask(true);
+        GlStateManager._enableCull();
+        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
+        GlStateManager._depthMask(true);
         RenderSystem.setShaderColor(1, 1, 1, 1);
         poseStack.popPose();
     }

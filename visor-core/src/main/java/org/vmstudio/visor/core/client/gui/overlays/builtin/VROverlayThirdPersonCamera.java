@@ -17,13 +17,14 @@ import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Quaternionfc;
 import org.joml.Vector3f;
+import net.minecraft.client.input.MouseButtonEvent;
 
 public class VROverlayThirdPersonCamera extends VROverlayScreen {
     public static final String ID = "third_person_camera";
@@ -158,7 +159,10 @@ public class VROverlayThirdPersonCamera extends VROverlayScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if(this.changingPosition){
             setChangingPosition(false);
         }

@@ -28,6 +28,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
+import net.minecraft.client.input.MouseButtonEvent;
 
 
 public class VROverlayGameScreen extends VROverlayFrameBuffer {
@@ -289,7 +290,10 @@ public class VROverlayGameScreen extends VROverlayFrameBuffer {
     }
 
     @Override
-    public boolean mouseClicked(double x, double y, int buttonType) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double x = event.x();
+        double y = event.y();
+        int buttonType = event.button();
         if (buttonType == 0 && isCursorOnResizeHandle(getRawMouseX(), getRawMouseY())) {
             startResizing();
             return true;
@@ -303,7 +307,10 @@ public class VROverlayGameScreen extends VROverlayFrameBuffer {
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if (buttonType == 0 && isBeingResized()) {
             stopResizing();
             return true;

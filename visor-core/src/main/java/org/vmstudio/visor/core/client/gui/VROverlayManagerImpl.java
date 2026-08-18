@@ -1,7 +1,7 @@
 package org.vmstudio.visor.core.client.gui;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexSorting;
@@ -38,6 +38,7 @@ import java.util.List;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import com.mojang.blaze3d.ProjectionType;
+import org.lwjgl.opengl.GL11;
 
 @Getter
 public class VROverlayManagerImpl implements VROverlayManager {
@@ -113,11 +114,11 @@ public class VROverlayManagerImpl implements VROverlayManager {
         posestack.pushMatrix();
         posestack.identity();
         posestack.translate(0.0f, 0.0f, -11000.0f);
-        RenderSystem.blendFuncSeparate(
-                GlStateManager.SourceFactor.SRC_ALPHA,
-                GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                GlStateManager.SourceFactor.ONE,
-                GlStateManager.DestFactor.ONE
+        GlStateManager._blendFuncSeparate(
+                GL11.GL_SRC_ALPHA,
+                GL11.GL_ONE_MINUS_SRC_ALPHA,
+                GL11.GL_ONE,
+                GL11.GL_ONE
         );
 
         // --- Render  ---

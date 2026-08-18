@@ -138,3 +138,10 @@ allprojects {
 
 }
 
+
+// PORT: temporary
+subprojects {
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs << "-Xmaxerrs" << "10000"
+    }
+}

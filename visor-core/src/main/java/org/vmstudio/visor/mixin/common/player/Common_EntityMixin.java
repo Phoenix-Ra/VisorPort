@@ -2,7 +2,7 @@ package org.vmstudio.visor.mixin.common.player;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -102,7 +102,7 @@ public abstract class Common_EntityMixin {
 
     @Unique
     private static final AttributeModifier VISOR$WALK_UP_BLOCKS = new AttributeModifier(
-            ResourceLocation.fromNamespaceAndPath("visor", "walk_up_blocks"),
+            Identifier.fromNamespaceAndPath("visor", "walk_up_blocks"),
             0.4D, AttributeModifier.Operation.ADD_VALUE
     );
 

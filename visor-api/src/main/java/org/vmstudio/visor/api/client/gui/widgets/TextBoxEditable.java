@@ -1,6 +1,6 @@
 package org.vmstudio.visor.api.client.gui.widgets;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import org.joml.Matrix3x2fStack;
 import lombok.Getter;
 import lombok.Setter;
 import org.vmstudio.visor.api.VisorAPI;
@@ -8,14 +8,14 @@ import org.vmstudio.visor.api.client.gui.GuiTexture;
 import org.vmstudio.visor.api.client.gui.overlays.framework.VROverlayScreen;
 import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoTextBoxEditable;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -32,6 +32,11 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
+import net.minecraft.client.renderer.RenderPipelines;
 
 public class TextBoxEditable extends AbstractWidget {
     private static final int CURSOR_INSERT_COLOR = -3092272;
@@ -149,10 +154,10 @@ public class TextBoxEditable extends AbstractWidget {
 
         guiGraphics.enableScissor(textX, textY, textMaxX, textMaxY);
 
-        PoseStack poseStack = guiGraphics.pose();
-        poseStack.pushPose();
-        poseStack.translate(textX, textY, 0);
-        poseStack.scale(textScale, textScale, 1.0f);
+        Matrix3x2fStack poseStack = guiGraphics.pose();
+        poseStack.pushMatrix();
+        poseStack.translate(textX, textY);
+        poseStack.scale(textScale, textScale);
 
         int lineHeight = getLineHeight();
         int lineY = -scrollOffset;
@@ -191,7 +196,7 @@ public class TextBoxEditable extends AbstractWidget {
                             guiGraphics.drawString(this.font, "_", cursorX, lineY, this.textColor);
                         } else {
                             guiGraphics.fill(
-                                    RenderType.guiOverlay(),
+                                    RenderPipelines.GUI,
                                     cursorX,
                                     lineY + LINE_PADDING,
                                     cursorX + 1,
@@ -206,7 +211,7 @@ public class TextBoxEditable extends AbstractWidget {
             }
         }
 
-        poseStack.popPose();
+        poseStack.popMatrix();
         guiGraphics.disableScissor();
 
         renderScrollBar(guiGraphics);
@@ -243,7 +248,7 @@ public class TextBoxEditable extends AbstractWidget {
         if (scrollBarTex != null) {
             scrollBarTex.blit(guiGraphics, trackX, thumbY, scrollBarWidth, thumbHeight);
         } else {
-            guiGraphics.fill(RenderType.guiOverlay(), trackX, thumbY, trackX + scrollBarWidth, thumbY + thumbHeight, 0x80000000);
+            guiGraphics.fill(RenderPipelines.GUI, trackX, thumbY, trackX + scrollBarWidth, thumbY + thumbHeight, 0x80000000);
         }
     }
 
@@ -270,7 +275,7 @@ public class TextBoxEditable extends AbstractWidget {
 
         var halfPadding = LINE_PADDING / 2;
         guiGraphics.fill(
-                RenderType.guiTextHighlight(),
+                RenderPipelines.GUI_TEXT_HIGHLIGHT,
                 startX,
                 lineY - halfPadding,
                 endX,
@@ -453,7 +458,7 @@ public class TextBoxEditable extends AbstractWidget {
     private void deleteText(int count) {
         if (readOnly) return;
 
-        if (Screen.hasControlDown()) {
+        if (McVersionUtilsClient.hasControlDown()) {
             this.deleteWords(count);
         } else {
             this.deleteChars(count);
@@ -653,24 +658,27 @@ public class TextBoxEditable extends AbstractWidget {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
+        int scanCode = event.scancode();
+        int modifiers = event.modifiers();
         if (!this.canConsumeInput()) return false;
 
-        this.shiftPressed = Screen.hasShiftDown();
+        this.shiftPressed = McVersionUtilsClient.hasShiftDown();
 
-        if (Screen.isCopy(keyCode)) {
+        if (event.isCopy()) {
             Minecraft.getInstance().keyboardHandler.setClipboard(this.getHighlighted());
             return true;
-        } else if (Screen.isSelectAll(keyCode)) {
+        } else if (event.isSelectAll()) {
             this.setSelectionAnchor(0);
             this.moveCursorToEnd();
             return true;
-        } else if (Screen.isPaste(keyCode)) {
+        } else if (event.isPaste()) {
             if (!readOnly) {
                 this.insertText(Minecraft.getInstance().keyboardHandler.getClipboard());
             }
             return true;
-        } else if (Screen.isCut(keyCode)) {
+        } else if (event.isCut()) {
             Minecraft.getInstance().keyboardHandler.setClipboard(this.getHighlighted());
             if (!readOnly) {
                 this.insertText("");
@@ -721,7 +729,7 @@ public class TextBoxEditable extends AbstractWidget {
                 if (!readOnly) {
                     this.shiftPressed = false;
                     this.deleteText(-1);
-                    this.shiftPressed = Screen.hasShiftDown();
+                    this.shiftPressed = McVersionUtilsClient.hasShiftDown();
                 }
                 return true;
             }
@@ -729,12 +737,12 @@ public class TextBoxEditable extends AbstractWidget {
                 if (!readOnly) {
                     this.shiftPressed = false;
                     this.deleteText(1);
-                    this.shiftPressed = Screen.hasShiftDown();
+                    this.shiftPressed = McVersionUtilsClient.hasShiftDown();
                 }
                 return true;
             }
             case GLFW.GLFW_KEY_RIGHT -> {
-                if (Screen.hasControlDown()) {
+                if (McVersionUtilsClient.hasControlDown()) {
                     this.moveCursorTo(this.getWordPosition(1));
                 } else {
                     this.moveCursor(1);
@@ -742,7 +750,7 @@ public class TextBoxEditable extends AbstractWidget {
                 return true;
             }
             case GLFW.GLFW_KEY_LEFT -> {
-                if (Screen.hasControlDown()) {
+                if (McVersionUtilsClient.hasControlDown()) {
                     this.moveCursorTo(this.getWordPosition(-1));
                 } else {
                     this.moveCursor(-1);
@@ -758,7 +766,7 @@ public class TextBoxEditable extends AbstractWidget {
                 return true;
             }
             case GLFW.GLFW_KEY_HOME -> {
-                if (Screen.hasControlDown()) {
+                if (McVersionUtilsClient.hasControlDown()) {
                     this.moveCursorToStart();
                 } else {
                     calculateLines();
@@ -769,7 +777,7 @@ public class TextBoxEditable extends AbstractWidget {
                 return true;
             }
             case GLFW.GLFW_KEY_END -> {
-                if (Screen.hasControlDown()) {
+                if (McVersionUtilsClient.hasControlDown()) {
                     this.moveCursorToEnd();
                 } else {
                     calculateLines();
@@ -800,7 +808,9 @@ public class TextBoxEditable extends AbstractWidget {
     }
 
     @Override
-    public boolean charTyped(char codePoint, int modifiers) {
+    public boolean charTyped(CharacterEvent event) {
+        char codePoint = (char) event.codepoint();
+        int modifiers = event.modifiers();
         if (!this.canConsumeInput()) return false;
         if (McVersionUtils.isAllowedChatCharacter(codePoint)) {
             if (!readOnly) {
@@ -812,12 +822,15 @@ public class TextBoxEditable extends AbstractWidget {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!this.active || !this.visible || !this.isValidClickButton(button)) return false;
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
+        if (!this.active || !this.visible || !this.isValidClickButton(event.buttonInfo())) return false;
 
         if (isScrollbarHovered(mouseX, mouseY)) {
             // Capture drag by letting superclass register the click
-            boolean consumed = super.mouseClicked(mouseX, mouseY, button);
+            boolean consumed = super.mouseClicked(event, doubleClick);
             this.scrolling = true;
             this.followCaret = false; // manual scroll
             this.lastScrollingCall = System.currentTimeMillis();
@@ -849,16 +862,18 @@ public class TextBoxEditable extends AbstractWidget {
         }
 
         // Focus the widget so wheel works; avoid selection change in read-only
-        this.shiftPressed = readOnly ? false : Screen.hasShiftDown();
+        this.shiftPressed = readOnly ? false : McVersionUtilsClient.hasShiftDown();
         if (!readOnly && !this.shiftPressed) {
             this.setSelectionAnchor(this.cursorPos);
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         // Only handle caret positioning when not read-only
         if (readOnly) {
             return;
@@ -913,7 +928,10 @@ public class TextBoxEditable extends AbstractWidget {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         // Any mouse drag is a manual scroll/selection gesture: do not auto-follow caret
         followCaret = false;
 
@@ -990,12 +1008,15 @@ public class TextBoxEditable extends AbstractWidget {
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (button == 0) {
             this.scrolling = false;
             this.thumbGrabOffset = -1;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
     private int findClosestCharPosition(String text, double relativeX) {

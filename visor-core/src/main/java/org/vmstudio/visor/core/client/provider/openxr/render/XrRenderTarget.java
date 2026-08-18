@@ -1,50 +1,27 @@
 package org.vmstudio.visor.core.client.provider.openxr.render;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.Minecraft;
-import org.lwjgl.opengl.GL30;
+import org.vmstudio.visor.extensions.client.render.RenderTargetExtension;
 
+/**
+ * Render target backed by an OpenXR swapchain image.
+ * <p>
+ * Before 1.21.9 this hand-rolled its own GL framebuffer and attached the runtime's texture to
+ * it, because {@code RenderTarget} exposed {@code frameBufferId}/{@code colorTextureId}. Those
+ * are gone, and the framebuffer is now managed inside blaze3d, so instead the swapchain texture
+ * is handed to {@link RenderTargetExtension#visor$setTextureId(int)} and Visor's
+ * {@code RenderTargetMixin} substitutes it when the colour attachment gets allocated.
+ */
 public class XrRenderTarget extends RenderTarget {
 
     public XrRenderTarget(int width, int height, int colorId, int index) {
-        super(false);
-        RenderSystem.assertOnRenderThreadOrInit();
+        super("Visor XR Eye " + index, false);
+        RenderSystem.assertOnRenderThread();
 
-        this.colorTextureId = colorId;
+        // must be set before resize(), which is what triggers createBuffers()
+        ((RenderTargetExtension) this).visor$setTextureId(colorId);
 
         this.resize(width, height);
-
-    }
-
-    @Override
-    public void createBuffers(int width, int height) {
-        RenderSystem.assertOnRenderThreadOrInit();
-        int maxSize = RenderSystem.maxSupportedTextureSize();
-        if (width > 0 && width <= maxSize && height > 0 && height <= maxSize) {
-            this.viewWidth = width;
-            this.viewHeight = height;
-            this.width = width;
-            this.height = height;
-            this.frameBufferId = GlStateManager.glGenFramebuffers();
-
-
-            GlStateManager._glBindFramebuffer(36160, this.frameBufferId);
-            //Binding our eye texture here
-            GL30.glFramebufferTexture2D(
-                    GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0,
-                    GL30.GL_TEXTURE_2D,
-                    colorTextureId,
-                    0
-            );
-
-
-            this.checkStatus();
-            this.clear();
-            this.unbindRead();
-        } else {
-            throw new IllegalArgumentException("Window " + width + "x" + height + " size out of bounds (max. size: " + maxSize + ")");
-        }
     }
 }

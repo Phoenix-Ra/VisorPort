@@ -10,7 +10,7 @@ import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoButtonImaged;
 import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoSelectionList;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -30,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import net.minecraft.client.input.MouseButtonEvent;
 
 
 public class TexturedSelectionList extends McSelectionList<TexturedSelectionList.TexturedRow> {
@@ -203,27 +204,26 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
                     scrollBarWidth, thumbH
             );
         }
-        updateTooltip();
-        RenderSystem.disableBlend();
+        updateTooltip(guiGraphics, mouseX, mouseY);
     }
 
     @Override
     protected void renderRows(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         int i = this.getRowLeft();
         int j = this.getRowWidth();
-        int k = this.itemHeight - paddingTop;
+        int k = this.defaultEntryHeight - paddingTop;
         int l = this.getItemCount();
 
         for (int m = 0; m < l; ++m) {
             int n = this.getRowTop(m);
             int o = this.getRowBottom(m);
             if (o >= this.listTop() && n <= this.listBottom()) {
-                this.renderItem(guiGraphics, mouseX, mouseY, partialTick, m, i, n, j, k);
+                this.renderItem(guiGraphics, mouseX, mouseY, partialTick, this.children().get(m));
             }
         }
     }
 
-    private void updateTooltip() {
+    private void updateTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         Function<String, Component> factory = widgetInfo.getTooltip();
         if (factory == null) return;
 
@@ -251,10 +251,13 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
 
         this.tooltip = Tooltip.create(tipText);
 
-        Screen screen = getAttachedTo();
-        if (screen != null) {
-            screen.setTooltipForNextRenderPass(this.tooltip, DefaultTooltipPositioner.INSTANCE, false);
-        }
+        guiGraphics.setTooltipForNextFrame(
+                Minecraft.getInstance().font,
+                this.tooltip.toCharSequence(Minecraft.getInstance()),
+                DefaultTooltipPositioner.INSTANCE,
+                mouseX, mouseY,
+                false
+        );
     }
 
     //Use Only during rendering of this widget!!!!
@@ -327,7 +330,7 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
         for (int i = 0; i < this.getItemCount(); i++) {
             TexturedRow row = this.children().get(i);
             if (row.contains(entry)) {
-                double desired = (double) i * this.itemHeight;
+                double desired = (double) i * this.defaultEntryHeight;
                 this.setScrollAmount(desired);
                 return;
             }
@@ -396,19 +399,25 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (isScrolling()) {
             lastDragCall = System.currentTimeMillis();
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDragged(event, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (button == 0) {
             setScrolling(false);
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
     //Layout overrides
@@ -430,7 +439,7 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
 
     @Override
     protected int rowTop(int index) {
-        return this.listTop() + paddingTop - (int) this.scrollOffset() + index * this.itemHeight + this.headerHeight;
+        return this.listTop() + paddingTop - (int) this.scrollOffset() + index * this.defaultEntryHeight;
     }
 
     @Override
@@ -467,14 +476,14 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
             return false;
         }
 
-        @Override
-        public void renderBack(@NotNull GuiGraphics guiGraphics,
-                               int index,
-                               int top, int left,
-                               int rowWidth, int rowHeight,
-                               int mouseX, int mouseY,
-                               boolean hovering,
-                               float fractionalTick) {
+        public void renderRowBackground(@NotNull GuiGraphics guiGraphics,
+                           int mouseX, int mouseY,
+                           boolean hovering,
+                           float fractionalTick) {
+            int top = this.getContentY();
+            int left = this.getContentX();
+            int rowWidth = this.getContentWidth();
+            int rowHeight = this.getContentHeight();
 
             int colWidth = getColumnWidth();
             WidgetInfoButtonImaged entryInfo = widgetInfo.getEntryButton();
@@ -511,13 +520,16 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
         }
 
         @Override
-        public void render(@NotNull GuiGraphics guiGraphics,
-                           int index,
-                           int top, int left,
-                           int rowWidth, int rowHeight,
+        public void renderContent(@NotNull GuiGraphics guiGraphics,
                            int mouseX, int mouseY,
                            boolean hovering,
                            float fractionalTick) {
+            int top = this.getContentY();
+            int left = this.getContentX();
+            int rowWidth = this.getContentWidth();
+            int rowHeight = this.getContentHeight();
+
+            renderRowBackground(guiGraphics, mouseX, mouseY, hovering, fractionalTick);
 
             Font font = TexturedSelectionList.this.minecraft.font;
             int colWidth = getColumnWidth();
@@ -546,7 +558,10 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+            double mouseX = event.x();
+            double mouseY = event.y();
+            int button = event.button();
             if (button == 0) {
                 int col = getColumnAtX(mouseX);
                 TexturedEntry entry = getEntry(col);

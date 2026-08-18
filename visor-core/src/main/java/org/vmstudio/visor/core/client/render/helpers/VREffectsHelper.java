@@ -23,6 +23,7 @@ import org.vmstudio.visor.core.client.render.VRShaders;
 import org.vmstudio.visor.core.client.render.shaders.VRShaderInBlockVignette;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 import com.mojang.blaze3d.ProjectionType;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 public class VREffectsHelper {
     private VREffectsHelper() {
@@ -47,10 +48,10 @@ public class VREffectsHelper {
         // --- Setup ---
         RenderSystem.setShader(CoreShaders.POSITION);
         RenderSystem.setShaderColor(0.0F, 0.0F, 0.0F, 1.0f);
-        RenderSystem.depthFunc(GL11C.GL_ALWAYS);
-        RenderSystem.depthMask(false);
-        RenderSystem.enableBlend();
-        RenderSystem.disableCull();
+        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
+        GlStateManager._depthMask(false);
+        GlStateManager._enableBlend();
+        GlStateManager._disableCull();
 
         // --- Render ---
         BufferBuilder bufferbuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
@@ -88,11 +89,11 @@ public class VREffectsHelper {
 
         // --- Setup ---
         RenderSystem.setShader(shader);
-        RenderSystem.depthFunc(GL11C.GL_ALWAYS);
-        RenderSystem.depthMask(false);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
+        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
+        GlStateManager._depthMask(false);
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager._disableCull();
 
         // --- Render ---
         BufferBuilder bufferbuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
@@ -174,33 +175,33 @@ public class VREffectsHelper {
             // clear stencil to 0xFF then write zero inside mask
             RenderSystem.clearStencil(0xFF);
             RenderSystem.clearDepth(0);
-            RenderSystem.stencilFunc(GL11.GL_ALWAYS, 0, 0xFF);
-            RenderSystem.colorMask(false, false, false, true);
+            GL11.glStencilFunc(GL11.GL_ALWAYS, 0, 0xFF);
+            GlStateManager._colorMask(false, false, false, true);
         } else {
             // clear stencil to 0 then write one inside mask
             RenderSystem.clearStencil(0);
             RenderSystem.clearDepth(1);
-            RenderSystem.stencilFunc(GL11.GL_ALWAYS, 0xFF, 0xFF);
-            RenderSystem.colorMask(true, true, true, true);
+            GL11.glStencilFunc(GL11.GL_ALWAYS, 0xFF, 0xFF);
+            GlStateManager._colorMask(true, true, true, true);
         }
     }
 
     private static void clearStencilAndDepth() {
-        RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
+        GlStateManager._clear(GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
     }
 
     private static void setupMaskDrawState() {
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_ALWAYS);
-        RenderSystem.disableCull();
+        GlStateManager._depthMask(true);
+        GlStateManager._enableDepthTest();
+        GlStateManager._depthFunc(GL11.GL_ALWAYS);
+        GlStateManager._disableCull();
         RenderSystem.setShaderColor(0f, 0f, 0f, 1f);
     }
 
     private static void applyOrthoProjection(RenderTarget rt, boolean inverse) {
 
         Matrix4f ortho = new Matrix4f()
-                .setOrtho(0, rt.viewWidth, 0, rt.viewHeight, 0, 20f);
+                .setOrtho(0, rt.width, 0, rt.height, 0, 20f);
         RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC);
 
         if (inverse) {
@@ -240,7 +241,7 @@ public class VREffectsHelper {
 
     private static void restorePostStencilState() {
         // stencil: only pass where stencil != 255
-        RenderSystem.stencilFunc(GL11.GL_NOTEQUAL, 255, 0xFF);
+        GL11.glStencilFunc(GL11.GL_NOTEQUAL, 255, 0xFF);
         RenderSystem.stencilOp(GL11.GL_KEEP, GL11.GL_KEEP, GL11.GL_KEEP);
         RenderSystem.stencilMask(0);
         RenderStateHelper.restoreAfterExternalRender(true);

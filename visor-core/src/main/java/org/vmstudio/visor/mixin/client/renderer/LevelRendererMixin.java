@@ -199,12 +199,12 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
         VRRenderPass renderPass = VRRenderState.getRenderPass();
         RenderTarget outline = this.visor$vrOutlineTargets.get(renderPass);
         if (outline == null) {
-            outline = new TextureTarget(passTarget.viewWidth, passTarget.viewHeight, true);
+            outline = new TextureTarget(passTarget.width, passTarget.height, true);
             outline.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
             this.visor$vrOutlineTargets.put(renderPass, outline);
-        } else if (outline.viewWidth != passTarget.viewWidth
-                || outline.viewHeight != passTarget.viewHeight) {
-            outline.resize(passTarget.viewWidth, passTarget.viewHeight);
+        } else if (outline.width != passTarget.width
+                || outline.height != passTarget.height) {
+            outline.resize(passTarget.width, passTarget.height);
         }
         this.entityOutlineTarget = outline;
     }

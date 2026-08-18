@@ -3,11 +3,11 @@ package org.vmstudio.visor.mixin.client.renderer.entity.player.layers;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.CapeLayer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
-import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.util.Mth;
 import org.joml.Matrix3f;
 import org.joml.Quaternionf;
@@ -21,7 +21,7 @@ import org.vmstudio.visor.extensions.client.entity.EntityRenderStateExtension;
 
 
 @Mixin(CapeLayer.class)
-public abstract class CapeLayerMixin extends RenderLayer<PlayerRenderState, PlayerModel> {
+public abstract class CapeLayerMixin extends RenderLayer<AvatarRenderState, PlayerModel> {
 
     @Unique
     private final Vector3f visor$tempV = new Vector3f();
@@ -29,15 +29,15 @@ public abstract class CapeLayerMixin extends RenderLayer<PlayerRenderState, Play
     @Unique
     private final Matrix3f visor$bodyRot = new Matrix3f();
 
-    public CapeLayerMixin(RenderLayerParent<PlayerRenderState, PlayerModel> renderer) {
+    public CapeLayerMixin(RenderLayerParent<AvatarRenderState, PlayerModel> renderer) {
         super(renderer);
     }
 
     // DEBUG CAPE
     /*
-    @WrapOperation(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/PlayerRenderState;FF)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/resources/PlayerSkin;capeTexture()Lnet/minecraft/resources/ResourceLocation;"))
-    private ResourceLocation visor$whiteCape(PlayerSkin skin, Operation<ResourceLocation> original) {
-        ResourceLocation capeTexture = original.call(skin);
+    @WrapOperation(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/resources/PlayerSkin;capeTexture()Lnet/minecraft/resources/Identifier;"))
+    private Identifier visor$whiteCape(PlayerSkin skin, Operation<Identifier> original) {
+        Identifier capeTexture = original.call(skin);
         if (capeTexture == null) {
             capeTexture = RenderHelper.WHITE_TEXTURE;
         }
@@ -47,9 +47,9 @@ public abstract class CapeLayerMixin extends RenderLayer<PlayerRenderState, Play
 
     // ordinal 1 is the HUMANOID check that applies the vanilla with-armor cape offset; returning
     // false there skips it, and the VR offset/rotation is applied instead.
-    @ModifyExpressionValue(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/PlayerRenderState;FF)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/CapeLayer;hasLayer(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/client/resources/model/EquipmentClientInfo$LayerType;)Z", ordinal = 1))
+    @ModifyExpressionValue(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/CapeLayer;hasLayer(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/client/resources/model/EquipmentClientInfo$LayerType;)Z", ordinal = 1))
     private boolean visor$modifyTransform(
-        boolean hasArmor, @Local(argsOnly = true) PlayerRenderState renderState,
+        boolean hasArmor, @Local(argsOnly = true) AvatarRenderState renderState,
         @Local(argsOnly = true) PoseStack poseStack)
     {
         // entity-derived VR data is resolved during extractRenderState and parked on the state
@@ -95,7 +95,7 @@ public abstract class CapeLayerMixin extends RenderLayer<PlayerRenderState, Play
 
         // limit the up rotation when walking forward, depending on body rotation.
         // 1.21.4 dropped the vanilla "+25 while crouching" flap term (see
-        // PlayerRenderer#extractRenderState), so there is nothing left to cancel here.
+        // AvatarRenderer#extractRenderState), so there is nothing left to cancel here.
         float lean = xRotation / Mth.HALF_PI;
         if (lean >= 0) {
             lean = renderState.capeLean * (1F - Mth.clamp(lean, 0F, 1F));

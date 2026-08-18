@@ -23,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import net.minecraft.client.input.MouseButtonEvent;
 
 public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
 
@@ -107,21 +108,20 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
             );
         }
 
-        RenderSystem.disableBlend();
     }
 
     @Override
     protected void renderRows(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         int i = this.getRowLeft();
         int j = this.getRowWidth();
-        int k = this.itemHeight - paddingTop;
+        int k = this.defaultEntryHeight - paddingTop;
         int l = this.getItemCount();
 
         for(int m = 0; m < l; ++m) {
             int n = this.getRowTop(m);
             int o = this.getRowBottom(m);
             if (o >= this.listTop() && n <= this.listBottom()) {
-                this.renderItem(guiGraphics, mouseX, mouseY, partialTick, m, i, n, j, k);
+                this.renderItem(guiGraphics, mouseX, mouseY, partialTick, this.children().get(m));
             }
         }
 
@@ -235,7 +235,7 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
         if (idx < 0) {
             return;
         }
-        double desired = (double)idx * this.itemHeight;
+        double desired = (double)idx * this.defaultEntryHeight;
         this.setScrollAmount(desired);
     }
 
@@ -245,8 +245,8 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
         int j = this.listLeft() + this.width / 2;
         int k = j - i;
         int l = j + i;
-        int m = Mth.floor(mouseY - (double)this.listTop()) - this.headerHeight + (int)this.scrollOffset() - 4;
-        int n = m / this.itemHeight;
+        int m = Mth.floor(mouseY - (double)this.listTop()) + (int)this.scrollOffset() - 4;
+        int n = m / this.defaultEntryHeight;
         var entry = mouseX < (double)this.scrollbarX()
                 && mouseX >= (double)k
                 && mouseX <= (double)l && n >= 0
@@ -271,19 +271,25 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if(isScrolling()) {
             lastDragCall = System.currentTimeMillis();
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDragged(event, dragX, dragY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (button == 0) {
             setScrolling(false);
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
 
 
@@ -307,7 +313,7 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
 
     @Override
     protected int rowTop(int index) {
-        return this.listTop() + paddingTop - (int)this.scrollOffset() + index * this.itemHeight + this.headerHeight;
+        return this.listTop() + paddingTop - (int)this.scrollOffset() + index * this.defaultEntryHeight;
     }
 
     @Override
@@ -353,14 +359,14 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
 
 
         @Override
-        public void render(@NotNull GuiGraphics guiGraphics,
-                           int index,
-                           int top, int left,
-                           int rowWidth, int rowHeight,
+        public void renderContent(@NotNull GuiGraphics guiGraphics,
                            int mouseX, int mouseY,
                            boolean hovering,
-                           float fractionalTick
-        ) {
+                           float fractionalTick) {
+            int top = this.getContentY();
+            int left = this.getContentX();
+            int rowWidth = this.getContentWidth();
+            int rowHeight = this.getContentHeight();
 
             if(selected){
                 checkboxTex = widgetInfo.getTextureCheckboxHoveredSelected();
@@ -442,7 +448,7 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
             int rowTop = CheckboxList.this.getRowTop(idx);
             int rowWidth = CheckboxList.this.getRowWidth();
 
-            int cbSize = itemHeight - paddingTop;
+            int cbSize = defaultEntryHeight - paddingTop;
 
             int iconX;
             if (widgetInfo.isCheckboxLeftSided()) {
@@ -458,7 +464,10 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
 
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+            double mouseX = event.x();
+            double mouseY = event.y();
+            int button = event.button();
             if(button == 0){
                 CheckboxList.this.playSelectedSound(Minecraft.getInstance().getSoundManager());
                 return true;

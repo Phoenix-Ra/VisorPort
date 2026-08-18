@@ -6,22 +6,22 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 
 
-public record VisorRawPayload(ResourceLocation channelId, byte[] data) implements CustomPacketPayload {
+public record VisorRawPayload(Identifier channelId, byte[] data) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<VisorRawPayload> TYPE =
-            new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("visor", "tunnel"));
+            new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("visor", "tunnel"));
 
     public static final StreamCodec<ByteBuf, VisorRawPayload> STREAM_CODEC = StreamCodec.composite(
-            ResourceLocation.STREAM_CODEC, VisorRawPayload::channelId,
+            Identifier.STREAM_CODEC, VisorRawPayload::channelId,
             ByteBufCodecs.BYTE_ARRAY, VisorRawPayload::data,
             VisorRawPayload::new
     );
 
-    public static @NotNull VisorRawPayload of(@NotNull ResourceLocation channelId,
+    public static @NotNull VisorRawPayload of(@NotNull Identifier channelId,
                                               @NotNull FriendlyByteBuf buffer) {
         byte[] bytes = new byte[buffer.readableBytes()];
         buffer.readBytes(bytes);

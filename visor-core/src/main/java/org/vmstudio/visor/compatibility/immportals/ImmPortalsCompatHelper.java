@@ -28,6 +28,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 //IMMERSIVE PORTALS COMPATIBILITY CLASS
 public final class ImmPortalsCompatHelper {
@@ -193,9 +194,9 @@ public final class ImmPortalsCompatHelper {
                 return false;
             }
 
-            RenderSystem.depthMask(false);
+            GlStateManager._depthMask(false);
             renderScreenTriangleMethod.invoke(null, fogColorSupplier.get());
-            RenderSystem.depthMask(true);
+            GlStateManager._depthMask(true);
             return true;
         } catch (Throwable throwable) {
             logReflectionFailure("Failed to fix IMMPortals mirror fog", throwable);

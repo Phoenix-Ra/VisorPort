@@ -13,6 +13,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 
 public class InputHelper {
     private static final Set<Integer> pressedKeys = new HashSet<>();
@@ -21,10 +24,8 @@ public class InputHelper {
 
 
     public static void pressMouse(@NotNull MouseButtonType button, int modifiers) {
-        Minecraft.getInstance().mouseHandler.onPress(
-                Minecraft.getInstance().getWindow().getWindow(),
-                button.getId(), 1, modifiers
-        );
+        Minecraft.getInstance().mouseHandler.onButton(Minecraft.getInstance().getWindow().handle(),
+                new MouseButtonInfo(button.getId(), modifiers), GLFW.GLFW_PRESS);
 
     }
     public static void pressMouse(@NotNull MouseButtonType button) {
@@ -33,10 +34,8 @@ public class InputHelper {
 
 
     public static void releaseMouse(@NotNull MouseButtonType button, int modifiers) {
-        Minecraft.getInstance().mouseHandler.onPress(
-                Minecraft.getInstance().getWindow().getWindow(),
-                button.getId(), 0, modifiers
-        );
+        Minecraft.getInstance().mouseHandler.onButton(Minecraft.getInstance().getWindow().handle(),
+                new MouseButtonInfo(button.getId(), modifiers), GLFW.GLFW_RELEASE);
     }
     public static void releaseMouse(@NotNull MouseButtonType button) {
         releaseMouse(button, 0);
@@ -60,7 +59,7 @@ public class InputHelper {
 
     public static void setMousePos(double x, double y) {
         Minecraft.getInstance().mouseHandler.onMove(
-                Minecraft.getInstance().getWindow().getWindow(),
+                Minecraft.getInstance().getWindow().handle(),
                 x, y
         );
     }
@@ -68,7 +67,7 @@ public class InputHelper {
 
     public static void scrollMouse(double xOffset, double yOffset) {
         Minecraft.getInstance().mouseHandler.onScroll(
-                Minecraft.getInstance().getWindow().getWindow(),
+                Minecraft.getInstance().getWindow().handle(),
                 xOffset, yOffset
         );
     }
@@ -76,10 +75,8 @@ public class InputHelper {
 
     public static void pressKey(int key, int modifiers) {
         pressedKeys.add(key);
-        Minecraft.getInstance().keyboardHandler.keyPress(
-                Minecraft.getInstance().getWindow().getWindow(),
-                key, 0, 1, modifiers
-        );
+        Minecraft.getInstance().keyboardHandler.keyPress(Minecraft.getInstance().getWindow().handle(),
+                GLFW.GLFW_PRESS, new KeyEvent(key, 0, modifiers));
     }
     public static void pressKey(int key) {
         pressKey(key, 0);
@@ -88,10 +85,8 @@ public class InputHelper {
 
     public static void releaseKey(int key, int modifiers) {
         pressedKeys.remove(key);
-        Minecraft.getInstance().keyboardHandler.keyPress(
-                Minecraft.getInstance().getWindow().getWindow(),
-                key, 0, 0, modifiers
-        );
+        Minecraft.getInstance().keyboardHandler.keyPress(Minecraft.getInstance().getWindow().handle(),
+                GLFW.GLFW_RELEASE, new KeyEvent(key, 0, modifiers));
     }
     public static void releaseKey(int key) {
         releaseKey(key, 0);
@@ -99,7 +94,7 @@ public class InputHelper {
 
 
     public static boolean isKeyDown(int key) {
-        return pressedKeys.contains(key) || GLFW.glfwGetKey(Minecraft.getInstance().getWindow().getWindow(), key) == 1 ;
+        return pressedKeys.contains(key) || GLFW.glfwGetKey(Minecraft.getInstance().getWindow().handle(), key) == 1 ;
     }
     public static boolean isKeyDown(InputConstants.Key key) {
         return key.getType() == InputConstants.Type.KEYSYM
@@ -166,15 +161,13 @@ public class InputHelper {
         Screen screen = keyboardAccessor.getAttachedTo();
         if(screen != null){
             //overlays
-            screen.charTyped(character,modifiers);
+            screen.charTyped(new CharacterEvent(character, modifiers));
             return true;
         }
         Minecraft mc = Minecraft.getInstance();
         if(mc.screen != null) {
-            Minecraft.getInstance().keyboardHandler.charTyped(
-                    Minecraft.getInstance().getWindow().getWindow(),
-                    character, modifiers
-            );
+            Minecraft.getInstance().keyboardHandler.charTyped(Minecraft.getInstance().getWindow().handle(),
+                    new CharacterEvent(character, modifiers));
 
         }
         return false;

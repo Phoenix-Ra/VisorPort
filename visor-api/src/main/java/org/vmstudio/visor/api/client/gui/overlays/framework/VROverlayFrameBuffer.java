@@ -26,6 +26,9 @@ import org.vmstudio.visor.api.common.player.VRPose;
 
 import java.io.IOException;
 import java.util.*;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 
 /**
  * {@link VROverlay} that renders
@@ -422,12 +425,18 @@ public abstract class VROverlayFrameBuffer implements VROverlay {
 
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         return false;
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         return false;
     }
 
@@ -437,7 +446,10 @@ public abstract class VROverlayFrameBuffer implements VROverlay {
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int buttonType, double deltaX, double deltaY) {
+    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         return false;
     }
 
@@ -447,16 +459,24 @@ public abstract class VROverlayFrameBuffer implements VROverlay {
     }
 
     @Override
-    public boolean keyReleased(int keyCode, int keyScan, int modifiers) {
+    public boolean keyReleased(KeyEvent event) {
+        int keyCode = event.key();
+        int keyScan = event.scancode();
+        int modifiers = event.modifiers();
         return false;
     }
 
     @Override
-    public boolean charTyped(char chr, int modifiers) {
+    public boolean charTyped(CharacterEvent event) {
+        char chr = (char) event.codepoint();
+        int modifiers = event.modifiers();
         return false;
     }
     @Override
-    public boolean keyPressed(int keyCode, int keyScan, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
+        int keyScan = event.scancode();
+        int modifiers = event.modifiers();
         return false;
     }
 

@@ -3,7 +3,7 @@ package org.vmstudio.visor.loader.fabric;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.netty.buffer.Unpooled;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.vmstudio.visor.api.ModLoader;
 import org.vmstudio.visor.api.VisorAPI;
 import org.vmstudio.visor.api.client.render.RenderPipelineCallback;
@@ -47,7 +47,7 @@ public class FabricModLoader implements ModLoader {
     private final Map<RenderPipelineStage, List<RenderPipelineCallback>> pipelineCallbacks
             = new EnumMap<>(RenderPipelineStage.class);
 
-    private final Map<ResourceLocation, VisorChannel> networkChannels = new HashMap<>();
+    private final Map<Identifier, VisorChannel> networkChannels = new HashMap<>();
     private boolean serverReceiverRegistered = false;
     private boolean clientReceiverRegistered = false;
 
@@ -255,7 +255,7 @@ public class FabricModLoader implements ModLoader {
     }
 
     @Override
-    public @NotNull Packet<?> createPacketToClient(@NotNull ResourceLocation channelId,
+    public @NotNull Packet<?> createPacketToClient(@NotNull Identifier channelId,
                                                    @NotNull VisorPayloadToClient payload) {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         payload.write(buffer);
@@ -263,7 +263,7 @@ public class FabricModLoader implements ModLoader {
     }
 
     @Override
-    public @NotNull Packet<?> createPacketToServer(@NotNull ResourceLocation channelId,
+    public @NotNull Packet<?> createPacketToServer(@NotNull Identifier channelId,
                                                    @NotNull VisorPayloadToServer payload) {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         payload.write(buffer);

@@ -26,13 +26,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
+import net.minecraft.client.input.MouseButtonEvent;
 
 public class VROverlaySettings extends VROverlayScreen
         implements VREventListener {
@@ -42,17 +43,17 @@ public class VROverlaySettings extends VROverlayScreen
 
     public static final Component TEXT_FIND = Component.translatable("visor.overlay.options.overlays.find");
 
-    private static final ResourceLocation BACKGROUND_OVERLAYS = McVersionUtils.newResourceLoc(
+    private static final Identifier BACKGROUND_OVERLAYS = McVersionUtils.newResourceLoc(
             "visor:textures/gui/overlays/settings/bg_main_1.png"
     );
-    private static final ResourceLocation BACKGROUND_CREATE = McVersionUtils.newResourceLoc(
+    private static final Identifier BACKGROUND_CREATE = McVersionUtils.newResourceLoc(
             "visor:textures/gui/overlays/settings/bg_main_2.png"
     );
 
-    private static final ResourceLocation BACKGROUND_EXTRA = McVersionUtils.newResourceLoc(
+    private static final Identifier BACKGROUND_EXTRA = McVersionUtils.newResourceLoc(
             "visor:textures/gui/overlays/settings/bg_main_extra_1.png"
     );
-    private static final ResourceLocation BACKGROUND_EXTRA_EXTENDED = McVersionUtils.newResourceLoc(
+    private static final Identifier BACKGROUND_EXTRA_EXTENDED = McVersionUtils.newResourceLoc(
             "visor:textures/gui/overlays/settings/bg_main_extra_2.png"
     );
 
@@ -339,7 +340,10 @@ public class VROverlaySettings extends VROverlayScreen
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if (getForcedAnchor() != null) {
             setDragged(false);
             return true;
@@ -351,16 +355,19 @@ public class VROverlaySettings extends VROverlayScreen
             return true;
         }
 
-        return super.mouseClicked(mouseX, mouseY, buttonType);
+        return super.mouseClicked(event, doubleClick);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if (getForcedAnchor() != null) {
             setDragged(false);
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, buttonType);
+        return super.mouseReleased(event);
     }
 
     @Override
@@ -419,11 +426,11 @@ public class VROverlaySettings extends VROverlayScreen
                     : settings.createOverlayWidgetSet;
         }
 
-        private ResourceLocation background() {
+        private Identifier background() {
             return this == OVERLAYS ? BACKGROUND_OVERLAYS : BACKGROUND_CREATE;
         }
 
-        private ResourceLocation backgroundExtra(VROverlaySettings settings) {
+        private Identifier backgroundExtra(VROverlaySettings settings) {
             return this == OVERLAYS ? BACKGROUND_EXTRA
                     : settings.isBackgroundExtended()
                     ? BACKGROUND_EXTRA_EXTENDED

@@ -1,7 +1,7 @@
 package org.vmstudio.visor.api.client.gui.helpers;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.Util;
+import org.joml.Matrix3x2fStack;
+import net.minecraft.util.Util;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.Mth;
@@ -62,12 +62,12 @@ public class GuiHelper {
 
         float scaledTextWidth = font.width(text) * scale;
 
-        PoseStack poseStack = guiGraphics.pose();
+        Matrix3x2fStack poseStack = guiGraphics.pose();
 
-        poseStack.pushPose();
-        poseStack.translate(posX, posY, 0);
-        poseStack.scale(scale, scale, 1f);
-        poseStack.translate(-posX, -posY, 0);
+        poseStack.pushMatrix();
+        poseStack.translate(posX, posY);
+        poseStack.scale(scale, scale);
+        poseStack.translate(-posX, -posY);
 
         float areaW = width / scale;
         float areaH = height / scale;
@@ -99,7 +99,7 @@ public class GuiHelper {
             guiGraphics.disableScissor();
         }
 
-        poseStack.popPose();
+        poseStack.popMatrix();
     }
 
     public static void renderScalableText(@NotNull GuiGraphics guiGraphics,
@@ -152,13 +152,13 @@ public class GuiHelper {
         }
 
         // Save current transform state
-        PoseStack poseStack = guiGraphics.pose();
-        poseStack.pushPose();
+        Matrix3x2fStack poseStack = guiGraphics.pose();
+        poseStack.pushMatrix();
 
         // Apply the transform FIRST, before scissoring
-        poseStack.translate(drawX, drawY, 0);
-        poseStack.scale(scale, scale, 1f);
-        poseStack.translate(-drawX, -drawY, 0);
+        poseStack.translate(drawX, drawY);
+        poseStack.scale(scale, scale);
+        poseStack.translate(-drawX, -drawY);
 
         // Calculate text position in the transformed space
         float baseX = drawX;
@@ -168,7 +168,7 @@ public class GuiHelper {
 
 
         // Restore transform state
-        poseStack.popPose();
+        poseStack.popMatrix();
 
     }
 

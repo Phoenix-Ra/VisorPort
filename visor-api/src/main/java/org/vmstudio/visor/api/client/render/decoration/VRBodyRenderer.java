@@ -2,7 +2,7 @@ package org.vmstudio.visor.api.client.render.decoration;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3fc;
@@ -33,7 +33,7 @@ public interface VRBodyRenderer {
      * @param modelName default or slim or smth else from mods
      */
     @Nullable
-    PlayerRenderer getModelRenderer(@NotNull VRClientPlayer player,
+    AvatarRenderer getModelRenderer(@NotNull VRClientPlayer player,
                                     @NotNull String modelName);
 
 
@@ -42,5 +42,5 @@ public interface VRBodyRenderer {
     }
 
     @NotNull
-    Collection<PlayerRenderer> getModelRenderers();
+    Collection<AvatarRenderer> getModelRenderers();
 }

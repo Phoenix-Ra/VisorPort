@@ -28,7 +28,7 @@ import org.vmstudio.visor.core.client.settings.VROptionWidgetType;
 import net.minecraft.client.*;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.Overlay;
-import net.minecraft.client.gui.screens.ReceivingLevelScreen;
+import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
@@ -416,13 +416,13 @@ public abstract class MinecraftMixin implements MinecraftExtension {
     /**
      * Resets room origin when world changed
      * <p>
-     * 1.21.1: setLevel gained a ReceivingLevelScreen.Reason parameter
+     * 1.21.1: setLevel gained a LevelLoadingScreen.Reason parameter
      *
      * @param pLevelClient s
      * @param info         s
      */
     @Inject(at = @At("HEAD"), method = "setLevel")
-    public void visor$onLevelChange(ClientLevel pLevelClient, ReceivingLevelScreen.Reason reason, CallbackInfo info) {
+    public void visor$onLevelChange(ClientLevel pLevelClient, LevelLoadingScreen.Reason reason, CallbackInfo info) {
         if (VisorState.get().isActive()) {
             ClientContext.localPlayer.setOrigin(
                     0.0f, 0.0f, 0.0f, true

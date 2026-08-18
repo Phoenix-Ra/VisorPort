@@ -19,6 +19,7 @@ import org.vmstudio.visor.core.client.gui.overlays.builtin.keyboard.VROverlayKey
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.client.input.MouseButtonEvent;
 
 public class VRKeyboardScreen extends Screen {
     @Getter
@@ -385,9 +386,12 @@ public class VRKeyboardScreen extends Screen {
     }
 
     @Override
-    public boolean mouseReleased(double d, double e, int i) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double d = event.x();
+        double e = event.y();
+        int i = event.button();
         clearPress();
-        return super.mouseReleased(d, e, i);
+        return super.mouseReleased(event);
     }
 
     public void clearPress() {

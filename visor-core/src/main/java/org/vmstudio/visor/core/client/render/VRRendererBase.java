@@ -36,6 +36,7 @@ import java.util.Map;
 
 import org.vmstudio.visor.core.client.ClientContext;
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 public abstract class VRRendererBase implements VRRenderer {
     public RenderTargetMain mainTarget;
@@ -112,8 +113,8 @@ public abstract class VRRendererBase implements VRRenderer {
 
         VRRenderState.startVRGuiPhase();
 
-        RenderSystem.depthMask(true);
-        RenderSystem.colorMask(true, true, true, true);
+        GlStateManager._depthMask(true);
+        GlStateManager._colorMask(true, true, true, true);
 
         MC.mainRenderTarget.clear();
         MC.mainRenderTarget.bindWrite(true);

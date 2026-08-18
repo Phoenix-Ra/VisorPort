@@ -4,7 +4,7 @@ package org.vmstudio.visor.api;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.vmstudio.visor.api.client.render.RenderPipelineCallback;
 import org.vmstudio.visor.api.client.render.RenderPipelineStage;
 import net.minecraft.core.BlockPos;
@@ -77,7 +77,7 @@ public interface ModLoader {
      * @return packet
      */
     @NotNull
-    Packet<?> createPacketToServer(@NotNull ResourceLocation channelId,
+    Packet<?> createPacketToServer(@NotNull Identifier channelId,
                                    @NotNull VisorPayloadToServer payload);
 
     /**
@@ -87,13 +87,13 @@ public interface ModLoader {
      * @return packet
      */
     @NotNull
-    Packet<?> createPacketToClient(@NotNull ResourceLocation channelId,
+    Packet<?> createPacketToClient(@NotNull Identifier channelId,
                                    @NotNull VisorPayloadToClient payload);
 
 
     //for neoforge
     @ApiStatus.Internal
-    default boolean canSendToServer(@NotNull ResourceLocation channelId) {
+    default boolean canSendToServer(@NotNull Identifier channelId) {
         return true;
     }
 

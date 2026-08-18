@@ -16,6 +16,9 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.util.Collection;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 
 /**
  * Basic interface for all VR overlays.
@@ -741,7 +744,7 @@ public interface VROverlay extends VisorComponent, PrioritySupporter {
      *
      * @return if succeeded
      */
-    boolean mouseClicked(double mouseX, double mouseY, int buttonType);
+    boolean mouseClicked(MouseButtonEvent event, boolean doubleClick);
 
     /**
      * On Mouse released
@@ -754,7 +757,7 @@ public interface VROverlay extends VisorComponent, PrioritySupporter {
      *
      * @return if succeeded
      */
-    boolean mouseReleased(double mouseX, double mouseY, int buttonType);
+    boolean mouseReleased(MouseButtonEvent event);
 
     /**
      * On Mouse scrolled
@@ -792,9 +795,7 @@ public interface VROverlay extends VisorComponent, PrioritySupporter {
      *
      * @return if succeeded
      */
-    boolean mouseDragged(double mouseX, double mouseY,
-                         int buttonType,
-                         double deltaX, double deltaY);
+    boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY);
 
 
     /**
@@ -808,7 +809,7 @@ public interface VROverlay extends VisorComponent, PrioritySupporter {
      *
      * @return if succeeded
      */
-    boolean keyPressed(int keyCode, int keyScan, int modifiers);
+    boolean keyPressed(KeyEvent event);
 
     /**
      * On Key released
@@ -821,7 +822,7 @@ public interface VROverlay extends VisorComponent, PrioritySupporter {
      *
      * @return if succeeded
      */
-    boolean keyReleased(int keyCode, int keyScan, int modifiers);
+    boolean keyReleased(KeyEvent event);
 
     /**
      * On Char typed
@@ -833,7 +834,7 @@ public interface VROverlay extends VisorComponent, PrioritySupporter {
      *
      * @return if succeeded
      */
-    boolean charTyped(char chr, int modifiers);
+    boolean charTyped(CharacterEvent event);
 
 
     //-------------------------

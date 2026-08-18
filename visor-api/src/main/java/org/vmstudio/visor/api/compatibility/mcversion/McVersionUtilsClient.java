@@ -10,15 +10,20 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.GenericMessageScreen;
 import net.minecraft.client.gui.screens.ProgressScreen;
-import net.minecraft.client.gui.screens.ReceivingLevelScreen;
+import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 import org.jetbrains.annotations.Nullable;
+import com.mojang.blaze3d.platform.InputConstants;
+import org.lwjgl.glfw.GLFW;
+import net.minecraft.client.renderer.RenderPipelines;
+import com.mojang.blaze3d.textures.GpuTextureView;
+import net.minecraft.client.input.InputQuirks;
 
 
 @Environment(EnvType.CLIENT)
@@ -28,7 +33,7 @@ public class McVersionUtilsClient {
     }
 
     public static boolean isLevelTransitionScreen(@Nullable Screen screen) {
-        return screen instanceof ReceivingLevelScreen
+        return screen instanceof LevelLoadingScreen
                 || screen instanceof ProgressScreen
                 || screen instanceof GenericMessageScreen;
     }
@@ -72,14 +77,14 @@ public class McVersionUtilsClient {
      * @param textureWidth  full texture width
      * @param textureHeight full texture height
      */
-    public static void blitStretched(GuiGraphics gui, ResourceLocation texture,
+    public static void blitStretched(GuiGraphics gui, Identifier texture,
                                      int x, int y,
                                      int targetWidth, int targetHeight,
                                      int srcX, int srcY,
                                      int srcWidth, int srcHeight,
                                      int textureWidth, int textureHeight) {
         gui.blit(
-                RenderType::guiTextured, texture,
+                RenderPipelines.GUI_TEXTURED, texture,
                 x, y,
                 srcX, srcY,
                 targetWidth, targetHeight,
@@ -104,13 +109,13 @@ public class McVersionUtilsClient {
      * @param textureWidth  full texture width
      * @param textureHeight full texture height
      */
-    public static void blitTiled(GuiGraphics gui, ResourceLocation texture,
+    public static void blitTiled(GuiGraphics gui, Identifier texture,
                                  int x, int y,
                                  int targetWidth, int targetHeight,
                                  int srcX, int srcY,
                                  int textureWidth, int textureHeight) {
         gui.blit(
-                RenderType::guiTextured, texture,
+                RenderPipelines.GUI_TEXTURED, texture,
                 x, y,
                 srcX, srcY,
                 targetWidth, targetHeight,
@@ -145,8 +150,8 @@ public class McVersionUtilsClient {
      *
      * @param texture id of the texture to bind
      */
-    public static void bindTexture(ResourceLocation texture) {
-        Minecraft.getInstance().getTextureManager().getTexture(texture).bind();
+    public static GpuTextureView getTextureView(Identifier texture) {
+        return Minecraft.getInstance().getTextureManager().getTexture(texture).getTextureView();
     }
 
     /**
@@ -157,12 +162,31 @@ public class McVersionUtilsClient {
      * @param texture   the texture to register
      * @return the id the texture was registered under
      */
-    public static ResourceLocation registerDynamicTexture(String namespace,
+    public static Identifier registerDynamicTexture(String namespace,
                                                           String path,
                                                           DynamicTexture texture) {
-        ResourceLocation id = McVersionUtils.newResourceLoc(namespace, "dynamic/" + path);
+        Identifier id = McVersionUtils.newResourceLoc(namespace, "dynamic/" + path);
         Minecraft.getInstance().getTextureManager().register(id, texture);
         return id;
     }
 
+    //---------- keyboard modifiers (Screen.hasXDown statics removed in 1.21.9) ----------
+
+    /** Live control-key state; Screen.hasControlDown() before 1.21.9. */
+    public static boolean hasControlDown() {
+        com.mojang.blaze3d.platform.Window window = Minecraft.getInstance().getWindow();
+        if (InputQuirks.REPLACE_CTRL_KEY_WITH_CMD_KEY) {
+            return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_SUPER)
+                    || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_SUPER);
+        }
+        return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_CONTROL)
+                || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_CONTROL);
+    }
+
+    /** Live shift-key state; Screen.hasShiftDown() before 1.21.9. */
+    public static boolean hasShiftDown() {
+        com.mojang.blaze3d.platform.Window window = Minecraft.getInstance().getWindow();
+        return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_SHIFT)
+                || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_SHIFT);
+    }
 }

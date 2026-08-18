@@ -1,6 +1,6 @@
 package org.vmstudio.visor.mixin.client.renderer.blaze3d;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.render.helpers.ShaderTextureHelper;
@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import static com.mojang.blaze3d.systems.RenderSystem.blendFuncSeparate;
+import org.lwjgl.opengl.GL11;
 
 @Mixin(RenderSystem.class)
 public class RenderSystemMixin {
@@ -24,10 +25,10 @@ public class RenderSystemMixin {
         }
     }
 
-    @ModifyArg(method = "defaultBlendFunc", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;blendFuncSeparate(Lcom/mojang/blaze3d/platform/GlStateManager$SourceFactor;Lcom/mojang/blaze3d/platform/GlStateManager$DestFactor;Lcom/mojang/blaze3d/platform/GlStateManager$SourceFactor;Lcom/mojang/blaze3d/platform/GlStateManager$DestFactor;)V", remap = true), remap = false, index = 3)
+    @ModifyArg(method = "defaultBlendFunc", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;blendFuncSeparate(Lcom/mojang/blaze3d/opengl/GlStateManager$SourceFactor;Lcom/mojang/blaze3d/opengl/GlStateManager$DestFactor;Lcom/mojang/blaze3d/opengl/GlStateManager$SourceFactor;Lcom/mojang/blaze3d/opengl/GlStateManager$DestFactor;)V", remap = true), remap = false, index = 3)
     private static GlStateManager.DestFactor visor$defaultBlendFuncAlphaBlending(
             GlStateManager.DestFactor destFactor) {
-        return GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA;
+        return GL11.GL_ONE_MINUS_SRC_ALPHA;
     }
 
     @ModifyVariable(method = "setShaderTexture(II)V", at = @At("HEAD"),

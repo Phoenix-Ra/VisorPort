@@ -1,6 +1,6 @@
 package org.vmstudio.visor.core.client.render.decoration;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import lombok.Getter;
@@ -119,7 +119,7 @@ public class DecorationRendererImpl implements VRDecorationRenderer {
             RenderPoseHelper.restoreLevelLights();
             modelView.popMatrix();
             GlStateManager._glBindFramebuffer(GL30C.GL_FRAMEBUFFER, boundFramebuffer);
-            RenderSystem.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+            GlStateManager._viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
         }
     }
 

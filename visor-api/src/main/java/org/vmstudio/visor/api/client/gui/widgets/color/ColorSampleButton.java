@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.vmstudio.visor.api.client.gui.helpers.ColorsHelper;
 
 import java.util.function.Consumer;
+import net.minecraft.client.input.InputWithModifiers;
 
 
 public class ColorSampleButton extends AbstractButton {
@@ -36,12 +37,12 @@ public class ColorSampleButton extends AbstractButton {
     }
 
     @Override
-    public void onPress() {
+    public void onPress(InputWithModifiers input) {
         this.onPress.accept(this);
     }
 
     @Override
-    protected void renderWidget(GuiGraphics guiGraphics,
+    protected void renderContents(GuiGraphics guiGraphics,
                                 int mouseX, int mouseY,
                                 float partialTick) {
         int x = getX();

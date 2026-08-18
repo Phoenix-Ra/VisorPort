@@ -20,6 +20,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
+import net.minecraft.client.input.MouseButtonEvent;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import org.lwjgl.opengl.GL11;
 
 public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegion> {
     private static final int FIELD_HEIGHT = 15;
@@ -396,14 +399,14 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
 
         RenderSystem.setShaderTexture(0, target.getColorTextureId());
 
-        RenderSystem.disableDepthTest();
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._disableDepthTest();
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         RenderSystem.setShader(CoreShaders.POSITION_TEX);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 
-        float uMax = (float) target.viewWidth / (float) target.width;
-        float vMax = (float) target.viewHeight / (float) target.height;
+        float uMax = (float) target.width / (float) target.width;
+        float vMax = (float) target.height / (float) target.height;
 
         Matrix4f pose = gui.pose().last().pose();
         BufferBuilder buf;
@@ -418,8 +421,8 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
         buf.addVertex(pose, previewX, previewY, 0).setUv(0.0f, vMax);
         BufferUploader.drawWithShader(buf.buildOrThrow());
 
-        RenderSystem.disableBlend();
-        RenderSystem.enableDepthTest();
+        GlStateManager._disableBlend();
+        GlStateManager._enableDepthTest();
 
         gui.renderOutline(previewX, previewY, previewW, previewH, 0x80FFFFFF);
     }
@@ -569,8 +572,11 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        boolean base = super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
+        boolean base = super.mouseClicked(event, doubleClick);
         if (button != 0) return base;
 
         if (!inPreview((int) mouseX, (int) mouseY)) {
@@ -593,12 +599,15 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragDX, double dragDY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragDX, double dragDY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (activeHandle == DragHandle.NONE) {
-            return super.mouseDragged(mouseX, mouseY, button, dragDX, dragDY);
+            return super.mouseDragged(event, dragDX, dragDY);
         }
         if (button != 0) {
-            return super.mouseDragged(mouseX, mouseY, button, dragDX, dragDY);
+            return super.mouseDragged(event, dragDX, dragDY);
         }
 
         int dxPx = (int) Math.round((mouseX - dragStartMouseX) / Math.max(0.00001, previewScale));
@@ -676,8 +685,11 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        boolean base = super.mouseReleased(mouseX, mouseY, button);
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
+        boolean base = super.mouseReleased(event);
         if (button == 0) {
             activeHandle = DragHandle.NONE;
         }

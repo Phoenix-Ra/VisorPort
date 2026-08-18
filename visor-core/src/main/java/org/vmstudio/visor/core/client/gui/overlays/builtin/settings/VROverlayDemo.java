@@ -23,6 +23,7 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
+import net.minecraft.client.input.MouseButtonEvent;
 
 
 public class VROverlayDemo extends VROverlayScreen {
@@ -320,7 +321,10 @@ public class VROverlayDemo extends VROverlayScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int buttonType) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int buttonType = event.button();
         if(movingByAnchor == null) return true;
         stopMovingByAnchor();
         return true;

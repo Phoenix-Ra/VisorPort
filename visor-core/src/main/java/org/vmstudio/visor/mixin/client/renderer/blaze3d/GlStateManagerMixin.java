@@ -1,6 +1,6 @@
 package org.vmstudio.visor.mixin.client.renderer.blaze3d;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import org.vmstudio.visor.core.client.render.helpers.ShaderTextureHelper;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.lwjgl.opengl.GL11;
 
 @Mixin(GlStateManager.class)
 public class GlStateManagerMixin {
@@ -22,12 +23,12 @@ public class GlStateManagerMixin {
     // dstAlpha first, because that is the variable we are changing
     @ModifyVariable(method = "_blendFuncSeparate", at = @At("HEAD"), remap = false, index = 3, argsOnly = true)
     private static int visor$guiAlphaBlending(int dstAlpha, int srcRgb, int dstRgb, int srcAlpha) {
-        if (srcRgb == GlStateManager.SourceFactor.SRC_ALPHA.value &&
-                dstRgb == GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA.value &&
-                srcAlpha == GlStateManager.SourceFactor.ONE.value &&
-                dstAlpha == GlStateManager.DestFactor.ZERO.value)
+        if (srcRgb == GL11.GL_SRC_ALPHA &&
+                dstRgb == GL11.GL_ONE_MINUS_SRC_ALPHA &&
+                srcAlpha == GL11.GL_ONE &&
+                dstAlpha == GL11.GL_ZERO)
         {
-            return GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA.value;
+            return GL11.GL_ONE_MINUS_SRC_ALPHA;
         } else {
             return dstAlpha;
         }

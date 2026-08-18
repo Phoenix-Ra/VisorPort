@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.MouseButtonEvent;
 
 /**
  * Version adapter for AbstractSelectionList
@@ -161,9 +162,9 @@ public abstract class McSelectionList<E extends McSelectionList.Entry<E>> extend
 
 
     @Override
-    public final boolean updateScrolling(double mouseX, double mouseY, int button) {
-        boolean grabbed = super.updateScrolling(mouseX, mouseY, button);
-        onUpdateScrolling(mouseX, mouseY, button);
+    public final boolean updateScrolling(MouseButtonEvent event) {
+        boolean grabbed = super.updateScrolling(event);
+        onUpdateScrolling(event.x(), event.y(), event.button());
         return grabbed;
     }
 

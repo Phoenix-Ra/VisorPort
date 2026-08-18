@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.renderer.CompiledShaderProgram;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 public class RenderShaderHelper {
     private RenderShaderHelper() {
@@ -19,10 +20,10 @@ public class RenderShaderHelper {
                                             @NotNull RenderTarget source
     ) {
         // --- Setup ---
-        RenderSystem.colorMask(true, true, true, false);
-        RenderSystem.disableDepthTest();
-        RenderSystem.depthMask(false);
-        RenderSystem.disableBlend();
+        GlStateManager._colorMask(true, true, true, false);
+        GlStateManager._disableDepthTest();
+        GlStateManager._depthMask(false);
+        GlStateManager._disableBlend();
         shader.bindSampler("Sampler0", source.getColorTextureId());
         shader.apply();
 
@@ -32,10 +33,10 @@ public class RenderShaderHelper {
 
         // --- Restore ---
         shader.clear();
-        RenderSystem.enableDepthTest();
-        RenderSystem.enableBlend();
-        RenderSystem.depthMask(true);
-        RenderSystem.colorMask(true, true, true, true);
+        GlStateManager._enableDepthTest();
+        GlStateManager._enableBlend();
+        GlStateManager._depthMask(true);
+        GlStateManager._colorMask(true, true, true, true);
     }
 
 

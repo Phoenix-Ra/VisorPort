@@ -4,6 +4,8 @@ import org.vmstudio.visor.core.client.gui.screens.VRKeyboardScreen;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.InputWithModifiers;
 
 public class KeyboardButton extends Button {
     private VRKeyboardScreen keyboardScreen;
@@ -49,17 +51,19 @@ public class KeyboardButton extends Button {
     }
 
     @Override
-    public void onPress() {
+    public void onPress(InputWithModifiers input) {
         if(usePressTask) {
             keyboardScreen.setPressedTask(super::onPress);
             keyboardScreen.setPressTick(0);
         }
-        super.onPress();
+        super.onPress(input);
         pressed = true;
     }
 
     @Override
-    public void onRelease(double d, double e) {
+    public void onRelease(MouseButtonEvent event) {
+        double d = event.x();
+        double e = event.y();
         if(onRelease != null && pressed) {
             onRelease.onRelease(this);
         }

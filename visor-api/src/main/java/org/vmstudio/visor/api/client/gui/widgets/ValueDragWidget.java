@@ -6,6 +6,7 @@ import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoValueDrag;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.input.MouseButtonEvent;
 
 
 public class ValueDragWidget extends AbstractWidget {
@@ -29,7 +30,9 @@ public class ValueDragWidget extends AbstractWidget {
     }
 
     @Override
-    public void onClick(double mouseX, double mouseY) {
+    public void onClick(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         this.dragging = true;
         this.lastDragCall = System.currentTimeMillis();
         this.dragStartMouseX = mouseX;
@@ -37,12 +40,16 @@ public class ValueDragWidget extends AbstractWidget {
     }
 
     @Override
-    public void onRelease(double mouseX, double mouseY) {
+    public void onRelease(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         this.dragging = false;
     }
 
     @Override
-    protected void onDrag(double mouseX, double mouseY, double dragX, double dragY) {
+    protected void onDrag(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
         if (!dragging) return;
 
         lastDragCall = System.currentTimeMillis();

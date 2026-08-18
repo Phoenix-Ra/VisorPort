@@ -18,11 +18,12 @@ import org.vmstudio.visor.core.client.ClientContext;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL30C;
 
-import static com.mojang.blaze3d.platform.GlStateManager._glBindFramebuffer;
-import static com.mojang.blaze3d.platform.GlStateManager._glBlitFrameBuffer;
+import static com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer;
+import static com.mojang.blaze3d.opengl.GlStateManager._glBlitFrameBuffer;
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import com.mojang.blaze3d.ProjectionType;
 import net.minecraft.client.renderer.FogParameters;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 public class MirrorHelper {
     private MirrorHelper() {
@@ -166,7 +167,7 @@ public class MirrorHelper {
 
         // 2) viewport + projection
         RenderSystem.backupProjectionMatrix();
-        RenderSystem.viewport(0, 0, vrWidth, vrHeight);
+        GlStateManager._viewport(0, 0, vrWidth, vrHeight);
         var proj = new Matrix4f().setOrtho(0, vrWidth, vrHeight, 0, NEAR_PLANE, FAR_PLANE);
         RenderSystem.setProjectionMatrix(proj, ProjectionType.ORTHOGRAPHIC);
 
@@ -180,7 +181,7 @@ public class MirrorHelper {
             // 4) disable fog + clear
             RenderSystem.setShaderFog(FogParameters.NO_FOG);
             int flags = CLEAR_DEPTH_FLAG | (clearBackground ? CLEAR_COLOR_FLAG : 0);
-            RenderSystem.clear(flags);
+            GlStateManager._clear(flags);
             if (clearBackground) {
                 RenderSystem.clearColor(0, 0, 0, 0);
             }
@@ -229,7 +230,7 @@ public class MirrorHelper {
                                    boolean keepAspect) {
         if (keepAspect) {
             float targetAspect = (float) MC.mainRenderTarget.width / (float) MC.mainRenderTarget.height;
-            float sourceAspect = (float) source.viewWidth / (float) source.viewHeight;
+            float sourceAspect = (float) source.width / (float) source.height;
             if (targetAspect > sourceAspect) {
                 yCropFactor = 0.5F
                         - (sourceAspect / targetAspect) * (0.5F - yCropFactor);

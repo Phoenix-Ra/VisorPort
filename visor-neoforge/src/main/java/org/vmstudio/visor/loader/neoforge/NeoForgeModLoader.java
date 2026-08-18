@@ -9,7 +9,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -57,7 +57,7 @@ public class NeoForgeModLoader implements ModLoader {
     private final Map<RenderPipelineStage, List<RenderPipelineCallback>> pipelineCallbacks
             = new EnumMap<>(RenderPipelineStage.class);
 
-    private final Map<ResourceLocation, VisorChannel> networkChannels = new HashMap<>();
+    private final Map<Identifier, VisorChannel> networkChannels = new HashMap<>();
 
     private boolean levelStageListenerRegistered = false;
 
@@ -184,14 +184,14 @@ public class NeoForgeModLoader implements ModLoader {
     }
 
     @Override
-    public @NotNull Packet<?> createPacketToClient(@NotNull ResourceLocation channelId,
+    public @NotNull Packet<?> createPacketToClient(@NotNull Identifier channelId,
                                                    @NotNull VisorPayloadToClient payload) {
         return new ClientboundCustomPayloadPacket(
                 VisorRawPayload.of(channelId, writePayload(payload)));
     }
 
     @Override
-    public @NotNull Packet<?> createPacketToServer(@NotNull ResourceLocation channelId,
+    public @NotNull Packet<?> createPacketToServer(@NotNull Identifier channelId,
                                                    @NotNull VisorPayloadToServer payload) {
         return new ServerboundCustomPayloadPacket(
                 VisorRawPayload.of(channelId, writePayload(payload)));
@@ -199,7 +199,7 @@ public class NeoForgeModLoader implements ModLoader {
 
 
     @Override
-    public boolean canSendToServer(@NotNull ResourceLocation channelId) {
+    public boolean canSendToServer(@NotNull Identifier channelId) {
         return ClientTunnelSupport.serverAcceptsTunnel();
     }
 

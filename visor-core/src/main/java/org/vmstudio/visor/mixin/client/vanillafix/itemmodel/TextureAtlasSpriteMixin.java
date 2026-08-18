@@ -1,7 +1,7 @@
 package org.vmstudio.visor.mixin.client.vanillafix.itemmodel;
 
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -15,7 +15,7 @@ public abstract class TextureAtlasSpriteMixin {
     protected abstract float atlasSize();
 
     @Shadow
-    public abstract ResourceLocation atlasLocation();
+    public abstract Identifier atlasLocation();
 
     @Inject(method = "uvShrinkRatio", at = @At("RETURN"), cancellable = true)
     public void visor$fixOutlineTransparency(CallbackInfoReturnable<Float> cir) {

@@ -1,7 +1,6 @@
 package org.vmstudio.visor.mixin.client.renderer.blaze3d;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.TextureUtil;
 import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.extensions.client.render.RenderTargetExtension;
 import org.lwjgl.opengl.GL11;
@@ -10,22 +9,23 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
+import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.systems.GpuDevice;
+import com.mojang.blaze3d.textures.TextureFormat;
+import org.vmstudio.visor.core.client.render.target.VRExternalGlTexture;
+import java.util.function.Supplier;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 
 @Mixin(RenderTarget.class)
 public abstract class RenderTargetMixin implements RenderTargetExtension {
     @Shadow
-    public int frameBufferId;
-    @Shadow
     public int width;
     @Shadow
     public int height;
     @Shadow
-    public int viewHeight;
-    @Shadow
-    public int viewWidth;
-    @Shadow
-    protected int colorTextureId;
+    protected GpuTexture colorTexture;
 
 
     @Unique
@@ -35,61 +35,46 @@ public abstract class RenderTargetMixin implements RenderTargetExtension {
     @Unique
     private boolean visor$useStencil = false;
 
-
     /* ************************* *\
-  //--------STENCIL SUPPORT--------\\
+  //--------TEXTURE CREATION--------\\
     \* ************************* */
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/GlStateManager;_texImage2D(IIIIIIIILjava/nio/IntBuffer;)V", remap = false, ordinal = 0), method = "createBuffers", index = 2)
-    public int visor$vrUseStencil1(int internalformat) {
-        return visor$useStencil
-                ? GL30.GL_DEPTH24_STENCIL8
-                : internalformat;
-    }
 
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/GlStateManager;_texImage2D(IIIIIIIILjava/nio/IntBuffer;)V", remap = false, ordinal = 0), method = "createBuffers", index = 6)
-    public int visor$vrUseStencil2(int format) {
-        return visor$useStencil
-                ? GL30.GL_DEPTH_STENCIL : format;
-    }
+    /**
+     * 1.21.9 rewrote {@code createBuffers} to allocate through {@code GpuDevice.createTexture}
+     * with a hardcoded RGBA8/DEPTH32 format and no raw GL, which retired the three separate
+     * injections Visor used to use (stencil format, external texture id, filter constant).
+     * All three now hang off this one redirect.
+     */
+    @Redirect(method = "createBuffers", at = @At(value = "INVOKE",
+            target = "Lcom/mojang/blaze3d/systems/GpuDevice;createTexture(Ljava/util/function/Supplier;ILcom/mojang/blaze3d/textures/TextureFormat;IIII)Lcom/mojang/blaze3d/textures/GpuTexture;"))
+    private GpuTexture visor$createTexture(GpuDevice device, Supplier<String> label, int usage,
+                                           TextureFormat format, int width, int height,
+                                           int depth, int mipLevels) {
 
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/GlStateManager;_texImage2D(IIIIIIIILjava/nio/IntBuffer;)V", remap = false, ordinal = 0), method = "createBuffers", index = 7)
-    public int visor$vrUseStencil3(int type) {
-        return visor$useStencil
-                ? GL30.GL_UNSIGNED_INT_24_8 : type;
-    }
-
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/GlStateManager;_glFramebufferTexture2D(IIIII)V", remap = false, ordinal = 1), method = "createBuffers", index = 1)
-    public int visor$vrUseStencil4(int attachment) {
-        return visor$useStencil
-                ? GL30.GL_DEPTH_STENCIL_ATTACHMENT : attachment;
-    }
-
-
-    /* ************** *\
-  //--------MISC--------\\
-    \* ************** */
-    @Redirect(at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/TextureUtil;generateTextureId()I", remap = false, ordinal = 0), method = "createBuffers")
-    public int visor$vrTextureId() {
-        if (this.visor$textureId == -1) {
-            return TextureUtil.generateTextureId();
-        } else {
-            return this.visor$textureId;
+        // colour attachment backed by a texture we were handed (an OpenXR swapchain image)
+        if (format == TextureFormat.RGBA8 && this.visor$textureId != -1) {
+            return new VRExternalGlTexture(usage, label.get(), format,
+                    width, height, depth, mipLevels, this.visor$textureId, false);
         }
-    }
 
-    @ModifyConstant(method = "createBuffers", constant = @Constant(intValue = 9728))
-    public int visor$vrLinearFilter(int i) {
-        return visor$useLinearFilter
-                ? GL11.GL_LINEAR : i;
+        // TextureFormat has no combined depth+stencil, so allocate one ourselves and wrap it
+        if (format == TextureFormat.DEPTH32 && this.visor$useStencil) {
+            int glId = GlStateManager._genTexture();
+            GlStateManager._bindTexture(glId);
+            GlStateManager._texImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_DEPTH24_STENCIL8,
+                    width, height, 0, GL30.GL_DEPTH_STENCIL, GL30.GL_UNSIGNED_INT_24_8, null);
+            return new VRExternalGlTexture(usage, label.get(), format,
+                    width, height, depth, mipLevels, glId, true);
+        }
+
+        return device.createTexture(label, usage, format, width, height, depth, mipLevels);
     }
 
     @Override
     public String toString() {
-        String stringbuilder = "\n" +
-                "Size:   " + this.viewWidth + " x " + this.viewHeight + "\n" +
-                "FB ID:  " + this.frameBufferId + "\n" +
-                "Tex ID: " + this.colorTextureId + "\n";
-        return stringbuilder;
+        return "\n" +
+                "Size:   " + this.width + " x " + this.height + "\n" +
+                "Tex ID: " + this.visor$getColorTextureId() + "\n";
     }
 
 
@@ -119,6 +104,12 @@ public abstract class RenderTargetMixin implements RenderTargetExtension {
     @Unique
     public void visor$isLinearFilter(boolean linearFilter) {
         this.visor$useLinearFilter = linearFilter;
+    }
+
+    @Override
+    @Unique
+    public int visor$getColorTextureId() {
+        return this.colorTexture instanceof GlTexture glTexture ? glTexture.glId() : -1;
     }
 
 

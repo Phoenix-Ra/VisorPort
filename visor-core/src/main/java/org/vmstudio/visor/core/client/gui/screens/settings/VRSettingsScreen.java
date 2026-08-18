@@ -13,13 +13,13 @@ import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
 import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.gui.overlays.builtin.settings.VROverlaySettings;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
 import org.jetbrains.annotations.NotNull;
 
@@ -27,11 +27,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
+import net.minecraft.client.input.MouseButtonEvent;
 
 public class VRSettingsScreen extends Screen {
 
     public static AtumColor INACTIVE_COLOR = AtumColor.immutable(91,91,91,255);
-    private static final ResourceLocation RESOURCE = McVersionUtils.newResourceLoc(
+    private static final Identifier RESOURCE = McVersionUtils.newResourceLoc(
             "visor:textures/gui/settings/general.png"
     );
     private static final int RESOURCE_WIDTH = 274;
@@ -604,8 +605,11 @@ public class VRSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        boolean success = super.mouseClicked(mouseX, mouseY, button);
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
+        boolean success = super.mouseClicked(event, doubleClick);
         options.mouseClicked(mouseX, mouseY, button, success);
         if(!success && button == 0 && maxCategoryScroll() > 0){
             return handleCategoryScrollClick(mouseX, mouseY);

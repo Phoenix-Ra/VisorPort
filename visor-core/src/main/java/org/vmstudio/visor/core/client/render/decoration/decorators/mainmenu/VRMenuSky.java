@@ -1,17 +1,17 @@
 package org.vmstudio.visor.core.client.render.decoration.decorators.mainmenu;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import me.phoenixra.atumvr.api.misc.color.AtumColorImmutable;
 import me.phoenixra.atumvr.api.misc.color.AtumColorMutable;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.CoreShaders;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11C;
@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 import org.vmstudio.visor.api.VisorAPI;
+import org.lwjgl.opengl.GL11;
 
 /**
  * Procedural sky for the VR main menu
@@ -67,11 +68,11 @@ public final class VRMenuSky {
     private static final long SKY_UPDATE_FREQUENCY = 200L;
 
     // ---- CELESTIAL BODIES ----
-    private static final ResourceLocation SUN_TEXTURE = McVersionUtils.newResourceLoc("textures/environment/sun.png");
+    private static final Identifier SUN_TEXTURE = McVersionUtils.newResourceLoc("textures/environment/sun.png");
     private static final float SUN_DISTANCE = 92.0f;
     private static final float SUN_SIZE = 13.0f;
 
-    private static final ResourceLocation MOON_TEXTURE = McVersionUtils.newResourceLoc("textures/environment/moon_phases.png");
+    private static final Identifier MOON_TEXTURE = McVersionUtils.newResourceLoc("textures/environment/moon_phases.png");
     private static final float MOON_DISTANCE = 90.0f;
     private static final float MOON_SIZE = 10.0f;
 
@@ -161,7 +162,7 @@ public final class VRMenuSky {
 
     private static final DotsSign VISOR_SIGN;
 
-    private static ResourceLocation GLOW_SPRITE = null;
+    private static Identifier GLOW_SPRITE = null;
 
     // ---- CLOUDS ----
     private static final float CLOUD_Y = -14.0f;
@@ -413,14 +414,14 @@ public final class VRMenuSky {
         currentScenePhase = sceneTimeToPhase(currentSceneTime);
 
         // --- Setup ---
-        RenderSystem.clear(GL11C.GL_COLOR_BUFFER_BIT | GL11C.GL_DEPTH_BUFFER_BIT);
+        GlStateManager._clear(GL11C.GL_COLOR_BUFFER_BIT | GL11C.GL_DEPTH_BUFFER_BIT);
         RenderSystem.setShader(CoreShaders.POSITION_COLOR);
         RenderSystem.setShaderColor(1, 1, 1, 1);
-        RenderSystem.depthMask(false);
-        RenderSystem.disableDepthTest();
-        RenderSystem.disableCull();
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._depthMask(false);
+        GlStateManager._disableDepthTest();
+        GlStateManager._disableCull();
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
         // --- Render ---
         renderSkyBox(builder, pose);
@@ -436,9 +437,9 @@ public final class VRMenuSky {
         renderUserDots(builder, pose);
 
         // --- Restore ---
-        RenderSystem.enableCull();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(true);
+        GlStateManager._enableCull();
+        GlStateManager._enableDepthTest();
+        GlStateManager._depthMask(true);
     }
 
     public static void renderLast(PoseStack poseStack) {
@@ -449,11 +450,11 @@ public final class VRMenuSky {
         // --- Setup ---
         RenderSystem.setShader(CoreShaders.POSITION_COLOR);
         RenderSystem.setShaderColor(1, 1, 1, 1);
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(true);
-        RenderSystem.enableCull();
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager._enableDepthTest();
+        GlStateManager._depthMask(true);
+        GlStateManager._enableCull();
 
         // --- Render ---
         renderClouds(builder, pose);
@@ -656,7 +657,7 @@ public final class VRMenuSky {
 
     private static void renderCelestial(BufferBuilder builder, Matrix4f pose,
                                         Vector3f dir, float visible,
-                                        ResourceLocation texture, float distance, float size,
+                                        Identifier texture, float distance, float size,
                                         AtumColor color,
                                         float u0, float v0, float u1, float v1) {
         scratchCenter.set(dir).mul(distance);
@@ -665,7 +666,7 @@ public final class VRMenuSky {
         RenderSystem.setShader(CoreShaders.POSITION_TEX);
         RenderSystem.setShaderTexture(0, texture);
         RenderSystem.setShaderColor(color.getRed(), color.getGreen(), color.getBlue(), visible);
-        RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE);
 
         builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
         billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp, -size, -size, u0, v0);
@@ -674,7 +675,7 @@ public final class VRMenuSky {
         billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp, -size,  size, u0, v1);
         BufferUploader.drawWithShader(builder.buildOrThrow());
 
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         RenderSystem.setShaderColor(1, 1, 1, 1);
     }
 
@@ -688,7 +689,7 @@ public final class VRMenuSky {
 
         RenderSystem.setShader(CoreShaders.POSITION_COLOR);
         RenderSystem.setShaderColor(1, 1, 1, 1);
-        RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE);
 
         builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
         for (int star = 0; star < STAR_QUAD.length; star++) {
@@ -705,7 +706,7 @@ public final class VRMenuSky {
 
         BufferUploader.drawWithShader(builder.buildOrThrow());
 
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
     }
 
     private static void emitShootingStar(BufferBuilder builder, Matrix4f pose,
@@ -855,7 +856,7 @@ public final class VRMenuSky {
         RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
         RenderSystem.setShaderTexture(0, GLOW_SPRITE);
         RenderSystem.setShaderColor(1, 1, 1, 1);
-        RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE);
 
         builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < UFO_DOTS_AMOUNT; i++) {
@@ -881,7 +882,7 @@ public final class VRMenuSky {
         }
         BufferUploader.drawWithShader(builder.buildOrThrow());
 
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         RenderSystem.setShaderColor(1, 1, 1, 1);
     }
 
@@ -914,9 +915,9 @@ public final class VRMenuSky {
         RenderSystem.setShaderTexture(0, GLOW_SPRITE);
         RenderSystem.setShaderColor(1, 1, 1, 1);
         if (asCloudDots) {
-            RenderSystem.defaultBlendFunc();
+            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         } else {
-            RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE); // additive
+            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE); // additive
         }
 
         int[] cloudTint = {0, 0, 0};
@@ -943,7 +944,7 @@ public final class VRMenuSky {
         }
         BufferUploader.drawWithShader(builder.buildOrThrow());
 
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         RenderSystem.setShaderColor(1, 1, 1, 1);
     }
 
@@ -1138,9 +1139,9 @@ public final class VRMenuSky {
         RenderSystem.setShaderTexture(0, GLOW_SPRITE);
         RenderSystem.setShaderColor(1, 1, 1, 1);
         if (showClouds) {
-            RenderSystem.defaultBlendFunc();
+            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         } else {
-            RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE); // additive
+            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE); // additive
         }
 
 
@@ -1166,10 +1167,10 @@ public final class VRMenuSky {
         }
         BufferUploader.drawWithShader(builder.buildOrThrow());
 
-        RenderSystem.defaultBlendFunc();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
         RenderSystem.setShaderColor(1, 1, 1, 1);
     }
-    static ResourceLocation glowSprite() {
+    static Identifier glowSprite() {
         ensureGlowSprite();
         return GLOW_SPRITE;
     }

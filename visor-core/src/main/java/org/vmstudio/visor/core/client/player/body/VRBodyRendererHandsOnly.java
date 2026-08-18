@@ -3,7 +3,7 @@ package org.vmstudio.visor.core.client.player.body;
 import com.mojang.blaze3d.vertex.PoseStack;
 import lombok.Getter;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import org.jetbrains.annotations.NotNull;
 import org.vmstudio.visor.api.client.player.VRClientPlayer;
 import org.vmstudio.visor.api.client.render.decoration.VRBodyRenderer;
@@ -18,7 +18,7 @@ import java.util.*;
 public class VRBodyRendererHandsOnly implements VRBodyRenderer {
 
     @Getter
-    private final List<PlayerRenderer> modelRenderers = new ArrayList<>();
+    private final List<AvatarRenderer> modelRenderers = new ArrayList<>();
 
     private final Map<String, VRPlayerRendererHandsOnly> modelsMap = new HashMap<>();
 
@@ -63,7 +63,7 @@ public class VRBodyRendererHandsOnly implements VRBodyRenderer {
     }
 
     @Override
-    public PlayerRenderer getModelRenderer(@NotNull VRClientPlayer player, @NotNull String modelName) {
+    public AvatarRenderer getModelRenderer(@NotNull VRClientPlayer player, @NotNull String modelName) {
         return modelsMap.getOrDefault(modelName, defaultRenderer);
     }
 }

@@ -21,6 +21,7 @@ import org.joml.Vector3f;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
+import com.mojang.blaze3d.opengl.GlStateManager;
 
 public class VRShaderMixedReality implements VRShader{
 
@@ -60,7 +61,7 @@ public class VRShaderMixedReality implements VRShader{
 
     public void drawMirror(){
         var mcWindow = ((WindowExtension) (Object) MC.getWindow());
-        RenderSystem.viewport(0, 0,
+        GlStateManager._viewport(0, 0,
                 mcWindow.visor$getActualScreenWidth(),
                 mcWindow.visor$getActualScreenHeight()
         );

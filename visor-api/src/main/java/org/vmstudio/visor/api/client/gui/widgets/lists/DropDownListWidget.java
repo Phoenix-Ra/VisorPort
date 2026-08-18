@@ -16,6 +16,8 @@ import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 
 import java.util.List;
 import java.util.function.Consumer;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.InputWithModifiers;
 
 
 public class DropDownListWidget extends AbstractButton {
@@ -73,7 +75,7 @@ public class DropDownListWidget extends AbstractButton {
      * Called when the main button is pressed. Here we simply toggle the expanded state.
      */
     @Override
-    public void onPress() {
+    public void onPress(InputWithModifiers input) {
         expanded = !expanded;
     }
 
@@ -84,7 +86,7 @@ public class DropDownListWidget extends AbstractButton {
      * Renders the base button and, if expanded, the dropdown list along with the interactive scrollbar.
      */
     @Override
-    protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderContents(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         // Render the base button (background, border, and label)
         super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
 
@@ -195,7 +197,10 @@ public class DropDownListWidget extends AbstractButton {
      * When dragging the scrollbar thumb, update the scroll offset based on the drag delta.
      */
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (draggingScrollbar) {
 
             int scrollbarHeight = visibleItems * ITEM_HEIGHT;
@@ -213,26 +218,32 @@ public class DropDownListWidget extends AbstractButton {
             scrollOffset = Mth.clamp(newScrollOffset, 0, maxScroll);
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        return super.mouseDragged(event, dragX, dragY);
     }
 
     /**
      * When the mouse button is released, stop dragging the scrollbar.
      */
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased(MouseButtonEvent event) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (draggingScrollbar) {
             draggingScrollbar = false;
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.mouseReleased(event);
     }
     /**
      * Handle mouse clicks. In addition to toggling the dropdown or selecting an item,
      * we check if the user clicked on the scrollbar thumb to initiate dragging.
      */
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
         if (!this.active || !this.visible) {
             return false;
         }

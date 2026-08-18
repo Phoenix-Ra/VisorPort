@@ -1,6 +1,6 @@
 package org.vmstudio.visor.core.client.render.helpers;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
@@ -25,6 +25,7 @@ import org.lwjgl.opengl.GL11C;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import net.minecraft.client.renderer.FogParameters;
+import org.lwjgl.opengl.GL11;
 
 public class RenderGuiHelper {
     private RenderGuiHelper() {
@@ -70,31 +71,31 @@ public class RenderGuiHelper {
         assert renderTarget != null;
         renderTarget.bindRead();
 
-        RenderSystem.disableCull();
+        GlStateManager._disableCull();
         RenderSystem.setShaderTexture(0, renderTarget.getColorTextureId());
 
         if (VRRenderState.getSceneType().isWorld()) {
             RenderSystem.setShaderFog(FogParameters.NO_FOG);
 
-            RenderSystem.enableBlend();
-            RenderSystem.blendFuncSeparate(
-                    GlStateManager.SourceFactor.SRC_ALPHA,
-                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                    GlStateManager.SourceFactor.ONE_MINUS_DST_ALPHA,
-                    GlStateManager.DestFactor.ONE
+            GlStateManager._enableBlend();
+            GlStateManager._blendFuncSeparate(
+                    GL11.GL_SRC_ALPHA,
+                    GL11.GL_ONE_MINUS_SRC_ALPHA,
+                    GL11.GL_ONE_MINUS_DST_ALPHA,
+                    GL11.GL_ONE
             );
         } else {
-            RenderSystem.enableBlend();
+            GlStateManager._enableBlend();
         }
 
         if (depthAlways) {
-            RenderSystem.depthFunc(GL11C.GL_ALWAYS);
-            RenderSystem.depthMask(false);
+            GlStateManager._depthFunc(GL11C.GL_ALWAYS);
+            GlStateManager._depthMask(false);
         } else {
-            RenderSystem.depthFunc(GL11C.GL_LEQUAL);
-            RenderSystem.depthMask(true);
+            GlStateManager._depthFunc(GL11C.GL_LEQUAL);
+            GlStateManager._depthMask(true);
         }
-        RenderSystem.enableDepthTest();
+        GlStateManager._enableDepthTest();
 
         // --- Pose ---
         poseStack.pushPose();
@@ -158,11 +159,11 @@ public class RenderGuiHelper {
 
         // --- Restore ---
         RenderSystem.setShaderFog(fogCache);
-        RenderSystem.depthFunc(GL11C.GL_LEQUAL);
-        RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.enableCull();
+        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
+        GlStateManager._depthMask(true);
+        GlStateManager._enableDepthTest();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager._enableCull();
 
         poseStack.popPose();
     }

@@ -4,14 +4,14 @@ import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.*;
-import net.minecraft.client.renderer.entity.player.PlayerRenderer;
-import net.minecraft.client.renderer.entity.state.PlayerRenderState;
+import net.minecraft.client.renderer.entity.player.AvatarRenderer;
+import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
@@ -146,17 +146,17 @@ public class PlayerRenderMixins {
 
 
     /**
-     * Vanilla PlayerRenderer declares no render() at all - the nearest declaration is
+     * Vanilla AvatarRenderer declares no render() at all - the nearest declaration is
      * LivingEntityRenderer#render(S, ...) - so javac compiles super.render(...) in our
-     * PlayerRenderer subclasses to
-     * "invokespecial PlayerRenderer.render(LivingEntityRenderState, ...)", the erasure of the
+     * AvatarRenderer subclasses to
+     * "invokespecial AvatarRenderer.render(LivingEntityRenderState, ...)", the erasure of the
      * inherited method. On Fabric that resolves straight up to LivingEntityRenderer#render.
      *
-     * Forge and NeoForge both patch a render(PlayerRenderState, ...) override into PlayerRenderer
+     * Forge and NeoForge both patch a render(AvatarRenderState, ...) override into AvatarRenderer
      * to fire their RenderPlayerEvent, which makes javac emit a synthetic bridge
-     * render(LivingEntityRenderState, ...) into PlayerRenderer as well. That bridge now sits
+     * render(LivingEntityRenderState, ...) into AvatarRenderer as well. That bridge now sits
      * exactly where our super call points, and all it does is invokevirtual back into
-     * render(PlayerRenderState, ...) - i.e. straight back into the VR renderer's own override.
+     * render(AvatarRenderState, ...) - i.e. straight back into the VR renderer's own override.
      * The result is unbounded mutual recursion and a StackOverflowError the first time a player
      * model is actually drawn (opening the survival inventory is usually the first time, since
      * the local player isn't rendered as an entity in first person).
@@ -166,9 +166,9 @@ public class PlayerRenderMixins {
      * Forge/NeoForge's RenderPlayerEvent for VR-rendered players - it never fired for them anyway,
      * since our subclass overrides the very method that raises it.
      */
-    @Mixin(PlayerRenderer.class)
+    @Mixin(AvatarRenderer.class)
     public abstract static class PlayerRendererMixin
-            extends LivingEntityRenderer<AbstractClientPlayer, PlayerRenderState, PlayerModel>
+            extends LivingEntityRenderer<AbstractClientPlayer, AvatarRenderState, PlayerModel>
             implements PlayerRendererExtension {
 
         // Mixins never merge constructors - this only exists so javac accepts the superclass.
@@ -178,7 +178,7 @@ public class PlayerRenderMixins {
         }
 
         @Override
-        public void visor$renderVanilla(PlayerRenderState renderState, PoseStack poseStack,
+        public void visor$renderVanilla(AvatarRenderState renderState, PoseStack poseStack,
                                         MultiBufferSource buffer, int packedLight) {
             super.render(renderState, poseStack, buffer, packedLight);
         }

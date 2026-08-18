@@ -2,7 +2,7 @@ package org.vmstudio.visor.mixin.client.renderer.blockentity;
 
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.render.VRShaders;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.blockentity.TheEndGatewayRenderer;
 import net.minecraft.client.renderer.blockentity.TheEndPortalRenderer;
 import org.spongepowered.asm.mixin.Mixin;

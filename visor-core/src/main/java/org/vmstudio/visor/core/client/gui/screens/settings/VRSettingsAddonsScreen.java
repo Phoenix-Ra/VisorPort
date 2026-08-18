@@ -15,6 +15,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 
 public class VRSettingsAddonsScreen extends Screen {
 
@@ -99,13 +101,16 @@ public class VRSettingsAddonsScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean keyPressed(KeyEvent event) {
+        int keyCode = event.key();
+        int scanCode = event.scancode();
+        int modifiers = event.modifiers();
         if (keyCode == InputConstants.KEY_ESCAPE) {
             ClientContext.settingsManager.saveOptions();
             MC.setScreen(this.previousScreen);
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     @Override
@@ -200,10 +205,13 @@ public class VRSettingsAddonsScreen extends Screen {
         }
 
         @Override
-        public boolean mouseClicked(double x, double y, int btn) {
-            if (leftButton.mouseClicked(x, y, btn))  return true;
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+            double x = event.x();
+            double y = event.y();
+            int btn = event.button();
+            if (leftButton.mouseClicked(event, doubleClick))  return true;
             return rightButton != null
-                    && rightButton.mouseClicked(x, y, btn);
+                    && rightButton.mouseClicked(event, doubleClick);
         }
 
         @Override

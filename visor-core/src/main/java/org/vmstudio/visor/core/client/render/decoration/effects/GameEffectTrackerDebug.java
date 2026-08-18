@@ -32,6 +32,8 @@ import java.util.EnumMap;
 import java.util.List;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import org.lwjgl.opengl.GL11;
 
 
 @RegisterVRGameEffect
@@ -110,10 +112,10 @@ public class GameEffectTrackerDebug extends VRGameEffect {
         Vec3 camPos = new Vec3((Vector3f) RenderPoseHelper.getCameraPosition(renderPass, renderPose));
 
         // --- GL setup ---
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableCull();
-        RenderSystem.disableDepthTest();
+        GlStateManager._enableBlend();
+        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GlStateManager._disableCull();
+        GlStateManager._disableDepthTest();
         RenderSystem.setShader(CoreShaders.POSITION_COLOR);
 
         // --- Pose setup ---
@@ -144,8 +146,8 @@ public class GameEffectTrackerDebug extends VRGameEffect {
         poseStack.popPose();
 
         // --- Restore GL ---
-        RenderSystem.enableDepthTest();
-        RenderSystem.enableCull();
+        GlStateManager._enableDepthTest();
+        GlStateManager._enableCull();
     }
 
     private void updateAnchor(Vec3 hmdPos, float yaw) {
