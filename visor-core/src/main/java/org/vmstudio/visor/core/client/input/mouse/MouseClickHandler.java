@@ -1,6 +1,8 @@
 package org.vmstudio.visor.core.client.input.mouse;
 
 import lombok.Setter;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import org.vmstudio.visor.api.client.ClientFeature;
 import org.vmstudio.visor.api.client.gui.overlays.VROverlay;
 import org.vmstudio.visor.api.client.gui.overlays.framework.VROverlayScreen;
@@ -47,6 +49,17 @@ public class MouseClickHandler {
         this.isLeftClick = buttonType == MouseButtonType.LEFT;
     }
 
+    // 1.21.11: the mouse callbacks take an event object instead of (x, y, button).
+    // A controller click carries no keyboard modifiers, so the modifier mask is always 0 -
+    // same as VROverlayScreen#startDragMouse builds for its synthetic drag events.
+    private @NotNull MouseButtonEvent buttonEvent(@NotNull VROverlay overlay) {
+        return new MouseButtonEvent(
+                overlay.getMouseX(),
+                overlay.getMouseY(),
+                new MouseButtonInfo(buttonType.getId(), 0)
+        );
+    }
+
     public void updateState(@NotNull HandType handType,
                             boolean pressed,
                             boolean changed) {
@@ -77,11 +90,7 @@ public class MouseClickHandler {
         } else if (focusedOverlay == null
                 && pressedOverlay != null
                 && wasPressedOverlay) {
-            pressedOverlay.mouseReleased(
-                    pressedOverlay.getMouseX(),
-                    pressedOverlay.getMouseY(),
-                    buttonType.getId()
-            );
+            pressedOverlay.mouseReleased(buttonEvent(pressedOverlay));
             if (pressedOverlay instanceof VROverlayScreen overlayScreen) {
                 overlayScreen.finishDragMouse(buttonType.getId());
             }
@@ -91,11 +100,7 @@ public class MouseClickHandler {
                 && pressedOverlay != null
                 && focusedOverlay != pressedOverlay
                 && wasPressedOverlay) {
-            pressedOverlay.mouseReleased(
-                    pressedOverlay.getMouseX(),
-                    pressedOverlay.getMouseY(),
-                    buttonType.getId()
-            );
+            pressedOverlay.mouseReleased(buttonEvent(pressedOverlay));
             if (pressedOverlay instanceof VROverlayScreen overlayScreen) {
                 overlayScreen.finishDragMouse(buttonType.getId());
             }
@@ -191,11 +196,7 @@ public class MouseClickHandler {
                 target = ClientContext.cursorHandler.getFocusedOverlay();
             }
             if (target != null) {
-                target.mouseReleased(
-                        target.getMouseX(),
-                        target.getMouseY(),
-                        buttonType.getId()
-                );
+                target.mouseReleased(buttonEvent(target));
                 if (target instanceof VROverlayScreen overlayScreen) {
                     overlayScreen.finishDragMouse(buttonType.getId());
                 }
@@ -213,11 +214,7 @@ public class MouseClickHandler {
     public void onClear() {
         InputHelper.releaseMouse(buttonType);
         if (pressedOverlay != null && wasPressedOverlay) {
-            pressedOverlay.mouseReleased(
-                    pressedOverlay.getMouseX(),
-                    pressedOverlay.getMouseY(),
-                    buttonType.getId()
-            );
+            pressedOverlay.mouseReleased(buttonEvent(pressedOverlay));
             if (pressedOverlay instanceof VROverlayScreen overlayScreen) {
                 overlayScreen.finishDragMouse(buttonType.getId());
             }
@@ -246,10 +243,9 @@ public class MouseClickHandler {
     }
 
     private void processOverlay(VROverlay overlay) {
-        overlay.mouseClicked(
-                overlay.getMouseX(), overlay.getMouseY(),
-                buttonType.getId()
-        );
+        // VR clicks are single presses - the handler has no double-click detection, so the
+        // 1.21.11 doubleClick flag is always false here.
+        overlay.mouseClicked(buttonEvent(overlay), false);
         if (overlay instanceof VROverlayScreen overlayScreen) {
             overlayScreen.startDragMouse(buttonType.getId());
         }

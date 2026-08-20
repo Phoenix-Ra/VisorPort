@@ -11,8 +11,7 @@ import org.jetbrains.annotations.Nullable;
 import org.vmstudio.visor.api.client.render.VRRenderPass;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.server.level.BlockDestructionProgress;
 import net.minecraft.world.entity.player.Player;
@@ -42,11 +41,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.At.Shift;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.vmstudio.visor.core.client.render.helpers.CullFrustumHelper;
 
 import org.vmstudio.visor.core.client.ClientContext;
@@ -63,9 +62,6 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
     @Shadow
     private Minecraft minecraft;
 
-
-    @Unique
-    private Entity visor$renderedEntity;
 
     @Shadow
     @Nullable
@@ -96,10 +92,11 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
     private List<Runnable> visor$swingTasks;
 
 
+    // PORT-1.21.11: the constructor gained LevelRenderState and FeatureRenderDispatcher params.
+    // None of them are used here, so the handler takes only the CallbackInfo and stops tracking
+    // the signature.
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void visor$initFields(Minecraft mc, EntityRenderDispatcher erd,
-                                  BlockEntityRenderDispatcher berd,
-                                  RenderBuffers rb, CallbackInfo ci) {
+    private void visor$initFields(CallbackInfo ci) {
         visor$damagedBlocksVr = Collections.synchronizedMap(new HashMap<>());
         visor$damagedBlocksVrSave = Collections.synchronizedMap(new HashMap<>());
         visor$swingTasks = Collections.synchronizedList(new ArrayList<>());
@@ -109,25 +106,37 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
   //--------RENDERING--------\\
     \* ****************** */
 
-    @ModifyVariable(method = "prepareCullFrustum", at = @At("HEAD"), index = 3, argsOnly = true)
+    // PORT-1.21.11: prepareCullFrustum is (frustumMatrix, projectionMatrix, cameraPos) now - the
+    // Vec3 moved from the front of the list to the back, so the projection sits at index 2.
+    @ModifyVariable(method = "prepareCullFrustum", at = @At("HEAD"), index = 2, argsOnly = true)
     private Matrix4f visor$widenCullFrustum(Matrix4f projection) {
         return CullFrustumHelper.widenCullProjection(projection);
     }
 
 
+    // PORT-1.21.11: collectVisibleEntities -> extractVisibleEntities (the extract/submit split).
+    // It still guards the camera entity's own model with camera.isDetached(), which is the call
+    // this redirect exists to override.
     @Redirect(
-            method = "collectVisibleEntities",
+            method = "extractVisibleEntities",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;isDetached()Z")
     )
     private boolean visor$renderSpectatedVRSelfView(Camera camera) {
-        if (VRRenderState.isSpectatedVRView(camera.getEntity())) {
+        if (VRRenderState.isSpectatedVRView(camera.entity())) {
             return true;
         }
         return camera.isDetached();
     }
 
-    @Inject(at = @At("HEAD"), method = "renderEntity")
-    public void visor$captureEntityRestore(CallbackInfo ci,
+    // PORT-1.21.11: LevelRenderer#renderEntity is gone. Per-entity work is extractEntity(Entity,
+    // float) now - that is where the render state samples the entity's position, so it is where
+    // the camera entity's real position has to be back in place. It returns the built state, so
+    // the handlers take a CallbackInfoReturnable.
+    // The pair also used to publish the entity as visor$renderedEntity for the VR name tag
+    // orientation; that reader runs in the submit phase, which no longer overlaps this window, so
+    // it takes its anchor off the render state instead and the field is gone.
+    @Inject(at = @At("HEAD"), method = "extractEntity")
+    public void visor$captureEntityRestore(CallbackInfoReturnable<EntityRenderState> cir,
                                               @Local(argsOnly = true) Entity entity,
                                               @Share("capturedEntity") LocalRef<Entity> capturedEntity
     ) {
@@ -137,11 +146,10 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
             ((GameRendererExtension) minecraft.gameRenderer)
                     .visor$applyCachedCameraEntityPosition(entity);
         }
-        this.visor$renderedEntity = entity;
     }
 
-    @Inject(at = @At("TAIL"), method = "renderEntity")
-    public void visor$captureEntitySetup(CallbackInfo ci,
+    @Inject(at = @At("TAIL"), method = "extractEntity")
+    public void visor$captureEntitySetup(CallbackInfoReturnable<EntityRenderState> cir,
                                   @Local(argsOnly = true) Entity entity,
                                   @Share("capturedEntity") LocalRef<Entity> capturedEntity
     ) {
@@ -149,13 +157,15 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
             ((GameRendererExtension) minecraft.gameRenderer)
                     .visor$setupCameraEntityAsVRCamera();
         }
-        this.visor$renderedEntity = null;
     }
 
 
 
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;getRenderDistance()F", shift = Shift.BEFORE),
-            method = "renderLevel(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/Camera;Lnet/minecraft/client/renderer/GameRenderer;Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;)V")
+    // PORT-1.21.11: renderLevel no longer takes a GameRenderer and never calls
+    // GameRenderer#getRenderDistance, so the old anchor for this injection does not exist any
+    // more. The body is a disabled @TODO, so the hook is parked at HEAD to keep it applying; the
+    // exact point has to be re-established when the Quest 3 rework below is picked up.
+    @Inject(at = @At("HEAD"), method = "renderLevel")
     public void visor$stencil(CallbackInfo info) {
         if (VRRenderState.getPhase().isNotVanilla()) {
             //@TODO rework to fix Quest 3 issue
@@ -179,8 +189,9 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
     }
 
 
-    @Inject(method = "renderLevel(Lcom/mojang/blaze3d/resource/GraphicsResourceAllocator;Lnet/minecraft/client/DeltaTracker;ZLnet/minecraft/client/Camera;Lnet/minecraft/client/renderer/GameRenderer;Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;)V",
-            at = @At("HEAD"))
+    // PORT-1.21.11: renderLevel's descriptor changed wholesale (no GameRenderer, extra fog slice
+    // and flags). There is still only one renderLevel, so the name alone selects it.
+    @Inject(method = "renderLevel", at = @At("HEAD"))
     private void visor$useVROutlineTarget(CallbackInfo ci) {
         if (VisorState.get().isNotActive() || VRRenderState.getPhase().isVanilla()) {
             if (this.visor$vanillaOutlineTarget != null) {
@@ -199,8 +210,11 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
         VRRenderPass renderPass = VRRenderState.getRenderPass();
         RenderTarget outline = this.visor$vrOutlineTargets.get(renderPass);
         if (outline == null) {
-            outline = new TextureTarget(passTarget.width, passTarget.height, true);
-            outline.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+            // PORT-1.21.11: TextureTarget takes a debug label, and a RenderTarget no longer owns a
+            // clear colour - vanilla's own initOutline dropped its setClearColor(0,0,0,0) call for
+            // the same reason, the outline attachment is cleared by the pass that draws into it.
+            outline = new TextureTarget("Visor VR Entity Outline " + renderPass,
+                    passTarget.width, passTarget.height, true);
             this.visor$vrOutlineTargets.put(renderPass, outline);
         } else if (outline.width != passTarget.width
                 || outline.height != passTarget.height) {
@@ -360,18 +374,6 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
 
         visor$damagedBlocksVr.put(blockPos.asLong(), System.currentTimeMillis());
         visor$damagedBlocksVrSave.put(blockPos.asLong(), progress);
-    }
-
-
-    /* ************************ *\
-  //--------PUBLIC METHODS--------\\
-    \* ************************ */
-
-
-    @Override
-    @Unique
-    public Entity visor$getRenderedEntity() {
-        return this.visor$renderedEntity;
     }
 
 

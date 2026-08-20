@@ -2,7 +2,6 @@ package org.vmstudio.visor.mixin.common.player;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
@@ -68,26 +67,25 @@ public abstract class Common_PlayerMixin extends Common_LivingEntityMixin
 
 
 
-    @WrapMethod(method = "sweepAttack")
-    protected void visor$wrapSweepAttack(Operation<Void> original) {
-        original.call();
+    // PORT-1.21.11: Player#sweepAttack() became the private
+    // doSweepAttack(Entity, float, DamageSource, float) - vanilla hands the sweep its target,
+    // the damage and the attack source now instead of re-deriving them from the player.
+    @WrapMethod(method = "doSweepAttack")
+    protected void visor$wrapSweepAttack(Entity target,
+                                       float damage,
+                                       DamageSource damageSource,
+                                       float attackStrengthScale,
+                                       Operation<Void> original) {
+        original.call(target, damage, damageSource, attackStrengthScale);
     }
     @Inject(method = "die", at = @At("TAIL"))
     protected void visor$afterDie(DamageSource damageSource, CallbackInfo ci){
 
     }
 
-    @WrapMethod(method = "hurtCurrentlyUsedShield")
-    protected void visor$roomscaleShieldItemDamage(float damageAmount, Operation<Void> original) {
-        original.call(damageAmount);
-    }
-
-    @ModifyExpressionValue(method = "hurtCurrentlyUsedShield",
-            at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/world/entity/player/Player;getUsedItemHand()Lnet/minecraft/world/InteractionHand;"))
-    protected InteractionHand visor$roomscaleShieldHand(InteractionHand original) {
-        return original;
-    }
+    // PORT-1.21.11: the roomscale shield hooks moved to Common_LivingEntityMixin -
+    // Player#hurtCurrentlyUsedShield is gone and the blocking item's durability loss now happens
+    // in LivingEntity#applyItemBlocking, which Player does not override.
 
 
     /* ***************************************** *\
@@ -101,16 +99,30 @@ public abstract class Common_PlayerMixin extends Common_LivingEntityMixin
         return forced != null ? forced : original.call(self);
     }
 
-    // getDestroySpeed → inventory.getDestroySpeed: route the inventory lookup to the forced item
+    // getDestroySpeed → inventory.getSelectedItem: route the inventory lookup to the mining item
+    // PORT-1.21.11: Inventory#getDestroySpeed is gone. Player#getDestroySpeed reads
+    // Inventory#getSelectedItem() and calls ItemStack#getDestroySpeed itself, so the swap happens
+    // one call earlier and picks the item rather than the finished speed. This also absorbs
+    // InventoryMixin's offhand override, which lost its host method in the same rework; vanilla's
+    // old Inventory#getDestroySpeed was exactly items.get(selected).getDestroySpeed(state), so
+    // choosing the stack is equivalent. The forced hand still wins over the VR hand, as before.
     @WrapOperation(method = "getDestroySpeed",
             at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/world/entity/player/Inventory;getDestroySpeed(Lnet/minecraft/world/level/block/state/BlockState;)F"))
-    private float visor$forceInventoryDestroySpeed(Inventory inv, BlockState state, Operation<Float> original) {
+                    target = "Lnet/minecraft/world/entity/player/Inventory;getSelectedItem()Lnet/minecraft/world/item/ItemStack;"))
+    private ItemStack visor$destroySpeedItem(Inventory inv, Operation<ItemStack> original) {
         ItemStack forced = CommonUtils.FORCED_HAND_ITEM.get();
         if (forced != null && !forced.isEmpty()) {
-            return forced.getDestroySpeed(state);
+            return forced;
         }
-        return original.call(inv, state);
+        if (!VRServerSettings.isTwoHandedVR()) {
+            return original.call(inv);
+        }
+        Player self = (Player) (Object) this;
+        VRPlayer vrPlayer = VisorAPI.getVRPlayer(self);
+        if (vrPlayer == null || vrPlayer.getActiveHand() != HandType.OFFHAND) {
+            return original.call(inv);
+        }
+        return self.getOffhandItem();
     }
 
     @Inject(at = @At("HEAD"), method = "hasCorrectToolForDrops",
@@ -190,24 +202,14 @@ public abstract class Common_PlayerMixin extends Common_LivingEntityMixin
         }
     }
 
-    // replace getMainHand with getItemInHand()
-    @WrapOperation(method = "attack", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/world/entity/player/Player;getMainHandItem()Lnet/minecraft/world/item/ItemStack;"))
-    private ItemStack visor$mainHandItem(Player self, Operation<ItemStack> original) {
-        VRPlayer vrPlayer = VisorAPI.getVRPlayer(self);
-        if (vrPlayer == null) {
-            return original.call(self);
-        }
-        return self.getItemInHand(
-                visor$attackHand(vrPlayer).asInteractionHand()
-        );
-
-    }
-
-    //getItemInHand()
-    @WrapOperation(method = "attack", at = @At(value = "INVOKE",
+    // PORT-1.21.11: Player#attack no longer touches the hands directly. Everything it needs from
+    // the held stack comes from getWeaponItem() (already redirected above), and the one remaining
+    // hand lookup - the sword test that decides whether the hit sweeps - moved into the private
+    // isSweepAttack(ZZZ). Same question as the old getMainHandItem/getItemInHand wraps asked:
+    // what is the *attacking* hand holding.
+    @WrapOperation(method = "isSweepAttack", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/entity/player/Player;getItemInHand(Lnet/minecraft/world/InteractionHand;)Lnet/minecraft/world/item/ItemStack;"))
-    private ItemStack visor$itemInHand(Player self, InteractionHand hand, Operation<ItemStack> original) {
+    private ItemStack visor$sweepAttackHandItem(Player self, InteractionHand hand, Operation<ItemStack> original) {
         VRPlayer vrPlayer = VisorAPI.getVRPlayer(self);
         if (vrPlayer == null) {
             return original.call(self, hand);
@@ -248,8 +250,12 @@ public abstract class Common_PlayerMixin extends Common_LivingEntityMixin
                 : base;
     }
 
+    // PORT-1.21.11: the knockback and push that attack() used to apply inline were extracted into
+    // causeExtraKnockback(Entity, float, Vec3). attack() routes through it, and so does the new
+    // stabAttack(), which means VR aim now steers the shove of a stab as well as a swing.
+
     // knockback for living entities targets
-    @WrapOperation(method = "attack", at = @At(value = "INVOKE",
+    @WrapOperation(method = "causeExtraKnockback", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/entity/LivingEntity;knockback(DDD)V"))
     private void visor$vrKnockbackDirection(LivingEntity target, double strength, double x, double z,
                                             Operation<Void> original) {
@@ -262,7 +268,7 @@ public abstract class Common_PlayerMixin extends Common_LivingEntityMixin
     }
 
     // knockback for non-living entities targets
-    @WrapOperation(method = "attack", at = @At(value = "INVOKE",
+    @WrapOperation(method = "causeExtraKnockback", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/entity/Entity;push(DDD)V"))
     private void visor$vrPushDirection(Entity target, double x, double y, double z,
                                        Operation<Void> original) {

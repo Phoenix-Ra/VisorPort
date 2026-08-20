@@ -8,6 +8,7 @@ import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.*;
@@ -311,12 +312,17 @@ public class VRItemPoseDefault extends VRHandItemPose {
             if (block instanceof TorchBlock) {
                 transformType = TransformType.BLOCK_STICK;
             } else {
+                // PORT-1.21.11: updateForTopItem lost the left-hand flag and takes an ItemOwner
+                // (Entity implements it) instead of a LivingEntity.
                 itemModelResolver.updateForTopItem(
                         ITEM_RENDER_STATE, itemStack, ItemDisplayContext.GROUND,
-                        false, MC.level, MC.player, 0
+                        MC.level, MC.player, 0
                 );
 
-                if (ITEM_RENDER_STATE.isGui3d()) {
+                // PORT-1.21.11: isGui3d() is gone. Both it and usesBlockLight() were fed by the
+                // model's gui light, so the block-lit flag is what still tells a block-shaped
+                // model apart from a flat generated sprite.
+                if (ITEM_RENDER_STATE.usesBlockLight()) {
                     transformType = TransformType.BLOCK_3D;
                 } else {
                     transformType = TransformType.BLOCK_ITEM;
@@ -344,14 +350,20 @@ public class VRItemPoseDefault extends VRHandItemPose {
     }
 
     public static boolean isTool(final Item item) {
-        return item instanceof DiggerItem
+        // PORT-1.21.11: DiggerItem and PickaxeItem no longer exist - mining tools are plain
+        // Items carrying a Tool component, so the tool tags are what identifies them now
+        // (same route ItemClassifier.SWORD already takes for the removed SwordItem).
+        var itemHolder = item.builtInRegistryHolder();
+        return itemHolder.is(ItemTags.PICKAXES)
+                || itemHolder.is(ItemTags.AXES)
+                || itemHolder.is(ItemTags.SHOVELS)
+                || itemHolder.is(ItemTags.HOES)
                 || item instanceof FishingRodItem
                 || item instanceof FoodOnAStickItem
                 || item instanceof FlintAndSteelItem
                 || item instanceof BrushItem
                 || item instanceof HoeItem
                 || item instanceof AxeItem
-                || item instanceof PickaxeItem
                 || item instanceof ShovelItem;
     }
     public static boolean isStick(final Item item){

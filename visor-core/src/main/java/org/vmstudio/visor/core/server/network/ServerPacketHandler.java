@@ -142,7 +142,7 @@ public class ServerPacketHandler {
                 }
                 var payload = (TeleportMovePayloadToServer) payloadToServer;
                 ServerPlayer player = vrPlayer.getMcPlayer();
-                player.absMoveTo(
+                player.absSnapTo(
                         payload.x(), payload.y(), payload.z(),
                         player.getYRot(),
                         player.getXRot()
@@ -158,7 +158,7 @@ public class ServerPacketHandler {
 
                 var payload = (SwingAttackPayloadToServer) payloadToServer;
 
-                ServerLevel serverLevel = serverPlayer.serverLevel();
+                ServerLevel serverLevel = serverPlayer.level();
                 HandType handType = payload.mainHand() ? HandType.MAIN : HandType.OFFHAND;
 
                 Entity entity = serverLevel.getEntityOrPart(
@@ -173,7 +173,7 @@ public class ServerPacketHandler {
                     }
 
                     AABB aABB = entity.getBoundingBox();
-                    if (serverPlayer.canInteractWithEntity(aABB, 1.0)) {
+                    if (serverPlayer.isWithinEntityInteractionRange(aABB, 1.0)) {
 
                         if (!(entity instanceof ItemEntity) && !(entity instanceof ExperienceOrb)
                                 && !(entity instanceof AbstractArrow) && entity != serverPlayer) {

@@ -214,7 +214,7 @@ public class TaskTeleport extends VisorTask implements VREventListener {
         LocalPlayerExtension modified = (LocalPlayerExtension) player;
         modified.visor$setTeleported(true);
 
-        player.moveTo(destination);
+        player.snapTo(destination);
         onTeleportEffects(player);
 
         ((LocalPlayerExtension) MC.player)

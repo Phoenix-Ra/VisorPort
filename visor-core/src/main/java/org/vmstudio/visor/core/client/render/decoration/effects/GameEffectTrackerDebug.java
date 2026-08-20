@@ -1,13 +1,11 @@
 package org.vmstudio.visor.core.client.render.decoration.effects;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.renderer.CoreShaders;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -32,8 +30,6 @@ import java.util.EnumMap;
 import java.util.List;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import org.lwjgl.opengl.GL11;
 
 
 @RegisterVRGameEffect
@@ -112,11 +108,6 @@ public class GameEffectTrackerDebug extends VRGameEffect {
         Vec3 camPos = new Vec3((Vector3f) RenderPoseHelper.getCameraPosition(renderPass, renderPose));
 
         // --- GL setup ---
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GlStateManager._disableCull();
-        GlStateManager._disableDepthTest();
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
 
         // --- Pose setup ---
         poseStack.pushPose();
@@ -141,13 +132,11 @@ public class GameEffectTrackerDebug extends VRGameEffect {
             addAxis(builder, pose, center, projectDir(tracker.getCustomVector(AXIS_Y), cos, sin), 64, 235, 90);  // Y green
             addAxis(builder, pose, center, projectDir(tracker.getCustomVector(AXIS_Z), cos, sin), 66, 135, 245); // Z blue
         }
-        BufferUploader.drawWithShader(builder.buildOrThrow());
+        VisorPipelines.POSITION_COLOR_NORMAL_NO_DEPTH_TYPE.draw(builder.buildOrThrow());
 
         poseStack.popPose();
 
         // --- Restore GL ---
-        GlStateManager._enableDepthTest();
-        GlStateManager._enableCull();
     }
 
     private void updateAnchor(Vec3 hmdPos, float yaw) {

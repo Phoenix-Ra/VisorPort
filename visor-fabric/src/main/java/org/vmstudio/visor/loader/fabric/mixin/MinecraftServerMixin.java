@@ -4,7 +4,7 @@ import com.mojang.datafixers.DataFixer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.Services;
 import net.minecraft.server.WorldStem;
-import net.minecraft.server.level.progress.ChunkProgressListenerFactory;
+import net.minecraft.server.level.progress.LevelLoadListener;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.spongepowered.asm.mixin.Mixin;
@@ -24,7 +24,12 @@ import java.util.function.BooleanSupplier;
 public abstract class MinecraftServerMixin {
 
     @Inject(at = @At("TAIL"), method = "<init>")
-    public void visor$registerAddons(Thread thread, LevelStorageSource.LevelStorageAccess levelStorageAccess, PackRepository packRepository, WorldStem worldStem, Proxy proxy, DataFixer dataFixer, Services services, ChunkProgressListenerFactory chunkProgressListenerFactory,
+    public void visor$registerAddons(Thread thread, LevelStorageSource.LevelStorageAccess levelStorageAccess, PackRepository packRepository, WorldStem worldStem, Proxy proxy, DataFixer dataFixer, Services services,
+                                     // PORT-1.21.11: the last constructor parameter went
+                                     // ChunkProgressListenerFactory -> LevelLoadListener.
+                                     // An @Inject into <init> must mirror the constructor
+                                     // descriptor exactly or the injector fails at runtime.
+                                     LevelLoadListener levelLoadListener,
                                      CallbackInfo callbackInfo){
         if(ModLoader.get().isDedicatedServer()){
             AddonManagerImpl.register();

@@ -6,16 +6,20 @@ import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.extensions.client.GuiExtension;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.gui.contextualbar.ContextualBarRenderer;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -61,39 +65,68 @@ public abstract class GuiMixin implements GuiExtension {
                 && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD))) return;
         ci.cancel();
     }
-    @Inject(at = @At("HEAD"), method = "renderJumpMeter", cancellable = true)
-    public void visor$noVanillaJumpMeter(CallbackInfo ci) {
-        if(VisorState.get().isNotActive() || (minecraft.screen == null
-                && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD))) return;
-        ci.cancel();
+    // 1.21.11: renderJumpMeter and renderExperienceBar are gone from Gui. The jump meter, the
+    // experience bar and the locator bar are now one ContextualBarRenderer that
+    // renderHotbarAndDecorations draws in two passes - the bar background, then the filled bar.
+    // Skipping both passes is what cancelling the two old methods did.
+    @Redirect(at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;renderBackground(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/DeltaTracker;)V"),
+            method = "renderHotbarAndDecorations")
+    public void visor$noVanillaContextualBarBackground(ContextualBarRenderer instance,
+                                                       GuiGraphics guiGraphics,
+                                                       DeltaTracker deltaTracker) {
+        if(visor$keepsVanillaHud()) {
+            instance.renderBackground(guiGraphics, deltaTracker);
+        }
     }
-    @Inject(at = @At("HEAD"), method = "renderExperienceBar", cancellable = true)
-    public void visor$noVanillaExperienceBar(CallbackInfo ci) {
-        if(VisorState.get().isNotActive() || (minecraft.screen == null
-                && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD))) return;
-        ci.cancel();
+    @Redirect(at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/DeltaTracker;)V"),
+            method = "renderHotbarAndDecorations")
+    public void visor$noVanillaContextualBar(ContextualBarRenderer instance,
+                                             GuiGraphics guiGraphics,
+                                             DeltaTracker deltaTracker) {
+        if(visor$keepsVanillaHud()) {
+            instance.render(guiGraphics, deltaTracker);
+        }
     }
     // 1.21.1: the level number is drawn by its own layer now
-    @Inject(at = @At("HEAD"), method = "renderExperienceLevel", cancellable = true)
-    public void visor$noVanillaExperienceLevel(CallbackInfo ci) {
-        if(VisorState.get().isNotActive() || (minecraft.screen == null
-                && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD))) return;
-        ci.cancel();
+    // 1.21.11: that layer is a static helper on ContextualBarRenderer, called straight from
+    // renderHotbarAndDecorations, so it is skipped at the call site instead of cancelled
+    @Redirect(at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;renderExperienceLevel(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;I)V"),
+            method = "renderHotbarAndDecorations")
+    public void visor$noVanillaExperienceLevel(GuiGraphics guiGraphics, Font font, int level) {
+        if(visor$keepsVanillaHud()) {
+            ContextualBarRenderer.renderExperienceLevel(guiGraphics, font, level);
+        }
+    }
+    // The guard the cancelled renderJumpMeter/renderExperienceBar/renderExperienceLevel
+    // injections shared: vanilla keeps drawing while Visor is off, or while no screen is open
+    // and HUD hiding was not requested.
+    @Unique
+    private boolean visor$keepsVanillaHud() {
+        return VisorState.get().isNotActive()
+                || (minecraft.screen == null
+                && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD));
     }
     // 1.21.1: the boss bar call lives in a constructor lambda now,
     // so it is cancelled in BossHealthOverlayMixin instead of redirected here
+    // 1.21.11: ChatComponent.render gained an explicit Font and a trailing
+    // "change cursor on insertions" flag
     @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/components/ChatComponent;render(Lnet/minecraft/client/gui/GuiGraphics;IIIZ)V"),
+            target = "Lnet/minecraft/client/gui/components/ChatComponent;render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;IIIZZ)V"),
             method = "renderChat")
     public void visor$noVanillaGuiChat(ChatComponent instance,
                                        GuiGraphics guiGraphics,
-                                       int i, int j, int k, boolean focused) {
+                                       Font font,
+                                       int i, int j, int k, boolean focused,
+                                       boolean changeCursorOnInsertions) {
         if(VisorState.get().isNotActive()) {
-            instance.render(guiGraphics, i, j, k, focused);
+            instance.render(guiGraphics, font, i, j, k, focused, changeCursorOnInsertions);
             return;
         }
         if(minecraft.screen instanceof ChatScreen) {
-            instance.render(guiGraphics, i, j, k, focused);
+            instance.render(guiGraphics, font, i, j, k, focused, changeCursorOnInsertions);
         }
     }
 

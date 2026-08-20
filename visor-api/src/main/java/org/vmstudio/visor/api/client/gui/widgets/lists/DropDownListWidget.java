@@ -84,11 +84,24 @@ public class DropDownListWidget extends AbstractButton {
 
     /**
      * Renders the base button and, if expanded, the dropdown list along with the interactive scrollbar.
+     * <p>
+     * PORT-1.21.11: {@code AbstractButton#renderWidget} is final now and is nothing but
+     * {@code renderContents(...)} followed by {@code handleCursor(...)}, so
+     * {@code super.renderWidget(...)} from in here was infinite recursion - the super call came
+     * straight back to this override through the virtual dispatch, which is the
+     * {@code StackOverflowError} on any screen holding a dropdown.
+     * <p>
+     * {@code super.renderContents(...)} is not the replacement either: it is abstract on
+     * {@code AbstractButton}, which this extends directly. The button-drawing that
+     * 1.21.4's {@code super.renderWidget(...)} did is now the two protected helpers below,
+     * copied from {@code Button.Plain#renderContents}.
      */
     @Override
     protected void renderContents(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         // Render the base button (background, border, and label)
-        super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
+        this.renderDefaultSprite(guiGraphics);
+        this.renderDefaultLabel(guiGraphics.textRendererForWidget(
+                this, GuiGraphics.HoveredTextEffects.NONE));
 
         if (expanded) {
             int dropdownX = this.getX();

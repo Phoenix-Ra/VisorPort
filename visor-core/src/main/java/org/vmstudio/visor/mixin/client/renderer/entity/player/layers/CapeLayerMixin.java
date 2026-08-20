@@ -33,21 +33,19 @@ public abstract class CapeLayerMixin extends RenderLayer<AvatarRenderState, Play
         super(renderer);
     }
 
-    // DEBUG CAPE
-    /*
-    @WrapOperation(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/resources/PlayerSkin;capeTexture()Lnet/minecraft/resources/Identifier;"))
-    private Identifier visor$whiteCape(PlayerSkin skin, Operation<Identifier> original) {
-        Identifier capeTexture = original.call(skin);
-        if (capeTexture == null) {
-            capeTexture = RenderHelper.WHITE_TEXTURE;
-        }
-        return capeTexture;
-    }
-    */
+    // A commented-out DEBUG CAPE hook used to live here: it wrapped PlayerSkin#capeTexture() so a
+    // capeless player still got a white cape to eyeball the VR transform against. Dropped rather
+    // than ported - 1.21.11 replaced capeTexture() with cape(), returning a ClientAsset.Texture
+    // instead of an Identifier, and submit() now returns early when that is null, so reviving it
+    // means synthesising a Texture rather than swapping a path.
 
     // ordinal 1 is the HUMANOID check that applies the vanilla with-armor cape offset; returning
     // false there skips it, and the VR offset/rotation is applied instead.
-    @ModifyExpressionValue(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/CapeLayer;hasLayer(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/client/resources/model/EquipmentClientInfo$LayerType;)Z", ordinal = 1))
+    // PORT-1.21.11: RenderLayer#render became RenderLayer#submit - the layer records geometry into
+    // a SubmitNodeCollector instead of drawing into a MultiBufferSource. The hasLayer branch this
+    // hooks (and its ordinal) is unchanged, and the pose is still read at submit time, so the
+    // transform written here reaches the cape exactly as before.
+    @ModifyExpressionValue(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/AvatarRenderState;FF)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/CapeLayer;hasLayer(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/client/resources/model/EquipmentClientInfo$LayerType;)Z", ordinal = 1))
     private boolean visor$modifyTransform(
         boolean hasArmor, @Local(argsOnly = true) AvatarRenderState renderState,
         @Local(argsOnly = true) PoseStack poseStack)

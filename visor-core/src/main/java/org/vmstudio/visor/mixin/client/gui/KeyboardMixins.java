@@ -1,6 +1,7 @@
 package org.vmstudio.visor.mixin.client.gui;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.platform.Window;
 import org.vmstudio.visor.api.client.gui.overlays.framework.VROverlayScreen;
 import org.vmstudio.visor.api.client.input.InputHelper;
 import org.vmstudio.visor.core.client.ClientContext;
@@ -9,6 +10,8 @@ import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import net.minecraft.client.gui.screens.inventory.BookEditScreen;
@@ -33,10 +36,11 @@ public class KeyboardMixins {
         /**
          * For keyboard to work
          */
+        // PORT-1.21.11: isKeyDown takes the Window rather than its raw handle now.
         @Inject(at = @At("HEAD"), method = "isKeyDown", cancellable = true)
-        private static void visor$keyDown(long l, int i, CallbackInfoReturnable<Boolean> cir) {
+        private static void visor$keyDown(Window window, int i, CallbackInfoReturnable<Boolean> cir) {
             cir.setReturnValue(
-                    GLFW.glfwGetKey(l, i) == 1
+                    GLFW.glfwGetKey(window.handle(), i) == 1
                             || (VisorState.get().isActive() && InputHelper.isKeyDown(i))
             );
         }
@@ -53,8 +57,10 @@ public class KeyboardMixins {
          * Send keyboard events to overlay
          * if keyboard is attached to an overlay
          */
+        // PORT-1.21.11: keyPress is (window, action, KeyEvent) - the key/scancode/modifier triple
+        // is the KeyEvent now, and Screen#keyPressed/keyReleased take that event straight through.
         @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getWindow()Lcom/mojang/blaze3d/platform/Window;", ordinal = 0, shift = At.Shift.AFTER), method = "keyPress", cancellable = true)
-        public void visor$onKeyPressed(long windowHandle, int keyCode, int keyScan, int actionType, int keyModifiers, CallbackInfo ci) {
+        public void visor$onKeyPressed(long windowHandle, int actionType, KeyEvent keyEvent, CallbackInfo ci) {
             if (VisorState.get().isNotActive()) {
                 return;
             }
@@ -64,10 +70,10 @@ public class KeyboardMixins {
             if(attachedScreen instanceof VROverlayScreen
                     && keyboardAccessor.isVisible()){
                 if (actionType == 0) {
-                    attachedScreen.keyReleased(keyCode, keyScan, keyModifiers);
+                    attachedScreen.keyReleased(keyEvent);
                 } else {
                     //pressed - 1, heldDown - 2
-                    attachedScreen.keyPressed(keyCode, keyScan, keyModifiers);
+                    attachedScreen.keyPressed(keyEvent);
                 }
                 ci.cancel();
             }
@@ -89,8 +95,9 @@ public class KeyboardMixins {
             super(i, j, k, l, component);
         }
 
+        // PORT-1.21.11: onClick carries a MouseButtonEvent plus the double-click flag now.
         @Inject(at = @At(value = "HEAD"), method = "onClick")
-        public void visor$openKeyboard(double d, double e, CallbackInfo ci) {
+        public void visor$openKeyboard(MouseButtonEvent mouseEvent, boolean doubleClick, CallbackInfo ci) {
             if (VisorState.get().isNotActive()) {
                 return;
             }

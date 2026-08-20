@@ -41,20 +41,24 @@ public abstract class BoatMixin extends Entity {
         super(entityType, level);
     }
 
+    // PORT-1.21.11: ClientInput no longer has leftImpulse/forwardImpulse fields - the two are a
+    // single Vec2 move vector now, whose x is the strafe axis the old leftImpulse carried.
+    // Vanilla normalises that vector, so a diagonal keyboard input reads ~0.707 here where
+    // 1.21.4 read 1.0; that is vanilla's own change, the axis and sign are unchanged.
     @ModifyConstant(constant = @Constant(floatValue = 1F, ordinal = 0), method = "controlBoat()V")
     public float visor$inputLeft(float f) {
-        return MC.player.input.leftImpulse;
+        return MC.player.input.getMoveVector().x;
     }
 
     @ModifyConstant(constant = @Constant(floatValue = 1F, ordinal = 1), method = "controlBoat()V")
     public float visor$inputRight(float f) {
-        return -MC.player.input.leftImpulse;
+        return -MC.player.input.getMoveVector().x;
     }
 
     /**
      * Applying values received in TrackerBoat
      */
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/vehicle/AbstractBoat;setDeltaMovement(Lnet/minecraft/world/phys/Vec3;)V", shift = At.Shift.BEFORE), method = "controlBoat", locals = LocalCapture.CAPTURE_FAILHARD, cancellable = true)
+    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/vehicle/boat/AbstractBoat;setDeltaMovement(Lnet/minecraft/world/phys/Vec3;)V", shift = At.Shift.BEFORE), method = "controlBoat", locals = LocalCapture.CAPTURE_FAILHARD, cancellable = true)
     public void visor$rowingInVR(CallbackInfo ci, float forward) {
         if (VisorState.get().isNotActive()) {
             return;

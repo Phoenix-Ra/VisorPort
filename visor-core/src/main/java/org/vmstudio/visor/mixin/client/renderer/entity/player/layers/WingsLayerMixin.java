@@ -37,7 +37,10 @@ public abstract class WingsLayerMixin<S extends HumanoidRenderState, M extends E
         super(renderer);
     }
 
-    @WrapOperation(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/HumanoidRenderState;FF)V", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;translate(FFF)V"))
+    // PORT-1.21.11: RenderLayer#render became RenderLayer#submit. The wrapped call is still the
+    // single translate(0, 0, 0.125) that seats the elytra on the back, and the equipment renderer
+    // reads the pose when it submits, so replacing it here still repositions the wings.
+    @WrapOperation(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/HumanoidRenderState;FF)V", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack;translate(FFF)V"))
     private void visor$elytraPosition(
         PoseStack instance, float x, float y, float z, Operation<Void> original,
         @Local(argsOnly = true) HumanoidRenderState renderState)

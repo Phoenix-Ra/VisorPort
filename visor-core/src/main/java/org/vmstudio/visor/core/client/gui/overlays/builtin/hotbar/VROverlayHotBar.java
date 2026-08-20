@@ -236,7 +236,7 @@ public class VROverlayHotBar extends VROverlayRadialSelector
             int itemX = ((SelectionBoxHotBar) selectionBox).getItemX();
             int itemY = ((SelectionBoxHotBar) selectionBox).getItemY();
 
-            guiGraphics.pose().pushPose();
+            guiGraphics.pose().pushMatrix();
             guiGraphics.renderItem(
                     itemStack,
                     x + itemX,
@@ -250,7 +250,7 @@ public class VROverlayHotBar extends VROverlayRadialSelector
                     y + itemY,
                     null
             );
-            guiGraphics.pose().popPose();
+            guiGraphics.pose().popMatrix();
         }
 
 

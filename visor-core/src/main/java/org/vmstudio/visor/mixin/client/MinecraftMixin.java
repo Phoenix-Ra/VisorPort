@@ -25,6 +25,7 @@ import org.vmstudio.visor.extensions.client.MinecraftExtension;
 import org.vmstudio.visor.extensions.client.entity.LocalPlayerExtension;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.settings.VROptionWidgetType;
+import java.util.function.BooleanSupplier;
 import net.minecraft.client.*;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.Overlay;
@@ -63,9 +64,7 @@ public abstract class MinecraftMixin implements MinecraftExtension {
     @Shadow
     public Screen screen;
 
-    @Final
-    @Shadow
-    public static boolean ON_OSX;
+
 
     @Final
     @Shadow
@@ -250,6 +249,38 @@ public abstract class MinecraftMixin implements MinecraftExtension {
 
 
     /**
+     * Blits the render target Visor actually finished the frame on, not the one vanilla saw at
+     * the top of it.
+     * <p>
+     * PORT-1.21.11: {@code runTick} used to read {@code this.mainRenderTarget} again for the
+     * final blit, which is what put Visor's mirror on the desktop window - {@code renderVR} runs
+     * at the "blit" profiler constant just above, and the mirror phase leaves the mirror target
+     * in that field. 1.21.11 hoists the read: {@code getMainRenderTarget()} is now called once
+     * before {@code gameRenderer.render} and stashed in a local, and that local is what gets
+     * blitted. Two things broke at once. The mirror stopped reaching the screen, and - because
+     * {@code createTargets()} runs inside the frame, destroying every VR target and building new
+     * ones - the stale local could point at a {@code RenderTarget} whose buffers had since been
+     * destroyed, which is the {@code "Can't blit to screen, color texture doesn't exist yet"}
+     * crash on the first frame after a target reinit.
+     * <p>
+     * One call site in {@code runTick}, so no {@code ordinal}.
+     */
+    @Redirect(method = "runTick", at = @At(value = "INVOKE",
+            target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V"))
+    private void visor$blitLiveTarget(RenderTarget capturedAtFrameStart) {
+        RenderTarget live = this.mainRenderTarget != null
+                ? this.mainRenderTarget
+                : capturedAtFrameStart;
+        // A target still mid-reinit has no colour attachment; skipping one frame of desktop
+        // mirror beats taking down the game.
+        if (live.getColorTexture() == null) {
+            return;
+        }
+        live.blitToScreen();
+    }
+
+
+    /**
      * Ensures the render phase
      * and main render target are correct on resize
      *
@@ -272,12 +303,29 @@ public abstract class MinecraftMixin implements MinecraftExtension {
      * <p>
      * FPS has to be handled only by VR related features
      */
-    @WrapOperation(at = @At(value = "INVOKE", target = "Ljava/lang/Thread;sleep(J)V"), method = "doWorldLoad", expect = 0)
-    private void visor$noFPSLimitOnWorldLoad(long l, Operation<Void> original) {
+    /*
+     * PORT-1.21.11: the Thread.sleep(16L) that paced the "waitForServer" loop is gone. doWorldLoad
+     * budgets a frame explicitly now -
+     *     long l = TimeUnit.SECONDS.toNanos(1L) / 60L;
+     *     ...
+     *     this.managedBlock(() -> Util.getNanos() > m);
+     * - so the 60 FPS cap moved from a sleep into a managedBlock that parks until the budget
+     * elapses. Skipping that call is exactly what skipping the sleep used to do; runAllTasks()
+     * runs immediately before it, so nothing is left undrained.
+     *
+     * The old hook carried expect = 0, which is why it did not fail when Thread.sleep disappeared -
+     * it silently matched nothing and the FPS cap quietly came back. That is removed on purpose:
+     * this injector should be loud the next time vanilla reshapes the loop.
+     */
+    @WrapOperation(method = "doWorldLoad",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/client/Minecraft;managedBlock(Ljava/util/function/BooleanSupplier;)V"))
+    private void visor$noFPSLimitOnWorldLoad(Minecraft instance, BooleanSupplier until,
+                                             Operation<Void> original) {
         if (VisorState.get().isActive()) {
             return;
         }
-        original.call(l);
+        original.call(instance, until);
     }
 
 
@@ -416,13 +464,15 @@ public abstract class MinecraftMixin implements MinecraftExtension {
     /**
      * Resets room origin when world changed
      * <p>
-     * 1.21.1: setLevel gained a LevelLoadingScreen.Reason parameter
+     * PORT-1.21.11: setLevel is back to a single ClientLevel parameter - the
+     * LevelLoadingScreen.Reason that 1.21.1 added is gone again. An @Inject handler must mirror
+     * the target's parameters exactly, so the stale Reason argument was an apply-time crash.
      *
      * @param pLevelClient s
      * @param info         s
      */
     @Inject(at = @At("HEAD"), method = "setLevel")
-    public void visor$onLevelChange(ClientLevel pLevelClient, LevelLoadingScreen.Reason reason, CallbackInfo info) {
+    public void visor$onLevelChange(ClientLevel pLevelClient, CallbackInfo info) {
         if (VisorState.get().isActive()) {
             ClientContext.localPlayer.setOrigin(
                     0.0f, 0.0f, 0.0f, true

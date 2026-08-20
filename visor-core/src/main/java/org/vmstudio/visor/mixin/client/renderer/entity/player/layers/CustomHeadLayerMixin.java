@@ -11,7 +11,11 @@ import org.vmstudio.visor.core.client.render.VRRenderState;
 
 @Mixin(CustomHeadLayer.class)
 public class CustomHeadLayerMixin {
-    @Inject(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;FF)V", at = @At("HEAD"), cancellable = true)
+    // PORT-1.21.11: RenderLayer#render became RenderLayer#submit. Cancelling at HEAD now means the
+    // head geometry is never handed to the SubmitNodeCollector, which suppresses it just as
+    // cancelling the old draw did. The descriptor pins the LivingEntityRenderState overload so the
+    // synthetic EntityRenderState bridge can never be picked instead.
+    @Inject(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;FF)V", at = @At("HEAD"), cancellable = true)
     private void visor$noHelmetInFirstPerson(CallbackInfo ci,
                                              @Local(argsOnly = true) LivingEntityRenderState renderState)
     {

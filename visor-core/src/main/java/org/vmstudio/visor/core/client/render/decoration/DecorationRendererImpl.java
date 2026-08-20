@@ -258,7 +258,9 @@ public class DecorationRendererImpl implements VRDecorationRenderer {
 
         currentDecorator.setupRendering(poseStack, partialTicks);
 
-        MC.gameRenderer.lightTexture().turnOffLightLayer();
+        // PORT-1.21.11: LightTexture no longer binds itself to a global texture unit
+        // (turnOn/turnOffLightLayer are gone) - a pipeline that wants the lightmap takes its
+        // texture view per pass, so there is no leftover binding left to switch off here.
         if (!ShadersHelper.isShaderActive()) {
             ClientContext.guiManager.renderDepthOverlays(poseStack, partialTicks);
         }
@@ -295,12 +297,9 @@ public class DecorationRendererImpl implements VRDecorationRenderer {
     private void renderAfterWorld(PoseStack poseStack, float partialTicks) {
         if (currentDecorator == null) return;
 
-        // Other AFTER_LEVEL listeners may leave the default framebuffer bound
-        // (RenderTarget.copyDepthFrom does this). Iris restores the eye target
-        // before its UI pass; the vanilla pipeline needs the same restoration.
-        if (!ShadersHelper.isShaderActive()) {
-            MC.mainRenderTarget.bindWrite(true);
-        }
+        // PORT-1.21.11: nothing to restore any more. A RenderTarget owns no GL objects and is
+        // never "bound" - every draw below names the eye target's texture view when it opens its
+        // pass, so an AFTER_LEVEL listener can no longer leave a foreign framebuffer behind.
 
         if(currentDecorator.isFullControl()){
             currentDecorator.renderAfterWorld(poseStack, partialTicks);

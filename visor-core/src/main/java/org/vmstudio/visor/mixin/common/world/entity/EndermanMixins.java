@@ -10,8 +10,6 @@ import net.minecraft.world.entity.ai.control.LookControl;
 import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
@@ -85,8 +83,13 @@ public class EndermanMixins {
         private static boolean visor$canAttackVrPlayer(EnderMan enderman,
                                                        ServerPlayer player,
                                                        VRServerPlayer vrPlayer) {
-            ItemStack itemstack = player.getInventory().armor.get(3);
-            if (!itemstack.is(Items.CARVED_PUMPKIN)) { //no ender item
+            // PORT-1.21.11: Inventory#armor is gone, and vanilla's own isBeingStaredBy replaced the
+            // hardcoded "carved pumpkin in armour slot 3" test with
+            // LivingEntity.PLAYER_NOT_WEARING_DISGUISE_ITEM - the head slot against
+            // ItemTags.GAZE_DISGUISE_EQUIPMENT, which ships holding carved_pumpkin and nothing
+            // else. Reusing the predicate keeps this VR override deciding what the vanilla path
+            // it replaces decides, datapack edits to the tag included.
+            if (LivingEntity.PLAYER_NOT_WEARING_DISGUISE_ITEM.test(player)) { //no ender item
                 if (player.level() != enderman.level()) return false;
 
                 var hmd = vrPlayer.getPoseData().getHmd();

@@ -38,10 +38,15 @@ public class VROverlayChat extends VROverlayTemplateScreen {
 
     @Override
     protected void onRender(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        // 1.21.11: ChatComponent.render takes the Font explicitly and a trailing
+        // "change cursor on insertions" flag. Vanilla's HUD path passes false for it
+        // (only ChatScreen's own draw turns it on), which is the behaviour this overlay had.
         minecraft.gui.getChat().render(
                 guiGraphics,
+                minecraft.font,
                 minecraft.gui.getGuiTicks(),0, 0,
-                minecraft.screen instanceof ChatScreen
+                minecraft.screen instanceof ChatScreen,
+                false
         );
     }
 

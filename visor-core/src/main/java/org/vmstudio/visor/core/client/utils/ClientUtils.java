@@ -181,9 +181,15 @@ public class ClientUtils {
             connection.getConnection().disconnect(Component.literal(message));
         }
         if (bl) {
-            minecraft.disconnect(new GenericMessageScreen(Component.translatable("visor.messages.saving_world", message)));
+            // PORT-1.21.11: disconnect(Screen) is gone; the surviving overload takes the
+            // "keep resource packs" flag explicitly. false is what the old one-arg form passed.
+            minecraft.disconnect(
+                    new GenericMessageScreen(Component.translatable("visor.messages.saving_world", message)),
+                    false
+            );
         } else {
-            minecraft.disconnect();
+            // PORT-1.21.11: the no-arg disconnect() is now named for the screen it shows.
+            minecraft.disconnectWithProgressScreen();
         }
 
         TitleScreen titleScreen = new TitleScreen();

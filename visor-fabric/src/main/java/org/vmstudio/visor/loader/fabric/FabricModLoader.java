@@ -14,12 +14,12 @@ import org.vmstudio.visor.api.common.network.VisorPayloadToClient;
 import org.vmstudio.visor.api.common.network.VisorPayloadToServer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import org.vmstudio.visor.loader.fabric.network.VisorRawPayload;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -44,14 +44,15 @@ public class FabricModLoader implements ModLoader {
     private final File configFolder = FabricLoader.getInstance()
             .getConfigDir().toFile();
 
-    private final Map<RenderPipelineStage, List<RenderPipelineCallback>> pipelineCallbacks
+    // static so FabricLevelRendererVRMixin can reach it, mirroring ForgeModLoader
+    private static final Map<RenderPipelineStage, List<RenderPipelineCallback>> pipelineCallbacks
             = new EnumMap<>(RenderPipelineStage.class);
 
     private final Map<Identifier, VisorChannel> networkChannels = new HashMap<>();
+    private boolean worldEventsRegistered = false;
     private boolean serverReceiverRegistered = false;
     private boolean clientReceiverRegistered = false;
 
-    private boolean worldEventsRegistered = false;
 
     @Override
     public File getConfigFolder() {
@@ -87,40 +88,51 @@ public class FabricModLoader implements ModLoader {
                 .add(callback);
 
         if (!worldEventsRegistered) {
+            /*
+             * PORT-1.21.11: WorldRenderEvents moved to ...rendering.v1.world and the event set was
+             * reshuffled for the extract/submit split. Two of the three Visor used survived in
+             * spirit:
+             *   BEFORE_ENTITIES  - unchanged, still "after the SOLID, CUTOUT and CUTOUT_MIPPED
+             *                      terrain layers are drawn, before entities", which is what Visor
+             *                      already used as its closest equivalent of AFTER_SOLID.
+             *   AFTER_TRANSLUCENT -> END_MAIN. Both fire once translucent terrain is on the
+             *                      framebuffer and before particles, clouds and weather.
+             * The context lost tickCounter() (it only exists on the extraction context now) and
+             * matrixStack() is matrices().
+             */
+            WorldRenderEvents.BEFORE_ENTITIES.register(context ->
+                    fireCallbacks(RenderPipelineStage.AFTER_SOLID,
+                            context.matrices(), visor$partialTicks()));
 
-            // matrixStack() can be null for some events (notably BEFORE_BLOCK_OUTLINE)
-            // Closest equivalent of AFTER_SOLID
-            WorldRenderEvents.BEFORE_ENTITIES.register(context -> {
-                fireCallbacks(RenderPipelineStage.AFTER_SOLID, visor$poseStackOf(context),
-                        context.tickCounter().getGameTimeDeltaPartialTick(true));
-            });
+            WorldRenderEvents.END_MAIN.register(context ->
+                    fireCallbacks(RenderPipelineStage.AFTER_TRANSLUCENT,
+                            context.matrices(), visor$partialTicks()));
 
-            // AFTER_TRANSLUCENT
-            WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
-                fireCallbacks(RenderPipelineStage.AFTER_TRANSLUCENT, visor$poseStackOf(context),
-                        context.tickCounter().getGameTimeDeltaPartialTick(true));
-            });
-
-            // AFTER_WORLD
-            // NOTE: pass the context stack through unmodified — the decoration
-            // renderers build their camera transform internally (verified
-            // against the runtime-working community 1.21.1 fabric port;
-            // seeding the view matrix here double-transforms them)
-            WorldRenderEvents.END.register(context -> {
-                fireCallbacks(RenderPipelineStage.AFTER_WORLD, visor$poseStackOf(context),
-                        context.tickCounter().getGameTimeDeltaPartialTick(true));
-            });
-
+            // AFTER_WORLD has no event any more - WorldRenderEvents.END is gone and END_MAIN
+            // stops short of particles, clouds and weather, so it would collide with
+            // AFTER_TRANSLUCENT rather than replace END. FabricLevelRendererVRMixin fires it from
+            // the tail of renderLevel instead, which is where END used to sit.
             worldEventsRegistered = true;
         }
     }
 
-    private static PoseStack visor$poseStackOf(WorldRenderContext context) {
-        PoseStack poseStack = context.matrixStack();
-        return poseStack != null ? poseStack : new PoseStack();
+    /**
+     * The drawing contexts no longer carry a DeltaTracker - only the extraction context does - and
+     * this is the same instance renderLevel is handed, including on Visor's own per-eye passes
+     * (VisorScene drives them with MC.gameRenderer.render(MC.getDeltaTracker(), ...)).
+     */
+    private static float visor$partialTicks() {
+        return Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true);
     }
 
-    private void fireCallbacks(RenderPipelineStage stage, PoseStack poseStack, float partialTicks) {
+    /** Entry point for FabricLevelRendererVRMixin, which owns the AFTER_WORLD stage. */
+    public static void fireRenderPipelineStage(@NotNull RenderPipelineStage stage,
+                                               @NotNull PoseStack poseStack,
+                                               float partialTicks) {
+        fireCallbacks(stage, poseStack, partialTicks);
+    }
+
+    private static void fireCallbacks(RenderPipelineStage stage, PoseStack poseStack, float partialTicks) {
         List<RenderPipelineCallback> callbacks = pipelineCallbacks.get(stage);
         if (callbacks == null || callbacks.isEmpty()) return;
         for (RenderPipelineCallback cb : callbacks) {

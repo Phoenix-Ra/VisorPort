@@ -23,6 +23,7 @@ import org.vmstudio.visor.mixin.common.accessors.ChunkMapAccessor;
 import org.vmstudio.visor.mixin.common.accessors.TrackedEntityAccessor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerPlayerConnection;
@@ -72,7 +73,9 @@ public class ServerNetworking {
 
     public static void kickDelayedIfNoVR(ServerPlayer serverPlayer) {
         scheduler.schedule(() -> {
-            if(serverPlayer.server.isShutdown()){
+            //ServerPlayer#server is private since 1.21.11, the level is the public route to it
+            MinecraftServer server = serverPlayer.level().getServer();
+            if(server == null || server.isShutdown()){
                 return;
             }
             if(serverPlayer.hasDisconnected()){
@@ -81,8 +84,9 @@ public class ServerNetworking {
             VRServerPlayer vrPlayer = VisorAPI.server()
                     .getVRPlayer(serverPlayer);
 
-            if(serverPlayer.server.getPlayerList()
-                    .isOp(serverPlayer.getGameProfile())){
+            //1.21.11: the op list is keyed by NameAndId instead of GameProfile
+            if(server.getPlayerList()
+                    .isOp(serverPlayer.nameAndId())){
                 return;
             }
 
@@ -294,7 +298,8 @@ public class ServerNetworking {
 
 
     public static Set<ServerPlayerConnection> getTrackedVRPlayers(ServerPlayer trackedBy) {
-        ChunkMap chunkMap = trackedBy.serverLevel().getChunkSource().chunkMap;
+        //1.21.11: serverLevel() folded into the covariant level() override
+        ChunkMap chunkMap = trackedBy.level().getChunkSource().chunkMap;
         var vrServer = VisorServerImpl.INSTANCE;
 
         TrackedEntityAccessor entityAccessor = ((ChunkMapAccessor) chunkMap).getTrackedEntities()

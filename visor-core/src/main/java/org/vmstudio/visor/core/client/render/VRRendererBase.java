@@ -10,6 +10,9 @@ import org.vmstudio.visor.api.client.player.body.VRBody;
 import org.vmstudio.visor.api.client.render.VRRenderPass;
 import org.vmstudio.visor.api.client.render.VRRenderer;
 import org.vmstudio.visor.core.client.render.context.RenderContext;
+import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
+import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
+import org.vmstudio.visor.core.client.render.helpers.VREffectsHelper;
 import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.VisorClientImpl;
@@ -36,7 +39,6 @@ import java.util.Map;
 
 import org.vmstudio.visor.core.client.ClientContext;
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
-import com.mojang.blaze3d.opengl.GlStateManager;
 
 public abstract class VRRendererBase implements VRRenderer {
     public RenderTargetMain mainTarget;
@@ -113,11 +115,10 @@ public abstract class VRRendererBase implements VRRenderer {
 
         VRRenderState.startVRGuiPhase();
 
-        GlStateManager._depthMask(true);
-        GlStateManager._colorMask(true, true, true, true);
-
-        MC.mainRenderTarget.clear();
-        MC.mainRenderTarget.bindWrite(true);
+        // PORT-1.21.11: the depth/colour mask pokes are gone with the rest of the global state,
+        // and there is no framebuffer to bind - "where do I draw" is the texture handed to each
+        // render pass. All that is left of this block is the clear.
+        RenderShaderHelper.clearColorAndDepth(MC.mainRenderTarget, 0, 1.0);
 
         // push pose to pop it in scene
         RenderSystem.getModelViewStack().pushMatrix();
@@ -130,8 +131,8 @@ public abstract class VRRendererBase implements VRRenderer {
     public void updateState() throws Throwable {
 
         //Window context changed
-        if (MC.getWindow().getWindow() != this.lastWindow) {
-            this.lastWindow = MC.getWindow().getWindow();
+        if (MC.getWindow().handle() != this.lastWindow) {
+            this.lastWindow = MC.getWindow().handle();
             this.prepareReinit("Window Handle Changed");
         }
 
@@ -371,6 +372,15 @@ public abstract class VRRendererBase implements VRRenderer {
             guiTarget.destroy();
             guiTarget = null;
         }
+
+        // PORT-1.21.11: these two helpers hold lazily allocated GPU buffers in statics (the
+        // eye-space light UBO and the stencil projection buffer), and nothing else releases them.
+        // destroy() is the one path that covers both cases they have to survive: a target reinit,
+        // which calls it from createTargets() before rebuilding, and VR shutdown, where
+        // XRProvider.destroy() calls renderer.destroy(). Both rebuild on next use, so closing
+        // early is safe.
+        RenderPoseHelper.close();
+        VREffectsHelper.close();
     }
 
 
@@ -382,7 +392,7 @@ public abstract class VRRendererBase implements VRRenderer {
 
     @Override
     public long getWindowHandle() {
-        return MC.getWindow().getWindow();
+        return MC.getWindow().handle();
     }
 
     @Override

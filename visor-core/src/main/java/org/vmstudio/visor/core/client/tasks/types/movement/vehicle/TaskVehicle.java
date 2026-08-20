@@ -235,7 +235,8 @@ public class TaskVehicle extends VisorTask {
                     .getRotationElement(PlayerPoseType.TICK)
                     .getDirection();
         }
-        if (entity instanceof Mob mob && mob.isControlledByLocalInstance()) {
+        // PORT-1.21.11: isControlledByLocalInstance() was renamed to isLocalInstanceAuthoritative()
+        if (entity instanceof Mob mob && mob.isLocalInstanceAuthoritative()) {
             final HandType handWithFood = ItemClassifier.FOOD_STICK
                     .is(player.getMainHandItem().getItem())
                     ? HandType.MAIN

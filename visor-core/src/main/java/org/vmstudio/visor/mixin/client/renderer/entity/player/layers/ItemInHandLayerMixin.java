@@ -29,17 +29,23 @@ import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 @Mixin(ItemInHandLayer.class)
 public abstract class ItemInHandLayerMixin {
 
-    // fully qualified so it can never drift onto a bridge overload of the same name
-    private static final String RENDER_ARM_WITH_ITEM =
-            "renderArmWithItem(Lnet/minecraft/client/renderer/entity/state/ArmedEntityRenderState;"
+    // PORT-1.21.11: renderArmWithItem became submitArmWithItem - it collects into a
+    // SubmitNodeCollector instead of a MultiBufferSource, and vanilla now also threads the held
+    // ItemStack through as its third argument. Both hooks only read/modify the PoseStack before
+    // the item is submitted, so the VR transforms land on the item exactly as they used to.
+    // Fully qualified so it can never drift onto a bridge overload of the same name.
+    private static final String SUBMIT_ARM_WITH_ITEM =
+            "submitArmWithItem(Lnet/minecraft/client/renderer/entity/state/ArmedEntityRenderState;"
                     + "Lnet/minecraft/client/renderer/item/ItemStackRenderState;"
+                    + "Lnet/minecraft/world/item/ItemStack;"
                     + "Lnet/minecraft/world/entity/HumanoidArm;"
                     + "Lcom/mojang/blaze3d/vertex/PoseStack;"
-                    + "Lnet/minecraft/client/renderer/MultiBufferSource;I)V";
+                    + "Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V";
 
-    @Inject(method = RENDER_ARM_WITH_ITEM,
+    // translateToHand also gained the render state as a leading argument in 1.21.11.
+    @Inject(method = SUBMIT_ARM_WITH_ITEM,
             at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/model/ArmedModel;translateToHand(Lnet/minecraft/world/entity/HumanoidArm;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
+                    target = "Lnet/minecraft/client/model/ArmedModel;translateToHand(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;Lnet/minecraft/world/entity/HumanoidArm;Lcom/mojang/blaze3d/vertex/PoseStack;)V",
                     shift = At.Shift.AFTER))
     private void visor$firstPersonItemScale(
             CallbackInfo ci,
@@ -54,9 +60,9 @@ public abstract class ItemInHandLayerMixin {
         }
     }
 
-    @Inject(method = RENDER_ARM_WITH_ITEM,
+    @Inject(method = SUBMIT_ARM_WITH_ITEM,
             at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/item/ItemStackRenderState;render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V"))
+                    target = "Lnet/minecraft/client/renderer/item/ItemStackRenderState;submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;III)V"))
     private void visor$applyItemHandPose(
             CallbackInfo ci,
             @Local(argsOnly = true) ArmedEntityRenderState renderState,

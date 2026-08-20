@@ -1,7 +1,5 @@
 package org.vmstudio.visor.core.client.render.decoration.effects.hand;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import org.vmstudio.visor.api.client.ClientFeature;
 import org.vmstudio.visor.api.client.player.pose.VRPlayerPoseClient;
@@ -18,7 +16,6 @@ import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
-import net.minecraft.client.renderer.CoreShaders;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
@@ -28,13 +25,12 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.joml.AxisAngle4f;
 import org.joml.Matrix4f;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-import org.lwjgl.opengl.GL11C;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import net.minecraft.world.level.lighting.LightEngine;
-import org.lwjgl.opengl.GL11;
 
 @RegisterVRHandEffect
 public class HandEffectCrosshair extends VRHandEffect {
@@ -88,22 +84,6 @@ public class HandEffectCrosshair extends VRHandEffect {
         BufferBuilder buf;
 
         // --- GL setup ---
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-
-        GlStateManager._enableDepthTest();
-        GlStateManager._depthMask(true);
-        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
-
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(
-                GL11.GL_ONE_MINUS_DST_COLOR,
-                GL11.GL_ONE_MINUS_SRC_COLOR,
-                GL11.GL_ONE,
-                GL11.GL_ZERO
-        );
-
-        RenderSystem.setShaderTexture(0, ICONS_LOC);
-        RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
 
         // --- Pose setup ---
         poseStack.pushPose();
@@ -139,14 +119,11 @@ public class HandEffectCrosshair extends VRHandEffect {
                 .setColor(brightness, brightness, brightness, 1f)
         ;
 
-        BufferUploader.drawWithShader(buf.buildOrThrow());
+        // The inverting blend keeps the crosshair readable on any backdrop; it is the one
+        // Visor draw that is not translucent or additive.
+        VisorPipelines.positionTexColorInvert(ICONS_LOC).draw(buf.buildOrThrow());
 
         // --- Restore GL & pose ---
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GlStateManager._disableBlend();
-        GlStateManager._enableDepthTest();
-        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
         poseStack.popPose();
     }
 

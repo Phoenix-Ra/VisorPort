@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
@@ -31,26 +32,25 @@ public abstract class ItemInHandRendererMixin implements ItemInHandRendererExten
     private float offHandHeight;
 
 
+
+    // PORT-1.21.11: renderMap takes a SubmitNodeCollector instead of a MultiBufferSource, and
+    // it is private on ItemInHandRenderer now - a shadow may not widen the target's visibility.
     @Shadow
-    public abstract void renderItem(LivingEntity livingEntity,
-                                    ItemStack itemStack,
-                                    ItemDisplayContext itemDisplayContext,
-                                    boolean bl,
-                                    PoseStack poseStack,
-                                    MultiBufferSource multiBufferSource,
-                                    int i);
-
-    @Shadow
-    protected abstract void renderMap(PoseStack pMatrixStack,
-                                      MultiBufferSource pBuffer,
-                                      int pCombinedLight,
-                                      ItemStack pStack);
+    private void renderMap(PoseStack poseStack,
+                           SubmitNodeCollector collector,
+                           int combinedLight,
+                           ItemStack itemStack) {
+        throw new AssertionError("shadow");
+    }
 
 
+    // PORT-1.21.11: renderHandsWithItems' third parameter went MultiBufferSource.BufferSource ->
+    // SubmitNodeCollector with the extract/submit split. An @Inject handler's parameters must
+    // mirror the target's exactly, so the stale type was an apply-time crash, not a warning.
     @Inject(method = "renderHandsWithItems", at = @At("HEAD"), cancellable = true)
     private void visor$noFirstPersonHandsInVR(float tickDelta,
                                               PoseStack poseStack,
-                                              MultiBufferSource.BufferSource bufferSource,
+                                              SubmitNodeCollector collector,
                                               LocalPlayer player,
                                               int light,
                                               CallbackInfo ci) {
@@ -61,10 +61,10 @@ public abstract class ItemInHandRendererMixin implements ItemInHandRendererExten
 
     @Override
     public void visor$renderMap(PoseStack poseStack,
-                                MultiBufferSource bufferSource,
+                                SubmitNodeCollector collector,
                                 int pCombinedLight,
                                 ItemStack itemStack) {
-        renderMap(poseStack, bufferSource, pCombinedLight, itemStack);
+        renderMap(poseStack, collector, pCombinedLight, itemStack);
     }
 
     @Unique

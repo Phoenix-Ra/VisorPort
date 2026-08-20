@@ -2,9 +2,11 @@ package org.vmstudio.visor.core.client.gui.screens;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.screens.*;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.permissions.Permissions;
 import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.gui.screens.settings.VRSettingsScreen;
 import org.vmstudio.visor.core.client.tasks.types.TaskHotBar;
@@ -55,7 +57,10 @@ public class VRPauseMenuScreen extends Screen {
     @Override
     protected void init() {
         TaskHotBar.setResetData(true);
-        boolean hasPerms = this.minecraft.player != null && this.minecraft.player.hasPermissions(2);
+        // PORT-1.21.11: op levels became a PermissionSet; level 2 is COMMANDS_GAMEMASTER,
+        // which is exactly what the /gamemode, /time and /weather buttons below need
+        boolean hasPerms = this.minecraft.player != null
+                && this.minecraft.player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
 
         if (this.currentTab == Tab.COMMANDS && !hasPerms) {
             this.currentTab = Tab.MAIN;
@@ -118,7 +123,8 @@ public class VRPauseMenuScreen extends Screen {
                                 })
                 );
                 addRenderableWidget(makeHalfBtn(Component.translatable("visor.screen.pause_menu.button.chat").getString(), right, y,
-                        b -> this.minecraft.setScreen(new ChatScreen(""))));
+                        // the second arg is isDraft: a chat screen opened from here is never a restored draft
+                        b -> this.minecraft.setScreen(new ChatScreen("", false))));
                 y += BTN_H + GAP;
 
                 addRenderableWidget(makeHalfBtn(Component.translatable("visor.screen.pause_menu.button.pause_menu").getString(), left, y,
@@ -184,12 +190,13 @@ public class VRPauseMenuScreen extends Screen {
             }
 
             case TOOLS -> {
-                addRenderableWidget(makeHalfBtn(Component.translatable("visor.screen.pause_menu.button.hitboxes").getString(), left, y, b -> {
-                    boolean cur = this.minecraft.getEntityRenderDispatcher().shouldRenderHitBoxes();
-                    this.minecraft.getEntityRenderDispatcher().setRenderHitBoxes(!cur);
-                }));
+                // PORT-1.21.11: the hitbox flag left EntityRenderDispatcher and Minecraft.debugRenderer
+                // is gone; both debug views are now entries in Minecraft.debugEntries, and toggleStatus
+                // is the same call vanilla's F3+B / F3+G keybinds make
+                addRenderableWidget(makeHalfBtn(Component.translatable("visor.screen.pause_menu.button.hitboxes").getString(), left, y,
+                        b -> this.minecraft.debugEntries.toggleStatus(DebugScreenEntries.ENTITY_HITBOXES)));
                 addRenderableWidget(makeHalfBtn(Component.translatable("visor.screen.pause_menu.button.chunk_borders").getString(), right, y,
-                        b -> this.minecraft.debugRenderer.switchRenderChunkborder()));
+                        b -> this.minecraft.debugEntries.toggleStatus(DebugScreenEntries.CHUNK_BORDERS)));
                 y += BTN_H + GAP;
 
                 addRenderableWidget(makeHalfBtn(Component.translatable("visor.screen.pause_menu.button.reload_chunks").getString(), left, y,

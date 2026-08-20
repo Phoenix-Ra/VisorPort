@@ -22,6 +22,10 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.ClientHooks;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.resources.model.MaterialSet;
+import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -69,13 +73,13 @@ public class NeoForgeModLoader implements ModLoader {
 
     @Override
     public boolean isModLoaded(@NotNull String id) {
-        return FMLLoader.getLoadingModList().getModFileById(id) != null;
+        return FMLLoader.getCurrent().getLoadingModList().getModFileById(id) != null;
     }
 
     @Override
     public @NotNull String getModVersion(@NotNull String id) {
         if (isModLoaded(VisorAPI.MOD_ID)) {
-            return FMLLoader.getLoadingModList()
+            return FMLLoader.getCurrent().getLoadingModList()
                     .getModFileById(id).versionString();
         }
         return "no version";
@@ -83,7 +87,8 @@ public class NeoForgeModLoader implements ModLoader {
 
     @Override
     public boolean isDedicatedServer() {
-        return FMLEnvironment.dist == Dist.DEDICATED_SERVER;
+        return // PORT-1.21.11: FMLEnvironment.dist became getDist()
+                FMLEnvironment.getDist() == Dist.DEDICATED_SERVER;
     }
 
 
@@ -95,7 +100,17 @@ public class NeoForgeModLoader implements ModLoader {
                 .add(callback);
 
         if (!levelStageListenerRegistered) {
-            NeoForge.EVENT_BUS.addListener(this::onRenderLevelStage);
+            // PORT-1.21.11: RenderLevelStageEvent.Stage is gone. NeoForge 21.11 turned the one
+            // event + Stage enum into an abstract event with a concrete subclass per stage, so
+            // the dispatch that used to be a switch on getStage() is now three registrations.
+            // AFTER_CUTOUT_BLOCKS became AfterOpaqueBlocks - the SOLID and CUTOUT chunk layers
+            // are drawn as one "opaque" group now, which is the same point in the frame.
+            NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.AfterOpaqueBlocks.class,
+                    e -> onRenderLevelStage(RenderPipelineStage.AFTER_SOLID));
+            NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.AfterTranslucentBlocks.class,
+                    e -> onRenderLevelStage(RenderPipelineStage.AFTER_TRANSLUCENT));
+            NeoForge.EVENT_BUS.addListener(RenderLevelStageEvent.AfterLevel.class,
+                    e -> onRenderLevelStage(RenderPipelineStage.AFTER_WORLD));
             levelStageListenerRegistered = true;
         }
     }
@@ -204,14 +219,43 @@ public class NeoForgeModLoader implements ModLoader {
     }
 
 
+    /*
+     * PORT-1.21.11: NeoForge widened these to (Player, PoseStack, MaterialSet, MultiBufferSource).
+     * Both still only post a RenderBlockScreenEffectEvent and return isCanceled() - neither draws
+     * anything itself (verified in ClientHooks#renderBlockOverlay) - so the two new arguments exist
+     * purely for listeners that want to draw the overlay themselves.
+     *
+     * Visor calls these as a QUESTION, not to render: GameRendererMixin passes a throwaway
+     * PoseStack and uses only the boolean ("did something suppress the fire overlay?"). So the
+     * buffer source handed over is a discard sink whose batches are never ended - a listener that
+     * draws into it emits nothing, which is exactly what happens on Forge, whose hook never gained
+     * a buffer source at all. The MaterialSet is the real one, so a listener that only looks up
+     * sprites still sees correct data.
+     */
     @Override
     public boolean renderWaterOverlay(Player player, PoseStack mat) {
-        return ClientHooks.renderWaterOverlay(player, mat);
+        return ClientHooks.renderWaterOverlay(
+                player, mat, visor$materials(), visor$discardBuffers());
     }
 
     @Override
     public boolean renderFireOverlay(Player player, PoseStack mat) {
-        return ClientHooks.renderFireOverlay(player, mat);
+        return ClientHooks.renderFireOverlay(
+                player, mat, visor$materials(), visor$discardBuffers());
+    }
+
+    /** AtlasManager is the client's MaterialSet implementation. */
+    private static MaterialSet visor$materials() {
+        return Minecraft.getInstance().getAtlasManager();
+    }
+
+    private static MultiBufferSource.BufferSource visor$discardBuffers;
+
+    private static MultiBufferSource.BufferSource visor$discardBuffers() {
+        if (visor$discardBuffers == null) {
+            visor$discardBuffers = MultiBufferSource.immediate(new ByteBufferBuilder(256));
+        }
+        return visor$discardBuffers;
     }
 
     @Override
@@ -272,37 +316,23 @@ public class NeoForgeModLoader implements ModLoader {
     }
 
 
-    private void onRenderLevelStage(RenderLevelStageEvent event) {
-        RenderPipelineStage stage = mapNeoForgeStage(event.getStage());
-        if (stage == null) return;
-
+    private void onRenderLevelStage(RenderPipelineStage stage) {
         List<RenderPipelineCallback> callbacks = pipelineCallbacks.get(stage);
         if (callbacks == null || callbacks.isEmpty()) return;
 
         // Identity basis on purpose: the decoration renderers build their own camera transform
         // (see DecorationRendererImpl#runStageWithVRContract, which resets the model-view stack),
-        // so seeding the view matrix here double-transforms them. Fabric has always handed over
-        // LevelRenderer's fresh PoseStack, and the 1.21.4 Forge port does the same now that
-        // RenderLevelStageEvent is gone - this keeps all three loaders on one contract.
+        // so seeding the view matrix here double-transforms them. Fabric and Forge both hand over
+        // a fresh PoseStack, and this keeps all three loaders on one contract.
         PoseStack poseStack = new PoseStack();
-        float partialTicks = event.getPartialTick().getGameTimeDeltaPartialTick(true);
+        // PORT-1.21.11: RenderLevelStageEvent#getPartialTick() went with the Stage rework and
+        // LevelRenderState carries no tick, so the delta comes from the same place the Forge
+        // mixin reads it.
+        float partialTicks = Minecraft.getInstance()
+                .getDeltaTracker().getGameTimeDeltaPartialTick(true);
 
         for (RenderPipelineCallback callback : callbacks) {
             callback.render(poseStack, partialTicks);
         }
-    }
-
-
-    private static RenderPipelineStage mapNeoForgeStage(RenderLevelStageEvent.Stage neoForgeStage) {
-        if (neoForgeStage == RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS) {
-            return RenderPipelineStage.AFTER_SOLID;
-        }
-        if (neoForgeStage == RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
-            return RenderPipelineStage.AFTER_TRANSLUCENT;
-        }
-        if (neoForgeStage == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
-            return RenderPipelineStage.AFTER_WORLD;
-        }
-        return null;
     }
 }

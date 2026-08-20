@@ -1,20 +1,22 @@
 package org.vmstudio.visor.core.client.render.decoration.decorators.mainmenu;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import me.phoenixra.atumvr.api.misc.color.AtumColorImmutable;
 import me.phoenixra.atumvr.api.misc.color.AtumColorMutable;
 import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.CoreShaders;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
+import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.world.level.MoonPhase;
+import net.minecraft.data.AtlasIds;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.lwjgl.opengl.GL11C;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
 
 import java.time.LocalTime;
@@ -23,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 import org.vmstudio.visor.api.VisorAPI;
-import org.lwjgl.opengl.GL11;
 
 /**
  * Procedural sky for the VR main menu
@@ -68,11 +69,18 @@ public final class VRMenuSky {
     private static final long SKY_UPDATE_FREQUENCY = 200L;
 
     // ---- CELESTIAL BODIES ----
-    private static final Identifier SUN_TEXTURE = McVersionUtils.newResourceLoc("textures/environment/sun.png");
+    /**
+     * PORT-1.21.11: the sun and moon are sprites in the {@code celestials} atlas now, not
+     * standalone textures - {@code textures/environment/sun.png} and {@code moon_phases.png} are
+     * both gone, which is the "Missing resource" pair in the log. The moon in particular is no
+     * longer one sheet cut into a 4x2 phase grid: each phase is its own sprite named
+     * {@code moon/<phase>}, so the grid arithmetic is replaced by a per-phase lookup and the
+     * sprite's own UV rect.
+     */
+    private static final Identifier SUN_SPRITE = McVersionUtils.newResourceLoc("sun");
     private static final float SUN_DISTANCE = 92.0f;
     private static final float SUN_SIZE = 13.0f;
 
-    private static final Identifier MOON_TEXTURE = McVersionUtils.newResourceLoc("textures/environment/moon_phases.png");
     private static final float MOON_DISTANCE = 90.0f;
     private static final float MOON_SIZE = 10.0f;
 
@@ -414,14 +422,9 @@ public final class VRMenuSky {
         currentScenePhase = sceneTimeToPhase(currentSceneTime);
 
         // --- Setup ---
-        GlStateManager._clear(GL11C.GL_COLOR_BUFFER_BIT | GL11C.GL_DEPTH_BUFFER_BIT);
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
-        GlStateManager._depthMask(false);
-        GlStateManager._disableDepthTest();
-        GlStateManager._disableCull();
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        // Every draw below now carries its own no-depth, no-cull, blended pipeline, so the state
+        // that used to be set once here rides on the render types instead.
+        RenderShaderHelper.clearColorAndDepth(Minecraft.getInstance().getMainRenderTarget(), 0, 1.0);
 
         // --- Render ---
         renderSkyBox(builder, pose);
@@ -435,26 +438,12 @@ public final class VRMenuSky {
         renderUfo(builder, pose);
 
         renderUserDots(builder, pose);
-
-        // --- Restore ---
-        GlStateManager._enableCull();
-        GlStateManager._enableDepthTest();
-        GlStateManager._depthMask(true);
     }
 
     public static void renderLast(PoseStack poseStack) {
         // --- Prepare variables ---
         BufferBuilder builder = null;
         Matrix4f pose = poseStack.last().pose();
-
-        // --- Setup ---
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GlStateManager._enableDepthTest();
-        GlStateManager._depthMask(true);
-        GlStateManager._enableCull();
 
         // --- Render ---
         renderClouds(builder, pose);
@@ -608,7 +597,7 @@ public final class VRMenuSky {
         horizon(builder, pose, SKY_BOX, -SKY_BOX, -SKY_BOX);
         horizon(builder, pose, -SKY_BOX, -SKY_BOX, -SKY_BOX);
 
-        BufferUploader.drawWithShader(builder.buildOrThrow());
+        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(builder.buildOrThrow());
     }
 
     // ====== CELESTIAL BODIES ======
@@ -628,12 +617,17 @@ public final class VRMenuSky {
                 )
         );
         float size = SUN_SIZE * (1f + 0.45f * currentTwilight);
+        TextureAtlas atlas = celestialsAtlas();
+        if (atlas == null) {
+            return;
+        }
+        TextureAtlasSprite sprite = atlas.getSprite(SUN_SPRITE);
         renderCelestial(
                 builder, pose,
                 currentSunDir, visible,
-                SUN_TEXTURE, SUN_DISTANCE, size,
+                atlas.location(), SUN_DISTANCE, size,
                 sunTint,
-                0f, 0f, 1f, 1f
+                sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1()
         );
     }
 
@@ -643,16 +637,39 @@ public final class VRMenuSky {
         if (visible <= 0f) {
             return;
         }
-        int phase = currentMoonPhase();
-        float u0 = (phase % 4) / 4f;
-        float v0 = ((int)(phase / 4f)) / 2f;
+        TextureAtlas atlas = celestialsAtlas();
+        if (atlas == null) {
+            return;
+        }
+        // MoonPhase.values() runs FULL_MOON..WAXING_GIBBOUS, the same order the old phase sheet
+        // was laid out in, so currentMoonPhase()'s index carries over unchanged.
+        MoonPhase phase = MoonPhase.values()[currentMoonPhase() & 7];
+        TextureAtlasSprite sprite = atlas.getSprite(
+                McVersionUtils.newResourceLoc("moon/" + phase.getSerializedName()));
         renderCelestial(
                 builder, pose,
                 currentMoonDir, visible,
-                MOON_TEXTURE, MOON_DISTANCE, MOON_SIZE,
+                atlas.location(), MOON_DISTANCE, MOON_SIZE,
                 moonTint,
-                u0, v0, u0 + 0.25f, v0 + 0.5f
+                sprite.getU0(), sprite.getV0(), sprite.getU1(), sprite.getV1()
         );
+    }
+
+    /**
+     * The celestials atlas, or {@code null} before the first resource reload has stitched it.
+     * The menu sky can draw a frame earlier than that, and a missing atlas is not worth an
+     * exception when the alternative is skipping one frame of sun.
+     */
+    private static TextureAtlas celestialsAtlas() {
+        var manager = Minecraft.getInstance().getAtlasManager();
+        if (manager == null) {
+            return null;
+        }
+        try {
+            return manager.getAtlasOrThrow(AtlasIds.CELESTIALS);
+        } catch (RuntimeException missing) {
+            return null;
+        }
     }
 
     private static void renderCelestial(BufferBuilder builder, Matrix4f pose,
@@ -663,20 +680,16 @@ public final class VRMenuSky {
         scratchCenter.set(dir).mul(distance);
         billboardBasis(dir, scratchRight, scratchUp);
 
-        RenderSystem.setShader(CoreShaders.POSITION_TEX);
-        RenderSystem.setShaderTexture(0, texture);
-        RenderSystem.setShaderColor(color.getRed(), color.getGreen(), color.getBlue(), visible);
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE);
-
-        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-        billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp, -size, -size, u0, v0);
-        billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp,  size, -size, u1, v0);
-        billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp,  size,  size, u1, v1);
-        billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp, -size,  size, u0, v1);
-        BufferUploader.drawWithShader(builder.buildOrThrow());
-
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
+        // The tint and the horizon fade used to arrive through setShaderColor. There is no
+        // per-draw colour left on this route, so both are baked into the vertices - which is why
+        // the geometry is POSITION_TEX_COLOR now rather than POSITION_TEX. Skip that and the sun
+        // and moon quietly lose their warmth and stop fading out at the horizon.
+        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp, -size, -size, u0, v0, color, visible);
+        billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp,  size, -size, u1, v0, color, visible);
+        billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp,  size,  size, u1, v1, color, visible);
+        billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp, -size,  size, u0, v1, color, visible);
+        VisorPipelines.positionTexColorAdditiveNoDepth(texture).draw(builder.buildOrThrow());
     }
 
     // ====== STARS ======
@@ -686,10 +699,6 @@ public final class VRMenuSky {
         if (night <= 0.05f) {
             return;
         }
-
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE);
 
         builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
         for (int star = 0; star < STAR_QUAD.length; star++) {
@@ -704,9 +713,7 @@ public final class VRMenuSky {
 
         emitShootingStar(builder, pose, night);
 
-        BufferUploader.drawWithShader(builder.buildOrThrow());
-
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        VisorPipelines.POSITION_COLOR_ADDITIVE_NO_DEPTH_TYPE.draw(builder.buildOrThrow());
     }
 
     private static void emitShootingStar(BufferBuilder builder, Matrix4f pose,
@@ -853,11 +860,6 @@ public final class VRMenuSky {
         float fade = clamp01(Math.min(ageSec, UFO_LIFETIME - ageSec) / UFO_FADE_SEC);
         int chaseStep = (int) (ageSec * UFO_LIGHT_STEP_HZ) % UFO_LIGHT_GROUPS;
 
-        RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-        RenderSystem.setShaderTexture(0, GLOW_SPRITE);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE);
-
         builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < UFO_DOTS_AMOUNT; i++) {
             float dotX = ufoX + scratchRight.x * UFO_LX[i] + scratchUp.x * UFO_LY[i];
@@ -880,10 +882,7 @@ public final class VRMenuSky {
                         UFO_DOT_CORE, UFO_BODY_CORE, (int) (235 * fade));
             }
         }
-        BufferUploader.drawWithShader(builder.buildOrThrow());
-
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
+        VisorPipelines.positionTexColorAdditiveNoDepth(GLOW_SPRITE).draw(builder.buildOrThrow());
     }
 
     private static void ufoParkingDir(int cycle, Vector3f out) {
@@ -911,15 +910,6 @@ public final class VRMenuSky {
         float gleamPos = (float) (currentTimeSec * VISOR_GLEAM_SPEED) % (VISOR_TOTAL_COLS + VISOR_GLEAM_W * 2f) - VISOR_GLEAM_W;
         boolean asCloudDots = currentDay >= VISOR_DAY_THRESHOLD;
 
-        RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-        RenderSystem.setShaderTexture(0, GLOW_SPRITE);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
-        if (asCloudDots) {
-            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        } else {
-            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE); // additive
-        }
-
         int[] cloudTint = {0, 0, 0};
         builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < VISOR_SIGN.n; i++) {
@@ -942,10 +932,9 @@ public final class VRMenuSky {
                 spriteQuad(builder, pose, cx, cy, cz, VISOR_STAR_CORE * pulse, color, coreAlpha);
             }
         }
-        BufferUploader.drawWithShader(builder.buildOrThrow());
-
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
+        // The cloud skin blends and the star skin adds; that runtime blend switch is a choice
+        // between two render types now.
+        VisorPipelines.positionTexColorGlow(GLOW_SPRITE, !asCloudDots).draw(builder.buildOrThrow());
     }
 
     // ====== CLOUDS ======
@@ -985,7 +974,7 @@ public final class VRMenuSky {
                 emitCloud(builder, pose, cloudCenterX, cloudCenterZ, cellX, cellZ);
             }
         }
-        BufferUploader.drawWithShader(builder.buildOrThrow());
+        VisorPipelines.POSITION_COLOR_TYPE.draw(builder.buildOrThrow());
     }
 
     private static void emitCloud(BufferBuilder builder, Matrix4f pose,
@@ -1135,16 +1124,6 @@ public final class VRMenuSky {
 
         boolean showClouds = currentDay >= VISOR_DAY_THRESHOLD;
 
-        RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-        RenderSystem.setShaderTexture(0, GLOW_SPRITE);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
-        if (showClouds) {
-            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        } else {
-            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE, GL11.GL_SRC_ALPHA, GL11.GL_ONE); // additive
-        }
-
-
         builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < userDotCount; i++) {
             scratchDir.set(userDotX[i], userDotY[i], userDotZ[i]);
@@ -1165,10 +1144,7 @@ public final class VRMenuSky {
                 dotQuad(builder, pose, scratchRight, scratchUp, cx, cy, cz, VISOR_STAR_CORE, colorCore, 255);
             }
         }
-        BufferUploader.drawWithShader(builder.buildOrThrow());
-
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
+        VisorPipelines.positionTexColorGlow(GLOW_SPRITE, !showClouds).draw(builder.buildOrThrow());
     }
     static Identifier glowSprite() {
         ensureGlowSprite();
@@ -1242,11 +1218,14 @@ public final class VRMenuSky {
                                         Matrix4f pose,
                                         Vector3f center, Vector3f right, Vector3f up,
                                         float rightOffset, float upOffset,
-                                        float u, float v) {
+                                        float u, float v,
+                                        AtumColor tint, float alpha) {
         float x = center.x + right.x * rightOffset + up.x * upOffset;
         float y = center.y + right.y * rightOffset + up.y * upOffset;
         float z = center.z + right.z * rightOffset + up.z * upOffset;
-        builder.addVertex(pose, x, y, z).setUv(u, v);
+        builder.addVertex(pose, x, y, z)
+                .setUv(u, v)
+                .setColor(tint.getRed(), tint.getGreen(), tint.getBlue(), alpha);
     }
 
 
@@ -1324,7 +1303,7 @@ public final class VRMenuSky {
                 McVersionUtilsClient.setPixel(img, x, y, alphaByte, 255, 255, 255);
             }
         }
-        DynamicTexture tex = new DynamicTexture(img);
+        DynamicTexture tex = new DynamicTexture(() -> "visor glow sprite", img);
         GLOW_SPRITE = McVersionUtilsClient.registerDynamicTexture(VisorAPI.MOD_ID, "visor_glow", tex);
     }
 

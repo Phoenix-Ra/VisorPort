@@ -203,8 +203,8 @@ public abstract class ServerPlayerGameModeMixin implements ServerPlayerGameModeE
         VRServerPlayer vrPlayer = VisorAPI.server().getVRPlayer(player);
         if (vrPlayer == null) return;
 
-        // 1.21.1: interaction range is attribute-driven, same check vanilla uses
-        if (!this.player.canInteractWithBlock(blockPos, 1.0)) {
+        // interaction range is attribute-driven, same check vanilla uses
+        if (!this.player.isWithinBlockInteractionRange(blockPos, 1.0)) {
             this.debugLogging(blockPos, false, j, "too far");
             return;
 
@@ -324,7 +324,8 @@ public abstract class ServerPlayerGameModeMixin implements ServerPlayerGameModeE
     @Unique
     public boolean visor$destroyBlock(BlockPos blockPos, ItemStack usedItem) {
         BlockState blockState = this.level.getBlockState(blockPos);
-        if (!usedItem.getItem().canAttackBlock(blockState, this.level, blockPos, this.player)) {
+        // the stack, not the item, answers this now - same call vanilla destroyBlock makes
+        if (!usedItem.canDestroyBlock(blockState, this.level, blockPos, this.player)) {
             return false;
         } else {
             BlockEntity blockEntity = this.level.getBlockEntity(blockPos);
@@ -418,8 +419,9 @@ public abstract class ServerPlayerGameModeMixin implements ServerPlayerGameModeE
             f *= 1.0F + (float) (MobEffectUtil.getDigSpeedAmplification(player) + 1) * 0.2F;
         }
 
-        if (player.hasEffect(MobEffects.DIG_SLOWDOWN)) {
-            float g = switch (player.getEffect(MobEffects.DIG_SLOWDOWN)
+        // DIG_SLOWDOWN was renamed to match its in-game name
+        if (player.hasEffect(MobEffects.MINING_FATIGUE)) {
+            float g = switch (player.getEffect(MobEffects.MINING_FATIGUE)
                     .getAmplifier()) {
                 case 0 -> 0.3F;
                 case 1 -> 0.09F;

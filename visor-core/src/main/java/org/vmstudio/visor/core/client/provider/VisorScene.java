@@ -17,6 +17,7 @@ import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.render.VRShaders;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.compatibility.ShadersHelper;
+import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import org.vmstudio.visor.core.client.render.helpers.MirrorHelper;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.core.client.utils.ClientUtils;
@@ -63,10 +64,11 @@ public class VisorScene implements AtumVRScene {
         profiler.pop();
 
         profiler.push("VROverlay texturing");
-        GuiGraphics guiGraphics = new GuiGraphics(MC, MC.renderBuffers().bufferSource());
+        // PORT-1.21.11: a GuiGraphics is no longer a thing you make once and flush repeatedly -
+        // it records into a GuiRenderState that gets replayed as a unit, so each overlay opens
+        // and closes its own. The manager does that per overlay now.
         ClientContext.overlayManager.renderOverlayTextures(
                 Profiler.get(),
-                guiGraphics,
                 renderContext.partialTicks()
         );
         profiler.pop();
@@ -98,7 +100,6 @@ public class VisorScene implements AtumVRScene {
 
         profiler.push("VR mirror");
         VRRenderState.startVRMirrorPhase();
-        MC.mainRenderTarget.bindWrite(true);
         MirrorHelper.drawMirror();
         profiler.pop();
         GLUtils.checkGLError("post mirror");
@@ -120,7 +121,6 @@ public class VisorScene implements AtumVRScene {
         if (flag) {
             RenderTarget rendertarget = MC.mainRenderTarget;
 
-            MC.mainRenderTarget.unbindWrite();
             ClientUtils.takeScreenshot(rendertarget);
             MC.getWindow().updateDisplay(null);
             ClientContext.renderer.setAskedForScreenShot(false);
@@ -144,18 +144,12 @@ public class VisorScene implements AtumVRScene {
             return;
         }
 
-        MC.mainRenderTarget.bindWrite(true);
-        RenderSystem.clearColor(0.0F, 0.0F, 0.0F, 1.0F);
-        GlStateManager._clear(16384);
-        GlStateManager._enableDepthTest();
+        // Opaque black, full depth. The old sequence set a clear colour, cleared colour only,
+        // and re-enabled the depth test; clearing is a command on the encoder now and the depth
+        // test belongs to whichever pipeline draws next.
+        RenderShaderHelper.clearColorAndDepth(MC.mainRenderTarget, 0xFF000000, 1.0);
 
         ShadersHelper.bridge().beginEye(renderPass.getEyeOrLeft());
-
-        if (ShadersHelper.isShaderActive()) {
-            RenderSystem.setShaderTexture(0, 0);
-            RenderSystem.setShaderTexture(1, 0);
-            RenderSystem.setShaderTexture(2, 0);
-        }
 
         MC.gameRenderer.render(
                 MC.getDeltaTracker(),
@@ -163,7 +157,6 @@ public class VisorScene implements AtumVRScene {
         );
 
         if (ShadersHelper.isShaderActive()) {
-            MC.mainRenderTarget.bindWrite(true);
             Matrix4fStack modelView = RenderSystem.getModelViewStack();
             modelView.pushMatrix();
             modelView.identity();

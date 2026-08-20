@@ -62,15 +62,16 @@ public abstract class FishingHookMixin extends Entity {
         );
     }
 
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/FishingHook;moveTo(DDDFF)V"), method = "<init>(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/level/Level;II)V")
+    // Entity#moveTo(DDDFF) is Entity#snapTo(DDDFF) now
+    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/projectile/FishingHook;snapTo(DDDFF)V"), method = "<init>(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/level/Level;II)V")
     private void visor$vrMoveTo(FishingHook instance, double x, double y, double z, float yRot, float xRot) {
         if (visor$vrPlayer == null) {
-            this.moveTo(x, y, z, yRot, xRot);
+            this.snapTo(x, y, z, yRot, xRot);
             visor$vrPlayer = null;
             return;
         }
 
-        instance.moveTo(
+        instance.snapTo(
                 visor$savedHandPos.x + visor$savedHandDir.x
                         * (double) 0.6F,
                 visor$savedHandPos.y + visor$savedHandDir.y

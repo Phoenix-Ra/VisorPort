@@ -10,6 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.ClientInput;
 import net.minecraft.client.player.KeyboardInput;
 import net.minecraft.world.entity.player.Input;
+import net.minecraft.world.phys.Vec2;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -57,8 +58,10 @@ public class MovementInputMixin extends ClientInput {
 
         if (ClientContext.localPlayer.isMoving()) {
             var movement = ClientContext.localPlayer.getMovement();
-            this.leftImpulse = -movement.x;
-            this.forwardImpulse = movement.y;
+            // the separate leftImpulse/forwardImpulse fields were folded into one Vec2(left, forward).
+            // it is written raw, not normalized() like KeyboardInput does for the digital keys -
+            // the VR stick is analog and normalizing would pin every nudge to full speed.
+            this.moveVector = new Vec2(-movement.x, movement.y);
         }
     }
 }

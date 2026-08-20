@@ -1,16 +1,17 @@
 package org.vmstudio.visor.core.client.render.helpers;
 
 
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import org.vmstudio.visor.api.common.utils.VRMathUtils;
-import org.vmstudio.visor.mixin.client.accessors.RenderSystemAccessor;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.CoreShaders;
-import net.minecraft.client.renderer.CoreShaders;
-import net.minecraft.client.renderer.ShaderProgram;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import org.joml.Vector4f;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -37,7 +38,8 @@ public class RenderHelper {
         }
     }
 
-    public static void renderCuboid(Matrix4f poseMatrix,
+    public static void renderCuboid(RenderType type,
+                                    Matrix4f poseMatrix,
                                     Vector3fc start,
                                     Vector3fc end,
                                     float innerWidth, float outerWidth,
@@ -95,11 +97,12 @@ public class RenderHelper {
                 addVertex(bufferBuilder, poseMatrix, pos, color, normal);
             }
         }
-        BufferUploader.drawWithShader(bufferBuilder.buildOrThrow());
+        type.draw(bufferBuilder.buildOrThrow());
     }
 
 
-    public static void renderFlatQuad(Matrix4f poseMatrix,
+    public static void renderFlatQuad(RenderType type,
+                                      Matrix4f poseMatrix,
                                       Vector3fc pos,
                                       float width,
                                       float height,
@@ -133,12 +136,23 @@ public class RenderHelper {
                     .setNormal(normal.x(), normal.y(), normal.z())
             ;
         }
-        BufferUploader.drawWithShader(bufferBuilder.buildOrThrow());
+        type.draw(bufferBuilder.buildOrThrow());
 
     }
 
 
-    public static void renderDisplayQuad(Matrix4f poseMatrix,
+    /**
+     * Draws a VR overlay panel: a camera-facing quad textured with {@code source}'s colour
+     * attachment.
+     * <p>
+     * The texture comes from a {@link RenderTarget}, not from a registered {@code Identifier}, so
+     * this cannot go through a {@code RenderType} - a {@code RenderSetup} can only name textures by
+     * id. It draws through {@link RenderShaderHelper#drawMesh} instead, which also lets the tint
+     * ride along as a real {@code ColorModulator}; {@code RenderType.draw} hardcodes that to white.
+     */
+    public static void renderDisplayQuad(RenderPipeline pipeline,
+                                         Matrix4f poseMatrix,
+                                         RenderTarget source,
                                          AtumColor color,
                                          float displayWidth,
                                          float displayHeight,
@@ -148,9 +162,6 @@ public class RenderHelper {
         float halfSize = size * 0.5f;
         float halfHeight = halfSize * aspect;
         float u0 = 0f, u1 = 1f, v0 = 0f, v1 = 1f;
-        float r = color.getRed(), g = color.getGreen(),
-                b = color.getBlue(), a = color.getAlpha();
-
 
         float[][] vertices = {
                 { -halfSize, -halfHeight, 0f,   u0, v0 },
@@ -158,10 +169,6 @@ public class RenderHelper {
                 {  halfSize,  halfHeight, 0f,   u1, v1 },
                 { -halfSize,  halfHeight, 0f,   u0, v1 }
         };
-
-        // --- Setup ---
-        RenderSystem.setShader(CoreShaders.POSITION_TEX);
-        RenderSystem.setShaderColor(r, g, b, a);
 
         // --- Render ---
         BufferBuilder buf;
@@ -173,29 +180,26 @@ public class RenderHelper {
                     .setUv(vertex[3], vertex[4])
             ;
         }
-        BufferUploader.drawWithShader(buf.buildOrThrow());
 
-        // --- Restore ---
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-
+        RenderShaderHelper.drawMesh(() -> "visor overlay quad", pipeline, buf.buildOrThrow(),
+                new Vector4f(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha()),
+                pass -> RenderShaderHelper.bindColor(pass, "Sampler0", source));
     }
 
 
-    public static void renderDisplayQuadWithLight(Matrix4f poseMatrix,
+    /**
+     * The lit variant of {@link #renderDisplayQuad}: same quad, sampling the lightmap so the panel
+     * dims with the block light around it.
+     * <p>
+     * 1.21.4 got flat lighting by overriding both shader light directions to point along the
+     * quad's own normal. That is no longer possible - the light directions live in a UBO slice
+     * rather than in two settable vectors - so the flatness is declared on the pipeline instead,
+     * via {@code NO_CARDINAL_LIGHTING}. Same result, see {@code VisorPipelines}.
+     */
+    public static void renderDisplayQuadWithLight(RenderPipeline pipeline,
+                                                  Matrix4f poseMatrix,
+                                                  RenderTarget source,
                                                   AtumColor color,
-                                                  float displayWidth,
-                                                  float displayHeight,
-                                                  float size,
-                                                  int light,
-                                                  boolean flipY) {
-        renderDisplayQuadWithLight(poseMatrix, color, CoreShaders.RENDERTYPE_ENTITY_CUTOUT_NO_CULL, displayWidth, displayHeight, size, light, flipY);
-    }
-
-
-
-    public static void renderDisplayQuadWithLight(Matrix4f poseMatrix,
-                                                  AtumColor color,
-                                                  ShaderProgram shader,
                                                   float displayWidth,
                                                   float displayHeight,
                                                   float size,
@@ -228,22 +232,6 @@ public class RenderHelper {
                 { uMin, vMax }
         };
 
-        // --- Setup ---
-        RenderSystem.setShader(shader);
-        MC.gameRenderer.lightTexture().turnOnLightLayer();
-        MC.gameRenderer.overlayTexture().setupOverlayColor();
-
-        // cache old light directions
-        Vector3f[] oldLights = RenderSystemAccessor.getShaderLightDirections();
-        Vector3f old0 = oldLights[0];
-        Vector3f old1 = oldLights[1];
-
-        // force lighting to face back
-        Vector3f back = (Vector3f) VRMathUtils.BACK_VECTOR;
-        RenderSystem.setShaderLights(back, back);
-        RenderSystem.setupShaderLights(RenderSystem.getShader());
-
-
         // --- Render ---
         BufferBuilder buf;
         buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.NEW_ENTITY);
@@ -260,14 +248,15 @@ public class RenderHelper {
             ;
         }
 
-        BufferUploader.drawWithShader(buf.buildOrThrow());
-
-        // --- Restore ---
-        MC.gameRenderer.lightTexture().turnOffLightLayer();
-        if (old0 != null && old1 != null) {
-            RenderSystem.setShaderLights(old0, old1);
-            RenderSystem.setupShaderLights(RenderSystem.getShader());
-        }
+        RenderShaderHelper.drawMesh(() -> "visor overlay quad (lit)", pipeline, buf.buildOrThrow(),
+                RenderShaderHelper.NO_TINT,
+                pass -> {
+                    RenderShaderHelper.bindColor(pass, "Sampler0", source);
+                    pass.bindTexture("Sampler1", MC.gameRenderer.overlayTexture().getTextureView(),
+                            RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+                    pass.bindTexture("Sampler2", MC.gameRenderer.lightTexture().getTextureView(),
+                            RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+                });
     }
 
 

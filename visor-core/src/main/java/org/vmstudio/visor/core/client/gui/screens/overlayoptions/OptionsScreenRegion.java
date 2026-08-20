@@ -2,7 +2,8 @@ package org.vmstudio.visor.core.client.gui.screens.overlayoptions;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuTextureView;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import org.vmstudio.visor.api.client.gui.helpers.GuiHelper;
 import org.vmstudio.visor.api.client.gui.overlays.options.OptionTextures;
@@ -14,15 +15,18 @@ import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoValueDrag;
 import org.vmstudio.visor.api.client.gui.widgets.sets.ValueEditorInt;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.render.TextureSetup;
+import net.minecraft.client.gui.render.state.BlitRenderState;
+import net.minecraft.client.renderer.RenderPipelines;
+import org.joml.Matrix3x2f;
+import org.vmstudio.visor.mixin.client.accessors.GameRendererAccessor;
 import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.client.renderer.CoreShaders;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
-import org.joml.Matrix4f;
 import net.minecraft.client.input.MouseButtonEvent;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import org.lwjgl.opengl.GL11;
+
+import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 
 public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegion> {
     private static final int FIELD_HEIGHT = 15;
@@ -389,40 +393,37 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
 
     private void drawFramebufferPreview(GuiGraphics gui) {
         RenderTarget target = optionsGroup.getTargetSupplier().get();
-        if (target == null || target.getColorTextureId() <= 0) {
+        GpuTextureView preview = target == null ? null : target.getColorTextureView();
+        if (preview == null) {
             gui.fill(previewX, previewY, previewX + previewW, previewY + previewH, 0xFF202020);
             gui.renderOutline(previewX, previewY, previewW, previewH, 0x55FFFFFF);
             return;
         }
 
-        gui.flush();
-
-        RenderSystem.setShaderTexture(0, target.getColorTextureId());
-
-        GlStateManager._disableDepthTest();
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        RenderSystem.setShader(CoreShaders.POSITION_TEX);
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-
-        float uMax = (float) target.width / (float) target.width;
-        float vMax = (float) target.height / (float) target.height;
-
-        Matrix4f pose = gui.pose().last().pose();
-        BufferBuilder buf;
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-        // bottom-left
-        buf.addVertex(pose, previewX, previewY + previewH, 0).setUv(0.0f, 0.0f);
-        // bottom-right
-        buf.addVertex(pose, previewX + previewW, previewY + previewH, 0).setUv(uMax, 0.0f);
-        // top-right
-        buf.addVertex(pose, previewX + previewW, previewY, 0).setUv(uMax, vMax);
-        // top-left
-        buf.addVertex(pose, previewX, previewY, 0).setUv(0.0f, vMax);
-        BufferUploader.drawWithShader(buf.buildOrThrow());
-
-        GlStateManager._disableBlend();
-        GlStateManager._enableDepthTest();
+        // PORT-1.21.11: this was a gui.flush() followed by a raw textured quad, which only worked
+        // while GUI drawing was immediate. It is recorded now, so a raw quad issued from inside
+        // render() draws straight away and the background panel - recorded before it, replayed
+        // after it - lands on top and hides it. A RenderType still cannot name a RenderTarget's
+        // texture, but the recorded form of a blit can: BlitRenderState carries a TextureSetup,
+        // which takes a GpuTextureView directly. Submitting one puts the preview in the same
+        // replay as everything around it, so ordering against the panel, the projection and the
+        // scissor all come from the GUI renderer rather than being reconstructed by hand.
+        // The state is the one RenderGuiHelper.beginGui built this GuiGraphics from - the game
+        // renderer owns the only GuiRenderState there is.
+        // v runs 1 -> 0 top to bottom: a RenderTarget's colour texture is bottom-up, GUI space
+        // is top-down. Nothing is scissored here, hence the null scissor rectangle.
+        ((GameRendererAccessor) MC.gameRenderer).visor$getGuiRenderState().submitGuiElement(
+                new BlitRenderState(
+                        RenderPipelines.GUI_TEXTURED,
+                        TextureSetup.singleTexture(preview,
+                                RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR)),
+                        new Matrix3x2f(gui.pose()),
+                        previewX, previewY,
+                        previewX + previewW, previewY + previewH,
+                        0f, 1f,
+                        1f, 0f,
+                        0xFFFFFFFF,
+                        null));
 
         gui.renderOutline(previewX, previewY, previewW, previewH, 0x80FFFFFF);
     }

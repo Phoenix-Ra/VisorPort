@@ -52,10 +52,13 @@ public class ModelUtils {
 
     private static void copyUV(ModelPart.Polygon source, ModelPart.Polygon target) {
         for (int i = 0; i < source.vertices().length; i++) {
-            ModelPart.Vertex newVertex = new ModelPart.Vertex(target.vertices()[i].pos(), source.vertices()[i].u(),
-                    source.vertices()[i].v());
-
-            target.vertices()[i] = newVertex;
+            // 1.21.11: Vertex is a flat (x, y, z, u, v) record - pos() is gone, and remap()
+            // rebuilds it keeping the position and replacing only the UV, which is exactly
+            // what "new Vertex(target.pos(), source.u(), source.v())" used to do.
+            target.vertices()[i] = target.vertices()[i].remap(
+                    source.vertices()[i].u(),
+                    source.vertices()[i].v()
+            );
         }
     }
 

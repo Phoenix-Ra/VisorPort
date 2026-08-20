@@ -10,11 +10,11 @@ import org.vmstudio.visor.api.compatibility.ItemClassifier;
 import org.vmstudio.visor.api.server.VRServerSettings;
 import org.vmstudio.visor.api.server.player.VRServerPlayer;
 import org.vmstudio.visor.extensions.common.ServerPlayerExtension;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.item.component.BlocksAttacks;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
@@ -29,28 +29,23 @@ import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemUseAnimation;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.At.Shift;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
 
 @Mixin(ServerPlayer.class)
 public abstract class ServerPlayerMixin
         extends Common_PlayerMixin implements ServerPlayerExtension {
-
-    @Shadow
-    @Final
-    public MinecraftServer server;
 
     @Unique
     private float visor$rotationYCached;
@@ -72,21 +67,20 @@ public abstract class ServerPlayerMixin
     \* **************** */
 
 
+    //1.21.11: entity save data goes through ValueInput/ValueOutput instead of a raw CompoundTag.
+    //The getXOr accessors replace the old "absent means default" behaviour of CompoundTag#getX
+    //and still read any numeric tag, so slots written as a float by older saves keep loading.
     @WrapMethod(method = "readAdditionalSaveData")
-    protected void visor$wrapReadData(CompoundTag compound, Operation<Void> original) {
-        original.call(compound);
-        visor$rotationYCached = compound.getFloat("visor$rotation_y");
-        if(compound.contains("visor$offhand_slot")){
-            visor$offhandSlotCached = compound.getInt("visor$offhand_slot");
-        }else{
-            visor$offhandSlotCached = -1;
-        }
+    protected void visor$wrapReadData(ValueInput input, Operation<Void> original) {
+        original.call(input);
+        visor$rotationYCached = input.getFloatOr("visor$rotation_y", 0.0F);
+        visor$offhandSlotCached = input.getIntOr("visor$offhand_slot", -1);
     }
     @WrapMethod(method = "addAdditionalSaveData")
-    protected void visor$wrapSaveData(CompoundTag compound, Operation<Void> original) {
-        original.call(compound);
-        compound.putFloat("visor$rotation_y", visor$rotationYCached);
-        compound.putFloat("visor$offhand_slot", visor$offhandSlotCached);
+    protected void visor$wrapSaveData(ValueOutput output, Operation<Void> original) {
+        original.call(output);
+        output.putFloat("visor$rotation_y", visor$rotationYCached);
+        output.putFloat("visor$offhand_slot", visor$offhandSlotCached);
     }
 
     /* *************** *\
@@ -124,15 +118,19 @@ public abstract class ServerPlayerMixin
     }
 
 
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;addFreshEntity(Lnet/minecraft/world/entity/Entity;)Z", shift = Shift.BEFORE), method = "drop(Lnet/minecraft/world/item/ItemStack;ZZ)Lnet/minecraft/world/entity/item/ItemEntity;",
-        locals = LocalCapture.CAPTURE_FAILHARD)
+    // PORT-1.21.11: ServerPlayer#drop no longer spawns the item itself - the
+    // Level#addFreshEntity call moved down into LivingEntity#drop - so there is no longer an
+    // injection point before the spawn. The hand pose is applied to the returned entity at
+    // RETURN instead; the entity tracker still broadcasts the final position in the same tick.
+    @Inject(at = @At("RETURN"), method = "drop(Lnet/minecraft/world/item/ItemStack;ZZ)Lnet/minecraft/world/entity/item/ItemEntity;")
     public void visor$vrItemDrop(ItemStack itemStack,
                                 boolean dropAround,
                                 boolean includeName,
-                                CallbackInfoReturnable<ItemEntity> info,
-                                ItemEntity itemEntity) {
+                                CallbackInfoReturnable<ItemEntity> info) {
+        ItemEntity itemEntity = info.getReturnValue();
         VRServerPlayer vrPlayer = visor$getVrPlayer();
-        if (vrPlayer == null
+        if (itemEntity == null
+                || vrPlayer == null
                 || dropAround) {
             return;
         }
@@ -199,7 +197,11 @@ public abstract class ServerPlayerMixin
     }
 
     @Override
-    protected void visor$wrapSweepAttack(Operation<Void> original) {
+    protected void visor$wrapSweepAttack(Entity target,
+                                         float damage,
+                                         DamageSource damageSource,
+                                         float attackStrengthScale,
+                                         Operation<Void> original) {
         VRServerPlayer vrPlayer = visor$getVrPlayer();
 
         if (vrPlayer != null) {
@@ -226,7 +228,7 @@ public abstract class ServerPlayerMixin
                 );
             }
         } else {
-            original.call();
+            original.call(target, damage, damageSource, attackStrengthScale);
         }
     }
 
@@ -312,18 +314,28 @@ public abstract class ServerPlayerMixin
         return null;
     }
 
+    /**
+     * PORT-1.21.11: this used to swap {@code useItem} out from under
+     * {@code Player#hurtCurrentlyUsedShield}, because that method decided for itself which stack
+     * to damage. {@code BlocksAttacks#hurtBlockingItem} takes the blocking stack as an argument,
+     * so the roomscale shield is passed in directly instead of being smuggled through a field -
+     * same outcome, without the temporary mutation of player state.
+     */
     @Override
-    protected void visor$roomscaleShieldItemDamage(float damageAmount, Operation<Void> original) {
+    protected void visor$roomscaleShieldItemDamage(BlocksAttacks blocksAttacks,
+                                                   Level level,
+                                                   ItemStack blockingWith,
+                                                   LivingEntity blocker,
+                                                   InteractionHand hand,
+                                                   float damageAmount,
+                                                   Operation<Void> original) {
         if (visor$roomscaleShieldItem == null) {
-            original.call(damageAmount);
+            original.call(blocksAttacks, level, blockingWith, blocker, hand, damageAmount);
             return;
         }
-        ItemStack backup = this.useItem;
-        this.useItem = visor$roomscaleShieldItem;
         try {
-            original.call(damageAmount);
+            original.call(blocksAttacks, level, visor$roomscaleShieldItem, blocker, hand, damageAmount);
         } finally {
-            this.useItem = backup;
             visor$roomscaleShieldItem = null;
             visor$roomscaleShieldHand = null;
         }

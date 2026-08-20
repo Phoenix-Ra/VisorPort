@@ -1,17 +1,23 @@
 package org.vmstudio.visor.core.client.render.helpers;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
-import net.minecraft.client.renderer.CoreShaders;
 import org.vmstudio.visor.api.client.player.pose.VRPlayerPoseClient;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
 import org.vmstudio.visor.api.client.gui.overlays.VROverlay;
 import org.vmstudio.visor.api.client.gui.overlays.VROverlayPose;
 import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.render.GuiRenderer;
+import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
+import net.minecraft.client.gui.render.state.GuiRenderState;
+import net.minecraft.client.renderer.fog.FogRenderer;
 import org.vmstudio.visor.core.client.render.VRRenderState;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
+import org.vmstudio.visor.mixin.client.accessors.GameRendererAccessor;
 import org.vmstudio.visor.core.client.utils.ClientUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
@@ -21,11 +27,8 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
-import org.lwjgl.opengl.GL11C;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
-import net.minecraft.client.renderer.FogParameters;
-import org.lwjgl.opengl.GL11;
 
 public class RenderGuiHelper {
     private RenderGuiHelper() {
@@ -36,6 +39,62 @@ public class RenderGuiHelper {
 
 
 
+
+
+    /**
+     * Starts an off-schedule GUI recording and returns the {@link GuiGraphics} to draw into.
+     * <p>
+     * PORT-1.21.11: {@code new GuiGraphics(mc, bufferSource)} plus {@code flush()} is gone. GUI
+     * drawing now appends to a {@link GuiRenderState} that the {@link GuiRenderer} replays in one
+     * pass, so anything drawing a GUI outside vanilla schedule has to reset the state, record, and
+     * ask the renderer to replay it. The replay lands on whatever {@code Minecraft.mainRenderTarget}
+     * currently is, which is exactly how Visor points it at an overlay texture or at the mirror.
+     * <p>
+     * Always pair with {@link #flushGui()}.
+     */
+    public static GuiGraphics beginGui() {
+        return beginGui(0, 0);
+    }
+
+    public static GuiGraphics beginGui(int mouseX, int mouseY) {
+        GuiRenderState state = ((GameRendererAccessor) MC.gameRenderer).visor$getGuiRenderState();
+        state.reset();
+        return new GuiGraphics(MC, state, mouseX, mouseY);
+    }
+
+    /**
+     * The projection VR overlay screens are drawn with.
+     * <p>
+     * Long-lived on purpose: it owns a GPU buffer, and {@code setProjectionMatrix} takes a buffer
+     * slice now rather than a {@code Matrix4f}, so building one per overlay per frame would be an
+     * allocation twice per eye. It caches internally and only rewrites when the size changes.
+     */
+    private static CachedOrthoProjectionMatrixBuffer overlayProjection;
+
+    /** Ortho projection over a {@code width x height} overlay, top-left origin. */
+    public static GpuBufferSlice overlayProjection(float width, float height) {
+        if (overlayProjection == null) {
+            overlayProjection = new CachedOrthoProjectionMatrixBuffer(
+                    "visor overlay projection", 1000.0F, 21000.0F, true);
+        }
+        return overlayProjection.getBuffer(width, height);
+    }
+
+    public static void close() {
+        if (overlayProjection != null) {
+            overlayProjection.close();
+            overlayProjection = null;
+        }
+    }
+
+
+    /** Replays everything recorded since {@link #beginGui} onto the current main render target. */
+    public static void flushGui() {
+        GameRendererAccessor gameRenderer = (GameRendererAccessor) MC.gameRenderer;
+        gameRenderer.visor$getGuiRenderer().render(
+                gameRenderer.visor$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE));
+        gameRenderer.visor$getGuiRenderer().incrementFrameNumber();
+    }
 
 
     public static void renderOverlayQuad(VROverlay overlay,
@@ -56,7 +115,7 @@ public class RenderGuiHelper {
         );
         scale = scale * renderPose.getWorldScale();
 
-        FogParameters fogCache = RenderSystem.getShaderFog();
+        GpuBufferSlice fogCache = RenderSystem.getShaderFog();
         var color = AtumColor.WHITE.asMutable();
 
         boolean dragging = overlay.isBeingDragged();
@@ -69,33 +128,16 @@ public class RenderGuiHelper {
 
         var renderTarget = overlay.getRenderTarget();
         assert renderTarget != null;
-        renderTarget.bindRead();
 
-        GlStateManager._disableCull();
-        RenderSystem.setShaderTexture(0, renderTarget.getColorTextureId());
-
-        if (VRRenderState.getSceneType().isWorld()) {
-            RenderSystem.setShaderFog(FogParameters.NO_FOG);
-
-            GlStateManager._enableBlend();
-            GlStateManager._blendFuncSeparate(
-                    GL11.GL_SRC_ALPHA,
-                    GL11.GL_ONE_MINUS_SRC_ALPHA,
-                    GL11.GL_ONE_MINUS_DST_ALPHA,
-                    GL11.GL_ONE
-            );
-        } else {
-            GlStateManager._enableBlend();
+        // Blend, depth and cull are chosen by picking a pipeline rather than by poking GL. Fog is
+        // still ambient state, because it is a uniform block that every pass binds from
+        // RenderSystem - and the lit panel samples it, so a world scene has to silence it.
+        boolean inWorld = VRRenderState.getSceneType().isWorld();
+        if (inWorld) {
+            RenderSystem.setShaderFog(((GameRendererAccessor) MC.gameRenderer)
+                    .visor$getFogRenderer()
+                    .getBuffer(FogRenderer.FogMode.NONE));
         }
-
-        if (depthAlways) {
-            GlStateManager._depthFunc(GL11C.GL_ALWAYS);
-            GlStateManager._depthMask(false);
-        } else {
-            GlStateManager._depthFunc(GL11C.GL_LEQUAL);
-            GlStateManager._depthMask(true);
-        }
-        GlStateManager._enableDepthTest();
 
         // --- Pose ---
         poseStack.pushPose();
@@ -122,7 +164,9 @@ public class RenderGuiHelper {
                     minLight
             );
             RenderHelper.renderDisplayQuadWithLight(
+                    VisorPipelines.overlayQuadFor(inWorld, true, depthAlways),
                     poseStack.last().pose(),
+                    renderTarget,
                     color,
                     (float) overlay.getWidth(),
                     (float) overlay.getHeight(),
@@ -132,7 +176,9 @@ public class RenderGuiHelper {
             );
         } else {
             RenderHelper.renderDisplayQuad(
+                    VisorPipelines.overlayQuadFor(inWorld, false, depthAlways),
                     poseStack.last().pose(),
+                    renderTarget,
                     color,
                     (float) overlay.getWidth(),
                     (float) overlay.getHeight(),
@@ -158,12 +204,9 @@ public class RenderGuiHelper {
         }
 
         // --- Restore ---
-        RenderSystem.setShaderFog(fogCache);
-        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
-        GlStateManager._depthMask(true);
-        GlStateManager._enableDepthTest();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GlStateManager._enableCull();
+        if (inWorld) {
+            RenderSystem.setShaderFog(fogCache);
+        }
 
         poseStack.popPose();
     }
@@ -172,7 +215,6 @@ public class RenderGuiHelper {
                                           PoseStack poseStack,
                                           AtumColor barColor,
                                           float brightness) {
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
 
         float aspect = overlay.getAspectRatio();
         float halfWidth  = VROverlayPose.QUAD_SCALE * 0.5f;
@@ -220,7 +262,7 @@ public class RenderGuiHelper {
         buf.addVertex(pose, right, top,    0f).setColor(r, g, b, a);
         buf.addVertex(pose, left,  top,    0f).setColor(r, g, b, a);
 
-        BufferUploader.drawWithShader(buf.buildOrThrow());
+        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(buf.buildOrThrow());
     }
 
 
@@ -228,7 +270,6 @@ public class RenderGuiHelper {
                                          PoseStack poseStack,
                                          AtumColor color,
                                          float brightness) {
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
 
         float aspect = overlay.getAspectRatio();
         float halfWidth  = VROverlayPose.QUAD_SCALE * 0.5f;
@@ -280,14 +321,13 @@ public class RenderGuiHelper {
         buf.addVertex(pose, right, top,    0f).setColor(r, g, b, a);
         buf.addVertex(pose, left,  top,    0f).setColor(r, g, b, a);
 
-        BufferUploader.drawWithShader(buf.buildOrThrow());
+        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(buf.buildOrThrow());
     }
 
     private static void drawResizeOutline(VROverlay overlay,
                                           PoseStack poseStack,
                                           AtumColor color,
                                           float brightness) {
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
 
         float aspect = overlay.getAspectRatio();
         float halfWidth  = VROverlayPose.QUAD_SCALE * 0.5f;
@@ -312,7 +352,7 @@ public class RenderGuiHelper {
         // right edge
         emitRect(buf, pose, halfWidth - thickness, -halfHeight + thickness, halfWidth, halfHeight - thickness, r, g, b, a);
 
-        BufferUploader.drawWithShader(buf.buildOrThrow());
+        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(buf.buildOrThrow());
     }
 
     private static void emitRect(BufferBuilder buf, Matrix4f pose,

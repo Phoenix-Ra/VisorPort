@@ -1,6 +1,5 @@
 package org.vmstudio.visor.core.client.render.decoration.effects;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import org.vmstudio.visor.api.client.player.pose.VRPlayerPoseClient;
@@ -13,18 +12,15 @@ import org.vmstudio.visor.api.common.addon.VisorAddon;
 import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
-import net.minecraft.client.renderer.CoreShaders;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
+import net.minecraft.client.renderer.rendertype.RenderType;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.GL11C;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import org.lwjgl.opengl.GL11;
 
 
 @RegisterVRGameEffect
@@ -51,33 +47,24 @@ public class GameEffectOnFire extends VRGameEffect {
                 .visor$getCameraEntityCache()
                 .getY());
 
-        TextureAtlasSprite sprite = ModelBakery.FIRE_1.sprite();
+        // Material no longer resolves its own sprite; the atlas manager is the lookup now.
+        TextureAtlasSprite sprite = MC.getAtlasManager().get(ModelBakery.FIRE_1);
         Identifier atlas = sprite.atlasLocation();
-        float uMin = sprite.getU0();
-        float uMax = sprite.getU1();
-        float vMin = sprite.getV0();
-        float vMax = sprite.getV1();
-        float midU = (uMin + uMax) * 0.5f;
-        float midV = (vMin + vMax) * 0.5f;
-        float shrink = sprite.uvShrinkRatio();
+        // PORT-1.21.11: TextureAtlasSprite#uvShrinkRatio is gone. The sprite now folds its atlas
+        // padding straight into u0/u1/v0/v1, so vanilla's own fire quads sample the raw sprite
+        // bounds; keeping the old inset-toward-the-middle lerp would crop the flame twice.
+        float u0 = sprite.getU0();
+        float u1 = sprite.getU1();
+        float v0 = sprite.getV0();
+        float v1 = sprite.getV1();
 
-        float u0 = Mth.lerp(shrink, uMin, midU);
-        float u1 = Mth.lerp(shrink, uMax, midU);
-        float v0 = Mth.lerp(shrink, vMin, midV);
-        float v1 = Mth.lerp(shrink, vMax, midV);
-
-        // --- GL setup ---
-        GlStateManager._depthFunc(
-                renderPass == VRRenderPass.THIRD_PERSON
-                        ? GL11C.GL_LEQUAL
-                        : GL11C.GL_ALWAYS
-        );
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GlStateManager._enableDepthTest();
-
-        RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-        RenderSystem.setShaderTexture(0, atlas);
+        // In third person the fire is part of the scene and tests depth; in first person it is
+        // a face overlay that has to draw over everything. GL_ALWAYS has no equivalent on a
+        // pipeline, so the first-person variant drops the depth test entirely - which also drops
+        // its depth write, harmless for something nothing else is meant to occlude.
+        RenderType type = renderPass == VRRenderPass.THIRD_PERSON
+                ? VisorPipelines.positionTexColor(atlas)
+                : VisorPipelines.positionTexColorNoDepth(atlas);
 
         // --- Pose setup ---
         stack.pushPose();
@@ -85,7 +72,9 @@ public class GameEffectOnFire extends VRGameEffect {
         RenderPoseHelper.applyCameraPose(renderPass, stack);
 
         // --- Render ---
-        BufferBuilder buf;
+        // One buffer for all four faces: they only differ by the matrix baked into the vertices,
+        // so splitting them would open four render passes for no reason.
+        BufferBuilder buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < 4; i++) {
             stack.pushPose();
             // spin quad around player
@@ -95,7 +84,6 @@ public class GameEffectOnFire extends VRGameEffect {
             stack.translate(0, -fireHeight, 0);
 
             Matrix4f mat = stack.last().pose();
-            buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
             buf.addVertex(mat, -FIRE_HALF_WIDTH,0, -FIRE_HALF_WIDTH)
                     .setUv(u1, v1).setColor(1,1,1,FIRE_ALPHA);
             buf.addVertex(mat,  FIRE_HALF_WIDTH,0, -FIRE_HALF_WIDTH)
@@ -104,14 +92,12 @@ public class GameEffectOnFire extends VRGameEffect {
                     .setUv(u0, v0).setColor(1,1,1,FIRE_ALPHA);
             buf.addVertex(mat, -FIRE_HALF_WIDTH, fireHeight,  -FIRE_HALF_WIDTH)
                     .setUv(u1, v0).setColor(1,1,1,FIRE_ALPHA);
-            BufferUploader.drawWithShader(buf.buildOrThrow());
 
             stack.popPose();
         }
+        type.draw(buf.buildOrThrow());
 
-        // --- Restore GL & pose ---
-        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
-        GlStateManager._disableBlend();
+        // --- Restore pose ---
         stack.popPose();
     }
 

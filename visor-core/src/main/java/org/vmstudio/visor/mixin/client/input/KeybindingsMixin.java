@@ -12,6 +12,7 @@ import org.vmstudio.visor.api.client.render.VRSceneType;
 import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.VisorState;
 import net.minecraft.client.KeyboardHandler;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.Screenshot;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
@@ -26,14 +27,21 @@ import java.util.function.Consumer;
 @Mixin(KeyboardHandler.class)
 public class KeybindingsMixin {
 
+    /*
+     * PORT-1.21.11: KeyboardHandler#keyPress(long, int, int, int, int) became
+     * keyPress(long window, int action, KeyEvent event) - key, scancode and modifiers are packed
+     * into the KeyEvent record, and the surviving int is the GLFW action. The @At is unchanged:
+     * debugCrashKeyTime is still read first thing inside keyPress, so ordinal 0 still lands
+     * before vanilla dispatches the key to the screen or the keybinds.
+     */
     @Inject(method = "keyPress", at = @At(value = "FIELD", target = "Lnet/minecraft/client/KeyboardHandler;debugCrashKeyTime:J", ordinal = 0), cancellable = true)
     private void visor$handleVRHotKeys(long windowPointer,
-                                    int key, int scanCode,
-                                    int action, int modifiers,
+                                    int action,
+                                    KeyEvent event,
                                     CallbackInfo ci) {
         if (action == GLFW.GLFW_PRESS) {
             if (InputHelper.isKeyDown(GLFW.GLFW_KEY_LEFT_CONTROL)) {
-                if (key == GLFW.GLFW_KEY_F7
+                if (event.key() == GLFW.GLFW_KEY_F7
                         && VisorAPI.clientState().sceneType() == VRSceneType.MAIN_MENU) {
                     VRPlayMode mode = VisorAPI.clientState().playMode().next();
                     VisorState.setVrPlayMode(mode);

@@ -21,8 +21,14 @@ public class NoSodiumLevelRendererMixin {
     /**
      * 1.21.1: needsFullRenderChunkUpdate/needsFrustumUpdate moved from
      * LevelRenderer into SectionOcclusionGraph
+     * <p>
+     * PORT-1.21.11: setupRender was renamed to cullTerrain and lost its
+     * hasCapturedFrustum parameter (the capture is now read off the field
+     * inline). The body is otherwise unchanged - it still skips applyFrustum
+     * unless consumeFrustumUpdate() or a camera rotation change says
+     * otherwise, which is exactly what this hook has to defeat per eye.
      */
-    @Inject(method = "setupRender", at = @At("HEAD"))
+    @Inject(method = "cullTerrain", at = @At("HEAD"))
     private void visor$alwaysUpdateCull(CallbackInfo ci) {
         if (VisorState.get().isActive()) {
             // fixes chunks cull frustum between displays

@@ -137,8 +137,12 @@ public class VRPlayerModelSimple extends PlayerModel {
         attackPart.zRot -= roll * 0.4F;
     }
 
+    // PORT-1.21.11: translateToHand now takes the render state as its first argument, and vanilla
+    // applies the model root transform here - the item layer stopped doing it on the caller side,
+    // so the root step is mirrored below or held items would ignore any root animation.
     @Override
-    public void translateToHand(HumanoidArm side, PoseStack poseStack) {
+    public void translateToHand(AvatarRenderState renderState, HumanoidArm side, PoseStack poseStack) {
+        this.root().translateAndRotate(poseStack);
         this.getArm(side).translateAndRotate(poseStack);
         if (this.slim) {
             poseStack.translate(side == HumanoidArm.LEFT ? -0.0625F : 0.0625F, 0.0F, 0.0F);

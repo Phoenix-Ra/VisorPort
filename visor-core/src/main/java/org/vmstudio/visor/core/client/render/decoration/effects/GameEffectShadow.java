@@ -1,7 +1,5 @@
 package org.vmstudio.visor.core.client.render.decoration.effects;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
 import me.phoenixra.atumvr.api.misc.color.AtumColorImmutable;
@@ -17,16 +15,13 @@ import org.vmstudio.visor.extensions.client.entity.LocalPlayerExtension;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.render.helpers.RenderHelper;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.api.client.gui.helpers.TexturesHelper;
-import net.minecraft.client.renderer.CoreShaders;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL43C;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 
@@ -39,12 +34,6 @@ public class GameEffectShadow extends VRGameEffect {
             0,0,0,
             64
     );
-    private int glCacheBlendSrcA;
-    private int glCacheBlendDstA;
-    private int glCacheBlendSrcRGB;
-    private int glCacheBlendDstRGB;
-    private boolean glCacheBlend;
-    private boolean glCacheCull;
 
     public GameEffectShadow(@NotNull VisorAddon owner) {
         super(owner);
@@ -71,16 +60,6 @@ public class GameEffectShadow extends VRGameEffect {
                 .subtract(camPos)
                 .add(0, 0.005, 0);
 
-        // --- GL setup ---
-        GlStateManager._disableCull();
-        setupPolygonGlState(true);
-        GlStateManager._enableDepthTest();
-        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
-
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
-        RenderSystem.setShaderTexture(0, TexturesHelper.getWhiteTexture());
-
-
         // --- Pose setup ---
         poseStack.pushPose();
 
@@ -90,7 +69,11 @@ public class GameEffectShadow extends VRGameEffect {
 
 
         // --- Render ---
+        // GL_ALWAYS with a depth write is not expressible on a pipeline. The shadow is a fake
+        // drawn flat on the ground and never meant to occlude anything, so it gives up the write
+        // rather than the "always draws" half.
         RenderHelper.renderFlatQuad(
+                VisorPipelines.POSITION_COLOR_NORMAL_NO_DEPTH_TYPE,
                 poseStack.last().pose(),
                 VRMathUtils.ZERO_VECTOR,
                 playerWidth,
@@ -99,43 +82,10 @@ public class GameEffectShadow extends VRGameEffect {
                 SHADOW_COLOR
         );
 
-        // --- Restore GL & pose ---
-        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
-        setupPolygonGlState(false);
-        GlStateManager._enableCull();
-
         poseStack.popPose();
     }
 
 
-    private void setupPolygonGlState(boolean enable) {
-
-        if (enable) {
-            glCacheBlendSrcA = GlStateManager.BLEND.srcAlpha;
-            glCacheBlendDstA = GlStateManager.BLEND.dstAlpha;
-            glCacheBlendSrcRGB = GlStateManager.BLEND.srcRgb;
-            glCacheBlendDstRGB = GlStateManager.BLEND.dstRgb;
-            glCacheBlend = GL43C.glIsEnabled(GL11.GL_BLEND);
-            glCacheCull = true;
-            GlStateManager._enableBlend();
-            GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-            GlStateManager._disableCull();
-
-        } else {
-            GlStateManager._blendFuncSeparate(glCacheBlendSrcRGB, glCacheBlendDstRGB, glCacheBlendSrcA,
-                    glCacheBlendDstA);
-
-            if (!glCacheBlend) {
-                GlStateManager._disableBlend();
-            }
-
-            if (glCacheCull) {
-                GlStateManager._enableCull();
-            }
-
-
-        }
-    }
 
     @Override
     public boolean isVisible(@NotNull VRDecorator currentDecorator) {

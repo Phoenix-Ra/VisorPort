@@ -7,7 +7,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.InputWithModifiers;
 
-public class KeyboardButton extends Button {
+// PORT-1.21.11: Button is abstract now - the sprite+label drawing it used to do itself moved
+// into Button.Plain, so that is the base a plain vanilla-looking button extends.
+public class KeyboardButton extends Button.Plain {
     private VRKeyboardScreen keyboardScreen;
     private final OnRelease onRelease;
     private boolean pressed;
@@ -33,8 +35,13 @@ public class KeyboardButton extends Button {
         this.onRelease = onRelease;
     }
 
+    /**
+     * 1.21.11: AbstractButton#renderWidget is final and only delegates to renderContents,
+     * so the second cursor has to be resolved here instead - still before the button draws,
+     * because the sprite it picks reads {@link #isHovered()}.
+     */
     @Override
-    protected void renderWidget(GuiGraphics guiGraphics, int i, int j, float f) {
+    protected void renderContents(GuiGraphics guiGraphics, int i, int j, float f) {
         VROverlayKeyboard overlayKeyboard = keyboardScreen.getOverlayKeyboard();
         if(overlayKeyboard.getInactiveCursorData().isInGui()){
             int mX = overlayKeyboard.getInactiveCursorData().getCursorX();
@@ -47,13 +54,14 @@ public class KeyboardButton extends Button {
             hoveredSecondary = false;
         }
 
-        super.renderWidget(guiGraphics, i, j, f);
+        super.renderContents(guiGraphics, i, j, f);
     }
 
     @Override
     public void onPress(InputWithModifiers input) {
         if(usePressTask) {
-            keyboardScreen.setPressedTask(super::onPress);
+            // onPress carries the input event now, so the repeat task replays this press
+            keyboardScreen.setPressedTask(() -> super.onPress(input));
             keyboardScreen.setPressTick(0);
         }
         super.onPress(input);
@@ -62,8 +70,6 @@ public class KeyboardButton extends Button {
 
     @Override
     public void onRelease(MouseButtonEvent event) {
-        double d = event.x();
-        double e = event.y();
         if(onRelease != null && pressed) {
             onRelease.onRelease(this);
         }

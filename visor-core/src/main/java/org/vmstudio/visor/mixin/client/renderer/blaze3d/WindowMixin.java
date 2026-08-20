@@ -109,11 +109,18 @@ public abstract class WindowMixin implements WindowExtension {
     }
 
 
+    /**
+     * PORT-1.21.11: {@code getGuiScale} returns {@code int} now, not {@code double}. The generic
+     * on {@code CallbackInfoReturnable} is erased by the time Mixin derives the handler
+     * descriptor, so neither javac nor the apply-time descriptor check sees a stale one - the
+     * mismatch only surfaces when the injector's generated {@code cir.getReturnValueI()} casts
+     * the boxed {@code Double} this used to store and throws {@code ClassCastException}.
+     */
     @Inject(method = "getGuiScale", at = @At("HEAD"), cancellable = true)
-    void visor$vrScaleFactor(CallbackInfoReturnable<Double> cir) {
+    void visor$vrScaleFactor(CallbackInfoReturnable<Integer> cir) {
         if (VisorState.get().isActive()) {
             cir.setReturnValue(
-                    (double) ClientContext
+                    ClientContext
                             .guiManager
                             .getScaleFactor()
             );

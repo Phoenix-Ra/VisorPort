@@ -1,14 +1,13 @@
 package org.vmstudio.visor.core.client.render.decoration.decorators.mainmenu;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
-import net.minecraft.client.renderer.CoreShaders;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
 import org.vmstudio.visor.core.client.utils.ClientUtils;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 
 /**
  * Renders the play-area floor
@@ -29,8 +28,6 @@ public final class VRMenuFloor {
             float length = area.y + i * 2;
 
             poseStack.pushPose();
-            RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-            RenderSystem.setShaderTexture(0, floorTexture);
 
             int r = 128, g = 128, b = 128;
 
@@ -61,7 +58,9 @@ public final class VRMenuFloor {
                     .setColor(r, g, b, 255)
             ;
 
-            BufferUploader.drawWithShader(bufferbuilder.buildOrThrow());
+            // The floor tiles by drawing UVs past 1.0, so it needs the repeating sampler;
+            // the default clamp would stretch one copy of the texture over the whole area.
+            VisorPipelines.positionTexColorRepeat(floorTexture).draw(bufferbuilder.buildOrThrow());
 
             poseStack.popPose();
         }

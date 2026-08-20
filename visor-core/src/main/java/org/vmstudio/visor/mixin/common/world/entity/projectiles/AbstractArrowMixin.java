@@ -4,7 +4,6 @@ import org.vmstudio.visor.api.VisorAPI;
 import org.vmstudio.visor.api.server.player.VRServerPlayer;
 import org.vmstudio.visor.core.common.CommonUtils;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -99,9 +98,8 @@ public abstract class AbstractArrowMixin extends Entity {
         //sound
         owner.connection.send(
                 new ClientboundSoundPacket(
-                        BuiltInRegistries.SOUND_EVENT.wrapAsHolder(
-                                SoundEvents.ITEM_BREAK
-                        ),
+                        // 1.21.11: SoundEvents constants are registry holders already
+                        SoundEvents.ITEM_BREAK,
                         SoundSource.PLAYERS,
                         owner.getX(),
                         owner.getY(),

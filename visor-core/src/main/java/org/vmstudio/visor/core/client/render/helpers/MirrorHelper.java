@@ -1,29 +1,23 @@
 package org.vmstudio.visor.core.client.render.helpers;
 
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.enums.EyeType;
 import org.vmstudio.visor.extensions.client.WindowExtension;
 import org.vmstudio.visor.core.client.render.VRShaders;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.core.client.utils.ClientUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import org.joml.Matrix4f;
 
 import java.util.List;
 
 import org.vmstudio.visor.core.client.ClientContext;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL30C;
 
-import static com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer;
-import static com.mojang.blaze3d.opengl.GlStateManager._glBlitFrameBuffer;
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
-import com.mojang.blaze3d.ProjectionType;
-import net.minecraft.client.renderer.FogParameters;
-import com.mojang.blaze3d.opengl.GlStateManager;
 
 public class MirrorHelper {
     private MirrorHelper() {
@@ -149,15 +143,10 @@ public class MirrorHelper {
 
 
     private static void drawTextMirror(String text, boolean clearBackground) {
-        final int CLEAR_DEPTH_FLAG = 256;
-        final int CLEAR_COLOR_FLAG = 16384;
         final int TEXT_COLOR       = 0xFFFFFF;
         final int CHAR_WIDTH       = 22;
         final int LINE_HEIGHT      = 5;
         final int TEXT_X_OFFSET    = 1;
-        final float NEAR_PLANE     = 1000f;
-        final float FAR_PLANE      = 3000f;
-        final float CAMERA_Z       = 2000f;
         final float TEXT_SCALE     = 2f;
 
         // 1) get the VR mirror dimensions
@@ -165,62 +154,43 @@ public class MirrorHelper {
         int vrWidth = window.visor$getActualScreenWidth();
         int vrHeight= window.visor$getActualScreenHeight();
 
-        // 2) viewport + projection
-        RenderSystem.backupProjectionMatrix();
-        GlStateManager._viewport(0, 0, vrWidth, vrHeight);
-        var proj = new Matrix4f().setOrtho(0, vrWidth, vrHeight, 0, NEAR_PLANE, FAR_PLANE);
-        RenderSystem.setProjectionMatrix(proj, ProjectionType.ORTHOGRAPHIC);
-
-        // 3) push / configure model-view
-        var mv = RenderSystem.getModelViewStack();
-        mv.pushMatrix();
-        try {
-            mv.identity();
-            mv.translate(0, 0, -CAMERA_Z);
-
-            // 4) disable fog + clear
-            RenderSystem.setShaderFog(FogParameters.NO_FOG);
-            int flags = CLEAR_DEPTH_FLAG | (clearBackground ? CLEAR_COLOR_FLAG : 0);
-            GlStateManager._clear(flags);
-            if (clearBackground) {
-                RenderSystem.clearColor(0, 0, 0, 0);
-            }
-
-            // 5) prepare GuiGraphics with scaled text
-            var gui = new GuiGraphics(MC, MC.renderBuffers().bufferSource());
-            gui.pose().scale(TEXT_SCALE, TEXT_SCALE, TEXT_SCALE);
-
-            // 6) wrap & draw text lines
-            int wrapWidth = vrWidth / CHAR_WIDTH;
-            var lines    = (text == null)
-                    ? List.<String>of()
-                    : ClientUtils.wrapText(text, wrapWidth);
-
-            int y = LINE_HEIGHT;
-            for (String line : lines) {
-                gui.drawString(MC.font, line, TEXT_X_OFFSET, y, TEXT_COLOR);
-                y += LINE_HEIGHT;
-            }
-
-            gui.flush();
-        } finally {
-            mv.popMatrix();
-            RenderSystem.restoreProjectionMatrix();
-            RenderStateHelper.restoreAfterExternalRender();
+        // PORT-1.21.11: the viewport is owned by the render pass now, and the projection the
+        // GUI renderer uses is its own - neither is ours to set here. The whole ortho/model-view
+        // sandwich this method used to build is what GuiRenderer does internally.
+        RenderTarget target = MC.getMainRenderTarget();
+        if (clearBackground) {
+            RenderShaderHelper.clearColorAndDepth(target, 0, 1.0);
         }
+
+        GuiGraphics gui = RenderGuiHelper.beginGui();
+        gui.pose().scale(TEXT_SCALE, TEXT_SCALE);
+
+        int wrapWidth = vrWidth / CHAR_WIDTH;
+        var lines = (text == null)
+                ? List.<String>of()
+                : ClientUtils.wrapText(text, wrapWidth);
+
+        int y = LINE_HEIGHT;
+        for (String line : lines) {
+            gui.drawString(MC.font, line, TEXT_X_OFFSET, y, TEXT_COLOR);
+            y += LINE_HEIGHT;
+        }
+
+        RenderGuiHelper.flushGui();
     }
 
 
+    /**
+     * Copies {@code source} onto the window, into the pixel rectangle {@code left..bottom}.
+     * <p>
+     * PORT-1.21.11: this was {@code glBlitFramebuffer}. A {@link RenderTarget} no longer owns a
+     * framebuffer object - only textures - so there is nothing to bind as a read target and the
+     * copy is a textured quad now. The rectangle arithmetic is the same; it just ends up in NDC.
+     */
     public static void blit(RenderTarget source,
                             int left, int top,
                             int right, int bottom) {
-        _glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, source.frameBufferId);
-        _glBlitFrameBuffer(
-                0, 0, source.width, source.height,
-                left, top, right, bottom,
-                GL11C.GL_COLOR_BUFFER_BIT, GL11C.GL_LINEAR);
-        _glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, 0);
-        RenderStateHelper.restoreAfterExternalRender();
+        drawQuad(source, left, top, right, bottom, 0f, 0f, 1f, 1f);
     }
 
     public static void blitCropped(RenderTarget source,
@@ -240,18 +210,39 @@ public class MirrorHelper {
             }
         }
 
-        int xMin = (int) (xCropFactor * source.width);
-        int yMin = (int) (yCropFactor * source.height);
-        int xMax = source.width - xMin;
-        int yMax = source.height - yMin;
+        // The crop was a source pixel rectangle; it is the same rectangle expressed as UVs.
+        drawQuad(source, left, top, right, bottom,
+                xCropFactor, yCropFactor, 1f - xCropFactor, 1f - yCropFactor);
+    }
 
-        _glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, source.frameBufferId);
-        _glBlitFrameBuffer(
-                xMin, yMin, xMax, yMax,
-                left, top, right, bottom,
-                GL11C.GL_COLOR_BUFFER_BIT, GL11C.GL_LINEAR);
-        _glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, 0);
-        RenderStateHelper.restoreAfterExternalRender();
+
+    private static void drawQuad(RenderTarget source,
+                                 int left, int top, int right, int bottom,
+                                 float u0, float v0, float u1, float v1) {
+        RenderTarget destination = MC.getMainRenderTarget();
+        float width = destination.width;
+        float height = destination.height;
+
+        // The quad is in NDC, so both matrices are identity. Produced before the pass opens:
+        // a dynamic uniform write goes through the command encoder, which rejects any command
+        // while a pass is open.
+        GpuBufferSlice transforms = RenderShaderHelper.writeIdentityTransform();
+        GpuBufferSlice projection = RenderShaderHelper.identityProjection();
+
+        RenderShaderHelper.renderScreenQuad(
+                () -> "visor mirror blit",
+                VisorPipelines.MIRROR_BLIT,
+                pass -> {
+                    pass.setUniform("DynamicTransforms", transforms);
+                    pass.setUniform("Projection", projection);
+                    RenderShaderHelper.bindColor(pass, "Sampler0", source);
+                },
+                destination.getColorTextureView(),
+                2f * left / width - 1f,
+                2f * top / height - 1f,
+                2f * right / width - 1f,
+                2f * bottom / height - 1f,
+                u0, v0, u1, v1);
     }
 
 

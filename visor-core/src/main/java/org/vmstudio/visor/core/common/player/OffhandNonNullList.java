@@ -54,7 +54,10 @@ public class OffhandNonNullList extends NonNullList<ItemStack> {
         if (slot < 0) {
             return ItemStack.EMPTY;
         }
-        return player.getInventory().items.set(slot, itemStack);
+        // PORT-1.21.11: Inventory.items became private when armor/offhand moved to EntityEquipment;
+        // getNonEquipmentItems() hands back that very list, so the write still lands in place
+        // and still returns the replaced stack (Inventory.setItem is void)
+        return player.getInventory().getNonEquipmentItems().set(slot, itemStack);
     }
 
     @Override
@@ -80,7 +83,7 @@ public class OffhandNonNullList extends NonNullList<ItemStack> {
         if (slot < 0) {
             return ItemStack.EMPTY;
         }
-        return player.getInventory().items.set(slot, ItemStack.EMPTY);
+        return player.getInventory().getNonEquipmentItems().set(slot, ItemStack.EMPTY);
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.gui.screens.*;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import org.vmstudio.visor.api.VisorClientState;
 import org.vmstudio.visor.api.VisorAPI;
@@ -217,7 +218,7 @@ public class VisorState implements VisorClientState {
         // release mouse when switching to standing
 
         InputConstants.grabOrReleaseMouse(
-                MC.getWindow().getWindow(),
+                MC.getWindow(),
                 GLFW.GLFW_CURSOR_NORMAL,
                 MC.mouseHandler.xpos(),
                 MC.mouseHandler.ypos()
@@ -238,7 +239,7 @@ public class VisorState implements VisorClientState {
         if (MC.screen != null || MC.level == null) {
             MC.mouseHandler.releaseMouse();
             InputConstants.grabOrReleaseMouse(
-                    MC.getWindow().getWindow(),
+                    MC.getWindow(),
                     GLFW.GLFW_CURSOR_NORMAL,
                     MC.mouseHandler.xpos(),
                     MC.mouseHandler.ypos()
@@ -246,7 +247,7 @@ public class VisorState implements VisorClientState {
         } else {
             MC.mouseHandler.grabMouse();
             InputConstants.grabOrReleaseMouse(
-                    MC.getWindow().getWindow(),
+                    MC.getWindow(),
                     GLFW.GLFW_CURSOR_DISABLED,
                     MC.mouseHandler.xpos(),
                     MC.mouseHandler.ypos()
@@ -262,7 +263,9 @@ public class VisorState implements VisorClientState {
         setVrPlayMode(VRPlayMode.DISABLED);
 
         if(MC.level != null) {
-            MC.level.disconnect();
+            // PORT-1.21.11: disconnect() takes the quit reason now; DEFAULT_QUIT_MESSAGE is the
+            // component the old no-arg overload sent, so the server sees the same reason as before.
+            MC.level.disconnect(ClientLevel.DEFAULT_QUIT_MESSAGE);
         }
         delayedErrorHandling = ()-> VRErrorReportScreen.catchError(throwable,true);
     }

@@ -1,19 +1,19 @@
 package org.vmstudio.visor.mixin.client.renderer.blaze3d;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.vmstudio.visor.core.client.VisorState;
-import org.vmstudio.visor.core.client.render.helpers.ShaderTextureHelper;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import static com.mojang.blaze3d.systems.RenderSystem.blendFuncSeparate;
-import org.lwjgl.opengl.GL11;
-
+/**
+ * PORT-1.21.11: two of the three injections here targeted methods that no longer exist.
+ * {@code RenderSystem.defaultBlendFunc} was removed with the rest of the immediate-mode blend API
+ * (blend now belongs to the pipeline; the GUI alpha rewrite moved to {@code GlStateManagerMixin},
+ * which pipelines still route through), and {@code setShaderTexture} went with the global texture
+ * slots, taking the stale-id guard with it.
+ */
 @Mixin(RenderSystem.class)
 public class RenderSystemMixin {
 
@@ -24,17 +24,4 @@ public class RenderSystemMixin {
             ci.cancel();
         }
     }
-
-    @ModifyArg(method = "defaultBlendFunc", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;blendFuncSeparate(Lcom/mojang/blaze3d/opengl/GlStateManager$SourceFactor;Lcom/mojang/blaze3d/opengl/GlStateManager$DestFactor;Lcom/mojang/blaze3d/opengl/GlStateManager$SourceFactor;Lcom/mojang/blaze3d/opengl/GlStateManager$DestFactor;)V", remap = true), remap = false, index = 3)
-    private static GlStateManager.DestFactor visor$defaultBlendFuncAlphaBlending(
-            GlStateManager.DestFactor destFactor) {
-        return GL11.GL_ONE_MINUS_SRC_ALPHA;
-    }
-
-    @ModifyVariable(method = "setShaderTexture(II)V", at = @At("HEAD"),
-            index = 1, argsOnly = true, remap = false)
-    private static int visor$dropDeletedShaderTexture(int textureId) {
-        return ShaderTextureHelper.sanitize(textureId);
-    }
-
 }

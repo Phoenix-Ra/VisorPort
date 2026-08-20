@@ -1,10 +1,8 @@
 package org.vmstudio.visor.core.client.gui;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexSorting;
 import lombok.Getter;
 import lombok.Setter;
 import me.phoenixra.atumvr.api.utils.GLUtils;
@@ -26,11 +24,11 @@ import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.render.helpers.RenderGuiHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
+import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.jetbrains.annotations.NotNull;
-import org.joml.Matrix4f;
 import org.vmstudio.visor.api.client.gui.overlays.options.types.*;
 
 import java.util.ArrayList;
@@ -38,7 +36,6 @@ import java.util.List;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import com.mojang.blaze3d.ProjectionType;
-import org.lwjgl.opengl.GL11;
 
 @Getter
 public class VROverlayManagerImpl implements VROverlayManager {
@@ -98,28 +95,17 @@ public class VROverlayManagerImpl implements VROverlayManager {
     }
 
     public void renderOverlayTextures(ProfilerFiller profiler,
-                                      GuiGraphics guiGraphics,
                                       float partialTicks) {
         if(preparedOverlays.isEmpty()){
             return;
         }
         // --- Setup ---
-        Matrix4f projection = new Matrix4f();
-        int prevOverlayWidth = -1;
-        int prevOverlayHeight = -1;
-
         RenderSystem.backupProjectionMatrix();
 
         Matrix4fStack posestack = RenderSystem.getModelViewStack();
         posestack.pushMatrix();
         posestack.identity();
         posestack.translate(0.0f, 0.0f, -11000.0f);
-        GlStateManager._blendFuncSeparate(
-                GL11.GL_SRC_ALPHA,
-                GL11.GL_ONE_MINUS_SRC_ALPHA,
-                GL11.GL_ONE,
-                GL11.GL_ONE
-        );
 
         // --- Render  ---
         for(var overlay : preparedOverlays){
@@ -133,31 +119,24 @@ public class VROverlayManagerImpl implements VROverlayManager {
             if(overlay instanceof VROverlayScreen overlayScreen) {
                 //apply clean render target
                 MC.mainRenderTarget = target;
-                target.clear();
-                target.bindWrite(true);
+                RenderShaderHelper.clearColorAndDepth(target, 0, 1.0);
 
-                //setup projection if changed
-                if(prevOverlayWidth != overlayScreen.width
-                        || prevOverlayHeight != overlayScreen.height) {
-                    projection.setOrtho(
-                            0,
-                            overlayScreen.width, overlayScreen.height,
-                            0,
-                            1000.0F, 21000.0F
-                    );
-                    RenderSystem.setProjectionMatrix(projection, ProjectionType.ORTHOGRAPHIC);
-                    prevOverlayWidth = overlayScreen.width;
-                    prevOverlayHeight = overlayScreen.height;
-                }
+                // The projection buffer caches on size, so this is cheap to hand over every time
+                // and there is no prev-size bookkeeping left to get wrong.
+                RenderSystem.setProjectionMatrix(
+                        RenderGuiHelper.overlayProjection(overlayScreen.width, overlayScreen.height),
+                        ProjectionType.ORTHOGRAPHIC);
 
-                //render overlay texture
-                overlayScreen.renderWithTooltip(
+                //render overlay texture - one record/replay cycle per overlay
+                GuiGraphics guiGraphics = RenderGuiHelper.beginGui(
+                        overlayScreen.getMouseX(), overlayScreen.getMouseY());
+                overlayScreen.renderWithTooltipAndSubtitles(
                         guiGraphics,
                         overlayScreen.getMouseX(),
                         overlayScreen.getMouseY(),
                         partialTicks
                 );
-                guiGraphics.flush();
+                RenderGuiHelper.flushGui();
 
             }else if(overlay instanceof VROverlayFrameBuffer overlayFrameBuffer){
                 // rendering is fully handled by VROverlayFrameBuffer,

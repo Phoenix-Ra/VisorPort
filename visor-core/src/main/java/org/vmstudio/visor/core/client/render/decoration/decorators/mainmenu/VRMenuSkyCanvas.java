@@ -1,8 +1,6 @@
 package org.vmstudio.visor.core.client.render.decoration.decorators.mainmenu;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
@@ -11,14 +9,13 @@ import com.mojang.math.Axis;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import me.phoenixra.atumvr.api.misc.color.AtumColorImmutable;
 import net.minecraft.util.Util;
-import net.minecraft.client.renderer.CoreShaders;
 import org.jetbrains.annotations.NotNull;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
-import org.lwjgl.opengl.GL11C;
 import org.vmstudio.visor.api.VisorAPI;
 import org.vmstudio.visor.api.client.ClientFeature;
 import org.vmstudio.visor.api.client.events.input.ActionButtonVREvent;
@@ -43,8 +40,6 @@ import org.vmstudio.visor.api.client.settings.enums.MainMenuSceneMode;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import org.lwjgl.opengl.GL11;
 
 //@TODO IT IS PROTOTYPE! REWORK FROM SCRATCH AFTER 0.7.0
 public final class VRMenuSkyCanvas implements VREventListener {
@@ -238,21 +233,6 @@ public final class VRMenuSkyCanvas implements VREventListener {
         RenderPoseHelper.applyHandPose(hand, poseStack);
         Matrix4f poseMatrix = poseStack.last().pose();
 
-        // --- GL setup ---
-        GlStateManager._enableDepthTest();
-        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
-        GlStateManager._depthMask(false);
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-        GlStateManager._disableCull();
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
-        if (MC.getOverlay() == null) {
-            var whiteTex = TexturesHelper.getWhiteTexture();
-            McVersionUtilsClient.bindTexture(whiteTex);
-            RenderSystem.setShaderTexture(0, whiteTex);
-        }
-
         BufferBuilder builder;
         float dashSpan = aim.distance - CURSOR_DASH_START;
         for (int i = 0; i < CURSOR_DASH_COUNT; i++) {
@@ -261,6 +241,7 @@ public final class VRMenuSkyCanvas implements VREventListener {
             float nearDist = CURSOR_DASH_START + dashSpan * nearFrac * nearFrac;
             float farDist = CURSOR_DASH_START + dashSpan * farFrac * farFrac;
             RenderHelper.renderCuboid(
+                    VisorPipelines.POSITION_COLOR_NORMAL_NO_DEPTH_TYPE,
                     poseMatrix,
                     new Vector3f(0, 0, -nearDist),
                     new Vector3f(0, 0, -farDist),
@@ -273,9 +254,6 @@ public final class VRMenuSkyCanvas implements VREventListener {
         // eraser ring marker
         var glowSprite = VRMenuSky.glowSprite();
         if (erase && glowSprite != null) {
-            RenderSystem.setShader(CoreShaders.POSITION_TEX_COLOR);
-            RenderSystem.setShaderTexture(0, glowSprite);
-
             int[] colorInt = color.asIntArray(false);
 
             float hitDistance = aim.distance;
@@ -291,14 +269,9 @@ public final class VRMenuSkyCanvas implements VREventListener {
             }
             markerQuad(builder, poseMatrix, 0, 0, -hitDistance, 0.35f, colorInt, 120);
 
-            BufferUploader.drawWithShader(builder.buildOrThrow());
+            VisorPipelines.positionTexColorNoDepth(glowSprite).draw(builder.buildOrThrow());
         }
 
-        // --- restore GL ---
-        GlStateManager._enableCull();
-        GlStateManager._depthFunc(GL11C.GL_LEQUAL);
-        GlStateManager._depthMask(true);
-        RenderSystem.setShaderColor(1, 1, 1, 1);
         poseStack.popPose();
     }
 

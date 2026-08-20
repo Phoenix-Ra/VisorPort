@@ -10,8 +10,15 @@ import org.vmstudio.visor.core.common.addon.AddonManagerImpl;
 @Mod(VisorAPI.MOD_ID)
 public class VisorMod {
 
+    /*
+     * PORT-1.21.11: Forge 61 moved to EventBus 7, which replaced the one IEventBus per mod with a
+     * BusGroup and a per-event-type EventBus. FMLJavaModLoadingContext#getModEventBus() is gone;
+     * the group comes from getModBusGroup() and each event class hands out its own bus through a
+     * static getBus(BusGroup). The mod constructor still receives the context, so the entrypoint
+     * contract is unchanged.
+     */
     public VisorMod(final FMLJavaModLoadingContext context){
-        context.getModEventBus()
+        FMLLoadCompleteEvent.getBus(context.getModBusGroup())
                 .addListener(this::onLoadComplete);
     }
 

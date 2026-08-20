@@ -75,8 +75,17 @@ public abstract class LocalPlayerMixin extends Common_PlayerMixin implements Loc
     /* ****************** *\
       //--------VEHICLE--------\\
         \* ****************** */
-    @Inject(at = @At("TAIL"), method = "startRiding")
-    public void visor$onStartRiding(Entity entity, boolean bl, CallbackInfoReturnable<Boolean> cir) {
+    /*
+     * PORT-1.21.11: startRiding gained a third parameter (sendGameEvent). The bare name is also
+     * ambiguous now - Entity declares both startRiding(Entity) and startRiding(Entity,boolean,
+     * boolean) - so the descriptor is spelled out. The 1-arg overload is final and only delegates
+     * here, and LocalPlayer overrides the 3-arg one, so this still catches every mounting path.
+     * TAIL is still "successfully mounted": the override returns early when super fails.
+     */
+    @Inject(at = @At("TAIL"),
+            method = "startRiding(Lnet/minecraft/world/entity/Entity;ZZ)Z")
+    public void visor$onStartRiding(Entity entity, boolean force, boolean sendGameEvent,
+                                    CallbackInfoReturnable<Boolean> cir) {
         if (VisorState.get().isNotActive()
                 || !visor$isLocalPlayer(this)) {
             return;
@@ -362,16 +371,18 @@ public abstract class LocalPlayerMixin extends Common_PlayerMixin implements Loc
 
 
 
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;sin(F)F"), method = "updateAutoJump")
-    private float visor$vrAutoJumpSin(float original) {
+    // PORT-1.21.11: Mth.sin/cos take a double now (the float overloads are gone), so the
+    // modified argument is a double even though the yaw feeding it is still a float.
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;sin(D)F"), method = "updateAutoJump")
+    private double visor$vrAutoJumpSin(double original) {
         return VisorState.get().isActive()
                 ? ClientContext.localPlayer
                 .getPoseData(PlayerPoseType.TICK).getBodyYaw()
                 : original;
     }
 
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;cos(F)F"), method = "updateAutoJump")
-    private float visor$vrAutoJumpCos(float original) {
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;cos(D)F"), method = "updateAutoJump")
+    private double visor$vrAutoJumpCos(double original) {
         return VisorState.get().isActive()
                 ? ClientContext.localPlayer
                 .getPoseData(PlayerPoseType.TICK).getBodyYaw()

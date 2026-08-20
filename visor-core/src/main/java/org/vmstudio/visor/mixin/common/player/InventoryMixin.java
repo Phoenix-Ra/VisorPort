@@ -1,48 +1,21 @@
 package org.vmstudio.visor.mixin.common.player;
 
-import com.google.common.collect.ImmutableList;
-import net.minecraft.core.NonNullList;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.world.Container;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
-import org.apache.commons.lang3.Validate;
 import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.vmstudio.visor.api.VisorAPI;
-import org.vmstudio.visor.api.common.HandType;
 import org.vmstudio.visor.api.common.player.VRPlayer;
 import org.vmstudio.visor.api.server.VRServerSettings;
-import org.vmstudio.visor.core.common.player.OffhandNonNullList;
-
-import java.util.Arrays;
-import java.util.List;
 
 @Mixin(Inventory.class)
 public abstract class InventoryMixin implements Container, Nameable {
-    @Final
-    @Shadow
-    public NonNullList<ItemStack> items;
-    @Final
-    @Shadow
-    public NonNullList<ItemStack> armor;
-    @Final
-    @Shadow
-    @Mutable
-    public NonNullList<ItemStack> offhand;
-    @Final
-    @Shadow
-    @Mutable
-    private List<NonNullList<ItemStack>> compartments;
-
-    @Shadow
-    public int selected;
 
     @Shadow
     @Final
@@ -53,76 +26,54 @@ public abstract class InventoryMixin implements Container, Nameable {
   //--------TWO HANDED VR (OFFHAND SUPPORT)--------\\
     \* ***************************************** */
 
-    /**
-     * Replaces vanilla offhand list with a custom one,
-     * that uses similar logic as main hand
+    /*
+     * PORT-1.21.11: Visor used to swap Inventory.offhand for an OffhandNonNullList so the offhand
+     * always resolved to whichever hotbar slot the player is really holding in VR. That list is
+     * gone - armor and offhand moved into EntityEquipment and Inventory keeps only the 36
+     * non-equipment stacks - so the redirect happens on the two container accessors that still
+     * reach the offhand. The entity-side half (getItemBySlot/setItemSlot, which is what
+     * Player#getOffhandItem goes through) lives in Common_LivingEntityMixin.
+     *
+     * The save/load pair that used to flip the list back to vanilla behaviour went with it:
+     * Inventory#save/#load only serialize the non-equipment stacks now, so there is nothing left
+     * for them to guard.
      */
-    @Inject(at = @At("TAIL"), method = "<init>")
-    public void visor$replaceOffhandList(Player player, CallbackInfo ci) {
-        offhand = visor$createOffhandList(1, ItemStack.EMPTY);
-        this.compartments = ImmutableList.of(
-                this.items, this.armor, this.offhand
-        );
-
-    }
-
-
-    //LOAD
-    @Inject( method = "load", at = @At(value = "HEAD"))
-    public void visor$loadHead(ListTag listTag, CallbackInfo ci) {
-        var offhand = (OffhandNonNullList) this.offhand;
-        offhand.setUseVanilla(true);
-    }
-    @Inject( method = "load", at = @At(value = "TAIL"))
-    public void visor$loadTail(ListTag listTag, CallbackInfo ci) {
-        var offhand = (OffhandNonNullList) this.offhand;
-        offhand.setUseVanilla(false);
-    }
-    //SAVE
-    @Inject( method = "save", at = @At(value = "HEAD"))
-    public void visor$saveHead(ListTag listTag, CallbackInfoReturnable<ListTag> cir) {
-        var offhand = (OffhandNonNullList) this.offhand;
-        offhand.setUseVanilla(true);
-    }
-    @Inject( method = "save", at = @At(value = "TAIL"))
-    public void visor$saveTail(ListTag listTag, CallbackInfoReturnable<ListTag> cir) {
-        var offhand = (OffhandNonNullList) this.offhand;
-        offhand.setUseVanilla(false);
-    }
-
-
-    @Inject(at = @At("HEAD"), method = "getDestroySpeed", cancellable = true)
-    public void visor$offhandDestroySpeed(BlockState blockState,
-                                          CallbackInfoReturnable<Float> ci
-    ) {
-        if (!VRServerSettings.isTwoHandedVR()) {
+    @Inject(method = "getItem", at = @At("HEAD"), cancellable = true)
+    public void visor$offhandGetItem(int slot, CallbackInfoReturnable<ItemStack> cir) {
+        int hotbarSlot = visor$vrOffhandSlot(slot);
+        if (hotbarSlot < 0) {
             return;
         }
-        VRPlayer vrPlayer = VisorAPI.getVRPlayer(player);
-        if (vrPlayer == null) return;
-
-        if (vrPlayer.getActiveHand() == HandType.MAIN) {
-            ci.setReturnValue(
-                    this.items.get(this.selected).getDestroySpeed(blockState)
-            );
-        } else {
-            ci.setReturnValue(
-                    player.getOffhandItem()
-                            .getDestroySpeed(blockState)
-            );
-        }
-
+        cir.setReturnValue(((Inventory) (Object) this).getItem(hotbarSlot));
     }
 
+    @Inject(method = "setItem", at = @At("HEAD"), cancellable = true)
+    public void visor$offhandSetItem(int slot, ItemStack stack, CallbackInfo ci) {
+        int hotbarSlot = visor$vrOffhandSlot(slot);
+        if (hotbarSlot < 0) {
+            return;
+        }
+        ((Inventory) (Object) this).setItem(hotbarSlot, stack);
+        ci.cancel();
+    }
+
+    /**
+     * The hotbar slot standing in for the offhand, or -1 when the vanilla slot should be used
+     * as-is. Mirrors the guards OffhandNonNullList applied before the equipment rework.
+     */
     @Unique
-    public OffhandNonNullList visor$createOffhandList(int i, ItemStack object) {
-        Validate.notNull(object);
-        ItemStack[] objects = new ItemStack[i];
-        Arrays.fill(objects, object);
-        return new OffhandNonNullList(
-                player,
-                Arrays.asList(objects),
-                object
-        );
+    private int visor$vrOffhandSlot(int slot) {
+        if (slot != Inventory.SLOT_OFFHAND || !VRServerSettings.isTwoHandedVR()) {
+            return -1;
+        }
+        VRPlayer vrPlayer = VisorAPI.getVRPlayer(player);
+        if (vrPlayer == null || vrPlayer.isRemote()) {
+            return -1;
+        }
+        int hotbarSlot = vrPlayer.getOffhandSlot();
+        return hotbarSlot >= 0
+                && hotbarSlot < ((Inventory) (Object) this).getNonEquipmentItems().size()
+                ? hotbarSlot
+                : -1;
     }
 }

@@ -11,6 +11,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
@@ -553,7 +554,8 @@ public class TaskSwing extends VisorTask {
         if (!isHittingBlock()) return;
         for (int hit = 0; hit < totalHits; ++hit) {
             if (MC.gameMode.continueDestroyBlock(blockHit.getBlockPos(), blockHit.getDirection())) {
-                MC.particleEngine.crack(blockHit.getBlockPos(), blockHit.getDirection());
+                //1.21.11: ParticleEngine#crack moved onto the level as addBreakingBlockEffect
+                MC.level.addBreakingBlockEffect(blockHit.getBlockPos(), blockHit.getDirection());
             }
             if (!isHittingBlock()) {
                 break;
@@ -607,7 +609,7 @@ public class TaskSwing extends VisorTask {
     }
 
     public static boolean isTool(final Item item) {
-        return item instanceof DiggerItem
+        return isDiggerItem(item)
                 || item instanceof ArrowItem
                 || item instanceof FishingRodItem
                 || item instanceof FoodOnAStickItem
@@ -623,8 +625,18 @@ public class TaskSwing extends VisorTask {
                 || item instanceof BrushItem
                 || item instanceof HoeItem
                 || item instanceof AxeItem
-                || item instanceof PickaxeItem
                 || item instanceof ShovelItem;
+    }
+
+    // PORT-1.21.11: DiggerItem (the shared Axe/Hoe/Pickaxe/Shovel base class) and PickaxeItem
+    // were both removed - the digger family is only expressed through item tags now, so the
+    // separate `instanceof PickaxeItem` term of isTool() is covered here as well.
+    private static boolean isDiggerItem(final Item item) {
+        final var holder = item.builtInRegistryHolder();
+        return holder.is(ItemTags.PICKAXES)
+                || holder.is(ItemTags.AXES)
+                || holder.is(ItemTags.SHOVELS)
+                || holder.is(ItemTags.HOES);
     }
 
 

@@ -1,6 +1,7 @@
 package org.vmstudio.visor.core.client.render.decoration.effects.hand;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import org.vmstudio.visor.api.client.gui.helpers.TexturesHelper;
@@ -15,13 +16,12 @@ import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.render.VRShaders;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import org.vmstudio.visor.core.client.render.shaders.VRShaderTeleportPoint;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.core.client.tasks.types.movement.TaskTeleport;
-import net.minecraft.client.renderer.CoreShaders;
-import net.minecraft.client.renderer.CompiledShaderProgram;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.util.Mth;
@@ -34,8 +34,6 @@ import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.world.level.lighting.LightEngine;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import org.lwjgl.opengl.GL11;
 
 @RegisterVRHandEffect
 public class HandEffectTeleport extends VRHandEffect {
@@ -85,17 +83,8 @@ public class HandEffectTeleport extends VRHandEffect {
         poseStack.setIdentity();
         RenderPoseHelper.applyCameraOrientation(renderPass, poseStack);
 
-        GlStateManager._enableBlend();
-        GlStateManager._blendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, GL11.GL_ONE, GL11.GL_ONE_MINUS_SRC_ALPHA);
-
-        // Render the teleport arc and landing pad effect
-        GlStateManager._enableDepthTest();
-
-        GlStateManager._depthMask(false);
-
+        // Blend, depth test and the disabled depth write all live on the pipelines now.
         renderTeleportArc(renderPass, poseStack);
-
-        GlStateManager._depthMask(true);
 
         poseStack.popPose();
     }
@@ -103,11 +92,6 @@ public class HandEffectTeleport extends VRHandEffect {
     private void renderTeleportArc(VRRenderPass renderPass,
                                    PoseStack poseStack) {
         Profiler.get().push("teleportArc");
-
-        GlStateManager._enableCull();
-        RenderSystem.setShader(CoreShaders.POSITION_COLOR);
-        McVersionUtilsClient.bindTexture(TexturesHelper.getWhiteTexture());
-        RenderSystem.setShaderTexture(0, TexturesHelper.getWhiteTexture());
 
         BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS,
                 DefaultVertexFormat.POSITION_COLOR_NORMAL);
@@ -196,21 +180,14 @@ public class HandEffectTeleport extends VRHandEffect {
                     poseStack
             );
         }
-        BufferUploader.drawWithShader(builder.buildOrThrow());
+        // One upload for every segment of the arc, as before - do not let this become a draw
+        // per segment.
+        VisorPipelines.POSITION_COLOR_NORMAL_TYPE.draw(builder.buildOrThrow());
 
         // Custom Shader Landing Pad Effect using our own shader
         if (validLocation && TaskTeleport.getInstance().isArcActive()) {
-
-            GlStateManager._disableCull();
-
-            VRShaders.getTeleportPoint().prepare(
-                    RenderSystem.getModelViewMatrix(),
-                    RenderSystem.getProjectionMatrix(),
-                    timer,
-                    color
-            );
-            CompiledShaderProgram shaderInstance = VRShaders.getTeleportPoint().getHandle();
-
+            VRShaderTeleportPoint shader = VRShaders.getTeleportPoint();
+            shader.writeUniforms(timer, color);
 
             // Calculate destination relative to camera and add slight offset to avoid z-fighting
             Vec3 destinationRelative = new Vec3(dest.x, dest.y, dest.z)
@@ -218,11 +195,7 @@ public class HandEffectTeleport extends VRHandEffect {
             // Draw a single quad centered at destinationRelative with fixed size.
             float quadSize = 0.8F;
 
-            drawQuad(destinationRelative, quadSize, poseStack);
-
-
-            shaderInstance.clear();
-            GlStateManager._enableCull();
+            drawQuad(shader, destinationRelative, quadSize, poseStack);
         }
 
         Profiler.get().pop();
@@ -230,18 +203,33 @@ public class HandEffectTeleport extends VRHandEffect {
     }
 
 
-    private void drawQuad(Vec3 center, float size, PoseStack poseStack) {
+    private void drawQuad(VRShaderTeleportPoint shader, Vec3 center, float size, PoseStack poseStack) {
         float halfSize = size / 2.0F;
         Matrix4f matrix = poseStack.last().pose();
+        RenderTarget target = MC.getMainRenderTarget();
 
-        RenderShaderHelper.renderQuad(
-                VRShaderTeleportPoint.PROGRAM.vertexFormat(),
+        // bindDefaultUniforms covers Projection/Fog/Globals/Lighting but not DynamicTransforms,
+        // which is where the model-view the shader reads lives.
+        //
+        // PORT-1.21.11: written here, not in the lambda - a dynamic uniform write is a command
+        // encoder call, and the encoder rejects those while the pass is open.
+        GpuBufferSlice transforms = RenderShaderHelper.writeTransform(RenderShaderHelper.NO_TINT);
+
+        RenderShaderHelper.renderWorldQuad(
+                () -> "visor teleport landing pad",
+                VRShaderTeleportPoint.PIPELINE,
+                pass -> {
+                    RenderShaderHelper.bindTransformUniforms(pass, transforms);
+                    pass.setUniform("VisorTeleportPoint", shader.buffer());
+                },
                 matrix,
                 (float) center.x - halfSize,
                 (float) center.y,
                 (float) center.z - halfSize,
                 (float) center.x + halfSize,
-                (float) center.z + halfSize
+                (float) center.z + halfSize,
+                target.getColorTextureView(),
+                target.getDepthTextureView()
         );
     }
 

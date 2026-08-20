@@ -8,6 +8,7 @@ import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -70,11 +71,11 @@ public abstract class TitleScreenMixin extends Screen {
 
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-    private void visor$dropdownClickPriority(double mouseX, double mouseY, int button,
+    private void visor$dropdownClickPriority(MouseButtonEvent event, boolean doubleClick,
                                              CallbackInfoReturnable<Boolean> cir) {
         if (visor$vrModeButton != null
                 && visor$vrModeButton.isExpanded()
-                && visor$vrModeButton.mouseClicked(mouseX, mouseY, button)) {
+                && visor$vrModeButton.mouseClicked(event, doubleClick)) {
             cir.setReturnValue(true);
         }
     }
@@ -84,7 +85,10 @@ public abstract class TitleScreenMixin extends Screen {
         if (VisorState.get() == VRStateMode.INITIALIZED
                 && VRClientSettings.getVrPlayMode().canPlayVR()) {
             Component text = Component.translatable("visor.messages.vr_auto_switch");
-            guiGraphics.renderTooltip(
+            // PORT-1.21.11: the immediate renderTooltip(Font, List<FormattedCharSequence>, x, y) overload
+            // is gone; GUI drawing is recorded now, so the tooltip is queued here and drawn by
+            // renderWithTooltipAndSubtitles' renderDeferredElements() - still on top, same position
+            guiGraphics.setTooltipForNextFrame(
                     font,
                     font.split(text, 280),
                     width / 2 - 140 - 12,
@@ -97,12 +101,17 @@ public abstract class TitleScreenMixin extends Screen {
      * 1.21.1: the panorama render moved behind TitleScreen#renderPanorama
      * (which overrides Screen's with its own fade); cancel it in VR instead
      * of overriding, so the vanilla fade logic stays intact outside VR
+     * <p>
+     * PORT-1.21.11: the fade moved into TitleScreen#render (fadeWidgets) and TitleScreen no longer
+     * declares renderPanorama at all - it just calls Screen's. Mixin cannot @Inject into an
+     * inherited method, so this became an override that delegates to super outside VR.
      */
-    @Inject(method = "renderPanorama", at = @At("HEAD"), cancellable = true)
-    private void visor$noPanorama(GuiGraphics guiGraphics, float partialTick, CallbackInfo ci) {
+    @Override
+    protected void renderPanorama(GuiGraphics guiGraphics, float partialTick) {
         if (VisorState.get().isActive()) {
-            ci.cancel();
+            return;
         }
+        super.renderPanorama(guiGraphics, partialTick);
     }
 
     @Unique

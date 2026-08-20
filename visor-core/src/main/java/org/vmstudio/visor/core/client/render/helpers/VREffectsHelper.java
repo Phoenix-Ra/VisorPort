@@ -4,16 +4,15 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.enums.EyeType;
-import net.minecraft.client.renderer.CompiledShaderProgram;
-import org.vmstudio.visor.api.client.gui.helpers.TexturesHelper;
 import org.vmstudio.visor.api.client.render.VRRenderPass;
 import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.compatibility.immportals.ImmPortalsCompatHelper;
 import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.render.VRRendererBase;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.CoreShaders;
+import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Matrix4f;
@@ -21,9 +20,9 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL11C;
 import org.vmstudio.visor.core.client.render.VRShaders;
 import org.vmstudio.visor.core.client.render.shaders.VRShaderInBlockVignette;
-import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 import com.mojang.blaze3d.ProjectionType;
-import com.mojang.blaze3d.opengl.GlStateManager;
+
+import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 
 public class VREffectsHelper {
     private VREffectsHelper() {
@@ -33,10 +32,29 @@ public class VREffectsHelper {
     public record NearestOpaqueBlock(float distance, BlockState state, BlockPos position) {}
 
 
+    /**
+     * Whether the per-eye hidden-area stencil mask is drawn.
+     * <p>
+     * <b>Off, and this is a real VR framerate regression, not a cosmetic one.</b> The mask culls
+     * the corners of each eye render that the headset optics never show, which on a wide-FOV HMD
+     * is a measurable fill-rate saving.
+     * <p>
+     * 1.21.9 removed stencil from the rendering API outright: {@code RenderPipeline.Builder} has no
+     * stencil methods, {@code RenderPass} has no stencil methods, {@code RenderSystem.stencilOp} /
+     * {@code stencilMask} / {@code clearStencil} are gone, and no class with "stencil" in its name
+     * survives in the jar. Raw {@code glEnable(GL_STENCIL_TEST)} from outside a pass does not
+     * reliably survive either, because the device binds its own framebuffer per pass and keeps a
+     * cached GL state that has no stencil in it. Vivecraft reached the same conclusion and hard
+     * disabled theirs.
+     * <p>
+     * Everything below is left intact and wired up so re-enabling is this one constant plus a
+     * mixin on the command encoder's pipeline-state application. Visor's {@code RenderTargetMixin}
+     * still allocates a {@code GL_DEPTH24_STENCIL8} attachment when asked, so the bits exist.
+     */
+    public static final boolean STENCIL_SUPPORTED = false;
+
 
     public static void renderInBlockEffect() {
-        // --- Prepare variables ---
-        Tesselator tesselator = Tesselator.getInstance();
         // orthographic matrix
         Matrix4f mat = new Matrix4f();
         mat.m00(1.0F);
@@ -45,26 +63,17 @@ public class VREffectsHelper {
         mat.m33(1.0F);
         mat.m32(-1.0F);
 
-        // --- Setup ---
-        RenderSystem.setShader(CoreShaders.POSITION);
-        RenderSystem.setShaderColor(0.0F, 0.0F, 0.0F, 1.0f);
-        GlStateManager._depthFunc(GL11C.GL_ALWAYS);
-        GlStateManager._depthMask(false);
-        GlStateManager._enableBlend();
-        GlStateManager._disableCull();
+        // The black came from setShaderColor, which no longer exists on this route, so the
+        // geometry carries it: POSITION_COLOR with black vertices rather than bare POSITION.
+        BufferBuilder bufferbuilder = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        bufferbuilder.addVertex(mat, -1.5F, -1.5F, 0.0F).setColor(0, 0, 0, 255);
+        bufferbuilder.addVertex(mat, 1.5F, -1.5F, 0.0F).setColor(0, 0, 0, 255);
+        bufferbuilder.addVertex(mat, 1.5F, 1.5F, 0.0F).setColor(0, 0, 0, 255);
+        bufferbuilder.addVertex(mat, -1.5F, 1.5F, 0.0F).setColor(0, 0, 0, 255);
 
-        // --- Render ---
-        BufferBuilder bufferbuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION);
-        bufferbuilder.addVertex(mat, -1.5F, -1.5F, 0.0F);
-        bufferbuilder.addVertex(mat, 1.5F, -1.5F, 0.0F);
-        bufferbuilder.addVertex(mat, 1.5F, 1.5F, 0.0F);
-        bufferbuilder.addVertex(mat, -1.5F, 1.5F, 0.0F);
-        BufferUploader.drawWithShader(bufferbuilder.buildOrThrow());
-
-        // --- Restore ---
-        RenderStateHelper.restoreAfterExternalRender();
+        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(bufferbuilder.buildOrThrow());
     }
-
 
 
     public static void renderInBlockVignette(float proximity) {
@@ -81,8 +90,14 @@ public class VREffectsHelper {
 
     private static boolean stencilEnabledByVisor;
 
+    /** Long-lived, because the projection buffer owns GPU memory and must not be per-call. */
+    private static PerspectiveProjectionMatrixBuffer stencilProjection;
+
 
     public static void drawEyeStencil() {
+        if (!STENCIL_SUPPORTED) {
+            return;
+        }
         if (ShadersHelper.isShaderActive()) {
             return;
         }
@@ -96,19 +111,31 @@ public class VREffectsHelper {
     }
 
     public static void disableStencilTest() {
+        if (!STENCIL_SUPPORTED) {
+            return;
+        }
         if (!stencilEnabledByVisor) {
             GL11C.glDisable(GL11C.GL_STENCIL_TEST);
         }
     }
 
-
+    /** Releases the projection buffer. Safe to call when the stencil never ran. */
+    public static void close() {
+        if (stencilProjection != null) {
+            stencilProjection.close();
+            stencilProjection = null;
+        }
+    }
 
 
     public static void doStencil(boolean inverse) {
+        if (!STENCIL_SUPPORTED) {
+            return;
+        }
         Minecraft mc = Minecraft.getInstance();
         RenderTarget rt = mc.getMainRenderTarget();
 
-        // 1) backup shader + matrices
+        // 1) backup matrices
         RenderSystem.backupProjectionMatrix();
         RenderSystem.getModelViewStack().pushMatrix();
 
@@ -120,7 +147,7 @@ public class VREffectsHelper {
             setupMaskDrawState();
             applyOrthoProjection(rt, inverse);
 
-            // draw hidden‐area triangles into the stencil
+            // draw hidden-area triangles into the stencil
             VRRenderPass eye = VRRenderState.getRenderPass();
             float[] maskVerts = getStencilMask(eye);
             drawStencilMask(maskVerts);
@@ -135,45 +162,48 @@ public class VREffectsHelper {
         }
     }
 
+    // PORT-1.21.11: RenderSystem lost every stencil wrapper, so these drop to raw GL. They are
+    // only reachable when STENCIL_SUPPORTED is turned back on.
     private static void enableStencilTest() {
         GL11.glEnable(GL11.GL_STENCIL_TEST);
-        RenderSystem.stencilOp(GL11.GL_KEEP, GL11.GL_KEEP, GL11.GL_REPLACE);
-        RenderSystem.stencilMask(0xFF);
+        GL11.glStencilOp(GL11.GL_KEEP, GL11.GL_KEEP, GL11.GL_REPLACE);
+        GL11.glStencilMask(0xFF);
     }
 
     private static void configureStencilWrite(boolean inverse) {
         if (inverse) {
             // clear stencil to 0xFF then write zero inside mask
-            RenderSystem.clearStencil(0xFF);
-            RenderSystem.clearDepth(0);
+            GL11.glClearStencil(0xFF);
+            GL11.glClearDepth(0);
             GL11.glStencilFunc(GL11.GL_ALWAYS, 0, 0xFF);
-            GlStateManager._colorMask(false, false, false, true);
+            GL11.glColorMask(false, false, false, true);
         } else {
             // clear stencil to 0 then write one inside mask
-            RenderSystem.clearStencil(0);
-            RenderSystem.clearDepth(1);
+            GL11.glClearStencil(0);
+            GL11.glClearDepth(1);
             GL11.glStencilFunc(GL11.GL_ALWAYS, 0xFF, 0xFF);
-            GlStateManager._colorMask(true, true, true, true);
+            GL11.glColorMask(true, true, true, true);
         }
     }
 
     private static void clearStencilAndDepth() {
-        GlStateManager._clear(GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
+        GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_STENCIL_BUFFER_BIT);
     }
 
     private static void setupMaskDrawState() {
-        GlStateManager._depthMask(true);
-        GlStateManager._enableDepthTest();
-        GlStateManager._depthFunc(GL11.GL_ALWAYS);
-        GlStateManager._disableCull();
-        RenderSystem.setShaderColor(0f, 0f, 0f, 1f);
+        GL11.glDepthMask(true);
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
+        GL11.glDepthFunc(GL11.GL_ALWAYS);
+        GL11.glDisable(GL11.GL_CULL_FACE);
     }
 
     private static void applyOrthoProjection(RenderTarget rt, boolean inverse) {
-
+        if (stencilProjection == null) {
+            stencilProjection = new PerspectiveProjectionMatrixBuffer("visor stencil projection");
+        }
         Matrix4f ortho = new Matrix4f()
                 .setOrtho(0, rt.width, 0, rt.height, 0, 20f);
-        RenderSystem.setProjectionMatrix(ortho, ProjectionType.ORTHOGRAPHIC);
+        RenderSystem.setProjectionMatrix(stencilProjection.getBuffer(ortho), ProjectionType.ORTHOGRAPHIC);
 
         if (inverse) {
             RenderSystem.getModelViewStack().translate(0, 0, -20);
@@ -193,28 +223,21 @@ public class VREffectsHelper {
     private static void drawStencilMask(float[] verts) {
         if (verts == null || verts.length < 2) return;
 
-        BufferBuilder buf;
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION);
-
-        // bind a simple 1×1 black texture so shader has "something"
-        McVersionUtilsClient.bindTexture(TexturesHelper.getBlackTexture());
+        BufferBuilder buf = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION);
 
         float scale = ClientContext.renderer.renderScale;
         for (int i = 0; i < verts.length; i += 2) {
-            buf
-                    .addVertex(verts[i] * scale, verts[i+1] * scale, 0f)
-            ;
+            buf.addVertex(verts[i] * scale, verts[i + 1] * scale, 0f);
         }
 
-        RenderSystem.setShader(CoreShaders.POSITION);
-        BufferUploader.drawWithShader(buf.buildOrThrow());
+        VisorPipelines.POSITION_TRIANGLES_TYPE.draw(buf.buildOrThrow());
     }
 
     private static void restorePostStencilState() {
         // stencil: only pass where stencil != 255
         GL11.glStencilFunc(GL11.GL_NOTEQUAL, 255, 0xFF);
-        RenderSystem.stencilOp(GL11.GL_KEEP, GL11.GL_KEEP, GL11.GL_KEEP);
-        RenderSystem.stencilMask(0);
-        RenderStateHelper.restoreAfterExternalRender(true);
+        GL11.glStencilOp(GL11.GL_KEEP, GL11.GL_KEEP, GL11.GL_KEEP);
+        GL11.glStencilMask(0);
     }
 }

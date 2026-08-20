@@ -186,8 +186,13 @@ public class VRSettingsAddonsScreen extends Screen {
         }
 
         @Override
-        public void render(GuiGraphics gui, int index, int top, int left, int listWidth, int slotHeight,
-                           int mouseX, int mouseY, boolean hovered, float partialTicks) {
+        public void renderContent(GuiGraphics gui, int mouseX, int mouseY,
+                                  boolean hovered, float partialTicks) {
+            // 1.21.11: the entry owns its own bounds instead of being handed them each frame
+            int top = this.getContentY();
+            int left = this.getContentX();
+            int listWidth = this.getContentWidth();
+
             int spacing = 5;
             int btnW = leftButton.getWidth();
             int totalW = btnW + (rightButton != null ? btnW + spacing : 0);
