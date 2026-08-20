@@ -12,7 +12,6 @@ import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.render.GuiRenderer;
-import net.minecraft.client.renderer.CachedOrthoProjectionMatrixBuffer;
 import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.client.renderer.fog.FogRenderer;
 import org.vmstudio.visor.core.client.render.VRRenderState;
@@ -61,32 +60,6 @@ public class RenderGuiHelper {
         state.reset();
         return new GuiGraphics(MC, state, mouseX, mouseY);
     }
-
-    /**
-     * The projection VR overlay screens are drawn with.
-     * <p>
-     * Long-lived on purpose: it owns a GPU buffer, and {@code setProjectionMatrix} takes a buffer
-     * slice now rather than a {@code Matrix4f}, so building one per overlay per frame would be an
-     * allocation twice per eye. It caches internally and only rewrites when the size changes.
-     */
-    private static CachedOrthoProjectionMatrixBuffer overlayProjection;
-
-    /** Ortho projection over a {@code width x height} overlay, top-left origin. */
-    public static GpuBufferSlice overlayProjection(float width, float height) {
-        if (overlayProjection == null) {
-            overlayProjection = new CachedOrthoProjectionMatrixBuffer(
-                    "visor overlay projection", 1000.0F, 21000.0F, true);
-        }
-        return overlayProjection.getBuffer(width, height);
-    }
-
-    public static void close() {
-        if (overlayProjection != null) {
-            overlayProjection.close();
-            overlayProjection = null;
-        }
-    }
-
 
     /** Replays everything recorded since {@link #beginGui} onto the current main render target. */
     public static void flushGui() {

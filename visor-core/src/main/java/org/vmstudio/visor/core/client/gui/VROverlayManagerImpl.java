@@ -35,7 +35,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
-import com.mojang.blaze3d.ProjectionType;
 
 @Getter
 public class VROverlayManagerImpl implements VROverlayManager {
@@ -52,6 +51,23 @@ public class VROverlayManagerImpl implements VROverlayManager {
 
     private final List<VROverlay> preparedDepthOverlays = new ArrayList<>();
     private final List<VROverlay> preparedHudOverlays = new ArrayList<>();
+
+    /**
+     * The overlay whose texture is being recorded/replayed right now, or null outside
+     * {@link #renderOverlayTextures}.
+     * <p>
+     * PORT-1.21.11: the GUI replay derives its ortho projection and gui scale from
+     * {@code Window} ({@code GuiRenderer.draw} builds it from {@code getWidth()/getGuiScale()}),
+     * so an overlay with its own resolution can no longer be handled by binding a projection
+     * here - GuiRenderer overwrites it. Instead WindowMixin reports THIS overlay's resolution
+     * while the replay runs, which puts every window-derived value (projection, gui scale,
+     * pip scale, tooltip clamping) on the overlay's own grid.
+     */
+    private VROverlayScreen texturingOverlay;
+
+    public VROverlayScreen getTexturingOverlay() {
+        return texturingOverlay;
+    }
 
     public void tick(){
         for(VROverlay overlay : overlaysRegistry.getSortedComponents()){
@@ -100,12 +116,12 @@ public class VROverlayManagerImpl implements VROverlayManager {
             return;
         }
         // --- Setup ---
+        // The replay overwrites the global projection pointer; put it back afterwards.
         RenderSystem.backupProjectionMatrix();
 
         Matrix4fStack posestack = RenderSystem.getModelViewStack();
         posestack.pushMatrix();
         posestack.identity();
-        posestack.translate(0.0f, 0.0f, -11000.0f);
 
         // --- Render  ---
         for(var overlay : preparedOverlays){
@@ -121,22 +137,23 @@ public class VROverlayManagerImpl implements VROverlayManager {
                 MC.mainRenderTarget = target;
                 RenderShaderHelper.clearColorAndDepth(target, 0, 1.0);
 
-                // The projection buffer caches on size, so this is cheap to hand over every time
-                // and there is no prev-size bookkeeping left to get wrong.
-                RenderSystem.setProjectionMatrix(
-                        RenderGuiHelper.overlayProjection(overlayScreen.width, overlayScreen.height),
-                        ProjectionType.ORTHOGRAPHIC);
-
-                //render overlay texture - one record/replay cycle per overlay
-                GuiGraphics guiGraphics = RenderGuiHelper.beginGui(
-                        overlayScreen.getMouseX(), overlayScreen.getMouseY());
-                overlayScreen.renderWithTooltipAndSubtitles(
-                        guiGraphics,
-                        overlayScreen.getMouseX(),
-                        overlayScreen.getMouseY(),
-                        partialTicks
-                );
-                RenderGuiHelper.flushGui();
+                // The replay projects and scales off the Window, so the Window has to speak this
+                // overlay's resolution while it runs - see texturingOverlay/WindowMixin.
+                this.texturingOverlay = overlayScreen;
+                try {
+                    //render overlay texture - one record/replay cycle per overlay
+                    GuiGraphics guiGraphics = RenderGuiHelper.beginGui(
+                            overlayScreen.getMouseX(), overlayScreen.getMouseY());
+                    overlayScreen.renderWithTooltipAndSubtitles(
+                            guiGraphics,
+                            overlayScreen.getMouseX(),
+                            overlayScreen.getMouseY(),
+                            partialTicks
+                    );
+                    RenderGuiHelper.flushGui();
+                } finally {
+                    this.texturingOverlay = null;
+                }
 
             }else if(overlay instanceof VROverlayFrameBuffer overlayFrameBuffer){
                 // rendering is fully handled by VROverlayFrameBuffer,
@@ -152,6 +169,10 @@ public class VROverlayManagerImpl implements VROverlayManager {
         }
 
         // --- Restore ---
+        // The loop left mainRenderTarget on the last overlay; put the phase's target back so
+        // everything between here and the next phase switch draws where it thinks it does.
+        MC.mainRenderTarget = VRRenderState.getTargetForPass(VRRenderState.getRenderPass());
+
         RenderSystem.restoreProjectionMatrix();
 
         posestack.popMatrix();

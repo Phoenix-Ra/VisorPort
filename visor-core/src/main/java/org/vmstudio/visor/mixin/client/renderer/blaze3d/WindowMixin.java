@@ -1,6 +1,7 @@
 package org.vmstudio.visor.mixin.client.renderer.blaze3d;
 
 import com.mojang.blaze3d.platform.Window;
+import org.vmstudio.visor.api.client.gui.overlays.framework.VROverlayScreen;
 import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.extensions.client.WindowExtension;
@@ -30,9 +31,34 @@ public abstract class WindowMixin implements WindowExtension {
   //--------REPLACING VANILLA VALUES--------\\
     \* ********************************** */
 
+    /**
+     * The overlay whose texture is being replayed right now, if any.
+     * <p>
+     * PORT-1.21.11: the GUI replay derives its ortho projection and gui scale from this Window
+     * ({@code GuiRenderer.draw} reads {@code getWidth()/getGuiScale()}), so while an overlay
+     * with its own resolution is being textured, the Window has to speak that overlay's
+     * resolution or the replay lands on the main GUI's grid - squashed for every overlay whose
+     * size differs from it. Guarded on the scale factor: an overlay that has not computed its
+     * scale yet falls back to the shared GUI values rather than dividing by zero.
+     */
+    @Unique
+    private static VROverlayScreen visor$texturingOverlay() {
+        var overlayManager = ClientContext.overlayManager;
+        if (overlayManager == null) {
+            return null;
+        }
+        VROverlayScreen overlay = overlayManager.getTexturingOverlay();
+        return overlay != null && overlay.getGuiScaleFactor() > 0 ? overlay : null;
+    }
+
     @Inject(method = "getWidth", at = @At("HEAD"), cancellable = true)
     void visor$vrWidth(CallbackInfoReturnable<Integer> cir) {
         if(VisorState.get().isActive()) {
+            VROverlayScreen overlay = visor$texturingOverlay();
+            if (overlay != null) {
+                cir.setReturnValue(overlay.getRequestedWidth());
+                return;
+            }
             var phase = VRRenderState.getPhase();
             if (phase.isVanilla() || phase.isVRGui()) {
                 cir.setReturnValue(
@@ -49,6 +75,11 @@ public abstract class WindowMixin implements WindowExtension {
     @Inject(method = "getHeight", at = @At("HEAD"), cancellable = true)
     void visor$vrHeight(CallbackInfoReturnable<Integer> cir) {
         if(VisorState.get().isActive()) {
+            VROverlayScreen overlay = visor$texturingOverlay();
+            if (overlay != null) {
+                cir.setReturnValue(overlay.getRequestedHeight());
+                return;
+            }
             var phase = VRRenderState.getPhase();
             if (phase.isVanilla() || phase.isVRGui()) {
                 cir.setReturnValue(
@@ -89,6 +120,11 @@ public abstract class WindowMixin implements WindowExtension {
     @Inject(method = "getGuiScaledWidth", at = @At("HEAD"), cancellable = true)
     void visor$vrGuiScaledWidth(CallbackInfoReturnable<Integer> cir) {
         if (VisorState.get().isActive()) {
+            VROverlayScreen overlay = visor$texturingOverlay();
+            if (overlay != null) {
+                cir.setReturnValue(overlay.getRequestedWidthScaled());
+                return;
+            }
             cir.setReturnValue(
                     ClientContext
                             .guiManager
@@ -100,6 +136,11 @@ public abstract class WindowMixin implements WindowExtension {
     @Inject(method = "getGuiScaledHeight", at = @At("HEAD"), cancellable = true)
     void visor$vrGuiScaledHeight(CallbackInfoReturnable<Integer> cir) {
         if (VisorState.get().isActive()) {
+            VROverlayScreen overlay = visor$texturingOverlay();
+            if (overlay != null) {
+                cir.setReturnValue(overlay.getRequestedHeightScaled());
+                return;
+            }
             cir.setReturnValue(
                     ClientContext
                             .guiManager
@@ -119,6 +160,11 @@ public abstract class WindowMixin implements WindowExtension {
     @Inject(method = "getGuiScale", at = @At("HEAD"), cancellable = true)
     void visor$vrScaleFactor(CallbackInfoReturnable<Integer> cir) {
         if (VisorState.get().isActive()) {
+            VROverlayScreen overlay = visor$texturingOverlay();
+            if (overlay != null) {
+                cir.setReturnValue(overlay.getGuiScaleFactor());
+                return;
+            }
             cir.setReturnValue(
                     ClientContext
                             .guiManager

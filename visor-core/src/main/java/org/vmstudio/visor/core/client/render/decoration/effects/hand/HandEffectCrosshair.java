@@ -81,7 +81,6 @@ public class HandEffectCrosshair extends VRHandEffect {
         }
         float brightness = getBrightness(crossPos) * baseBrightness;
 
-        BufferBuilder buf;
 
         // --- GL setup ---
 
@@ -99,9 +98,27 @@ public class HandEffectCrosshair extends VRHandEffect {
         poseStack.scale(scale, scale, scale);
 
         // --- Render ---
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         Matrix4f mat = poseStack.last().pose();
 
+        // The inverting blend keeps the crosshair readable on any backdrop; it is the one
+        // Visor draw that is not translucent or additive.
+        VisorPipelines.positionTexColorInvert(ICONS_LOC)
+                .draw(buildCrosshairQuad(mat, brightness));
+
+        // 1.21.4 drew this quad with GL_ALWAYS and depth WRITES on; the write is what kept the
+        // entities rendered after this stage from drawing over the crosshair. One pipeline
+        // cannot express that any more (see VisorPipelines.CROSSHAIR_DEPTH_CARVE), so the same
+        // quad goes through a second, colour-masked pass that only stamps the depth.
+        VisorPipelines.crosshairDepthCarve(ICONS_LOC)
+                .draw(buildCrosshairQuad(mat, brightness));
+
+        // --- Restore pose ---
+        poseStack.popPose();
+    }
+
+    private MeshData buildCrosshairQuad(Matrix4f mat, float brightness) {
+        BufferBuilder buf = Tesselator.getInstance()
+                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         buf.addVertex(mat, -1f,1f,0f)
                 .setUv(UV_SIZE, 0f)
                 .setColor(brightness, brightness, brightness, 1f)
@@ -118,13 +135,7 @@ public class HandEffectCrosshair extends VRHandEffect {
                 .setUv(UV_SIZE, UV_SIZE)
                 .setColor(brightness, brightness, brightness, 1f)
         ;
-
-        // The inverting blend keeps the crosshair readable on any backdrop; it is the one
-        // Visor draw that is not translucent or additive.
-        VisorPipelines.positionTexColorInvert(ICONS_LOC).draw(buf.buildOrThrow());
-
-        // --- Restore GL & pose ---
-        poseStack.popPose();
+        return buf.buildOrThrow();
     }
 
     private void applyCrossHairRotation(PoseStack poseStack,

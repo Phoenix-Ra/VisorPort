@@ -243,6 +243,32 @@ public final class VisorPipelines {
             .withCull(false)
             .build();
 
+    /**
+     * The crosshair's depth carve - the second half of what 1.21.4 expressed in one draw.
+     * <p>
+     * 1.21.4 drew the crosshair with {@code depthFunc(GL_ALWAYS)} AND {@code depthMask(true)}:
+     * always visible over what was already drawn, and its depth stamped into the buffer so the
+     * entities rendered after the AFTER_SOLID stage could only cover it by being genuinely
+     * closer. {@code NO_DEPTH_TEST} maps to {@code glDisable(GL_DEPTH_TEST)}, under which GL
+     * never writes depth, so one pipeline cannot do both halves any more. The colour half stays
+     * on {@link #POSITION_TEX_COLOR_INVERT}; this colour-masked pass restores the write half.
+     * LEQUAL rather than the old unconditional write: where the crosshair shows through a wall,
+     * it no longer pushes the wall's depth back, it just declines to carve there.
+     */
+    public static final RenderPipeline CROSSHAIR_DEPTH_CARVE = RenderPipeline.builder()
+            .withLocation(visor("pipeline/crosshair_depth_carve"))
+            .withVertexShader("core/position_tex_color")
+            .withFragmentShader("core/position_tex_color")
+            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
+            .withSampler("Sampler0")
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
+            .withoutBlend()
+            .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+            .withDepthWrite(true)
+            .withColorWrite(false, false)
+            .withCull(false)
+            .build();
+
 
     // ==================== POSITION_TEX ====================
 
@@ -414,6 +440,10 @@ public final class VisorPipelines {
             texture -> texturedType("visor_position_tex_color_invert",
                     POSITION_TEX_COLOR_INVERT, texture));
 
+    private static final Function<Identifier, RenderType> CROSSHAIR_DEPTH_CARVE_TYPE = Util.memoize(
+            texture -> texturedType("visor_crosshair_depth_carve",
+                    CROSSHAIR_DEPTH_CARVE, texture));
+
     private static final Function<Identifier, RenderType> POSITION_TEX_NO_DEPTH_TYPE = Util.memoize(
             texture -> texturedType("visor_position_tex_no_depth", POSITION_TEX_NO_DEPTH, texture));
 
@@ -446,6 +476,10 @@ public final class VisorPipelines {
 
     public static RenderType positionTexColorInvert(Identifier texture) {
         return POSITION_TEX_COLOR_INVERT_TYPE.apply(texture);
+    }
+
+    public static RenderType crosshairDepthCarve(Identifier texture) {
+        return CROSSHAIR_DEPTH_CARVE_TYPE.apply(texture);
     }
 
     public static RenderType positionTexNoDepth(Identifier texture) {

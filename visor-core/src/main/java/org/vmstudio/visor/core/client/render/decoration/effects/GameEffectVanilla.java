@@ -35,7 +35,11 @@ public class GameEffectVanilla extends VRGameEffect {
                 partialTicks,
                 MC.gameRenderer.getSubmitNodeStorage()
         );
+        // renderAllFeatures() only buffers the vertices; the draw happens at endBatch() and
+        // samples the matrices bound then. Both calls, inside this stage's state bracket,
+        // is the same contract vanilla's renderHandsWithItems follows.
         MC.gameRenderer.getFeatureRenderDispatcher().renderAllFeatures();
+        MC.renderBuffers().bufferSource().endBatch();
     }
 
     @Override

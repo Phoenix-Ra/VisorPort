@@ -36,6 +36,8 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
+import net.minecraft.client.renderer.ScreenEffectRenderer;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -614,6 +616,30 @@ public abstract class GameRendererMixin
         }
         if (VRRenderState.getPhase().isVanilla()) {
             encoder.clearDepthTexture(depthTexture, depth);
+        }
+    }
+
+    /**
+     * The third piece of what the old {@code renderHand} redirect suppressed. In 1.21.4 the
+     * screen-space overlays (fire, underwater, the inside-a-block texture) were drawn from
+     * {@code renderItemInHand}, so cutting the hand render cut them too. In 1.21.11 the call
+     * moved out into {@code renderLevel}, after the hand render and under the same flat hud3d
+     * projection - left alone it stamps those overlays across each VR eye as a screen quad.
+     * Visor draws its own versions (GameEffectOnFire, the in-block vignette), so the vanilla
+     * call runs only for the flat-screen phases, exactly as before. The item activation
+     * animation that also lives in renderScreenEffect is driven by Visor separately, through
+     * {@code GameEffectVanilla}.
+     */
+    @Redirect(at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/ScreenEffectRenderer;renderScreenEffect(ZFLnet/minecraft/client/renderer/SubmitNodeCollector;)V"),
+            method = "renderLevel")
+    public void visor$noVanillaScreenEffects(ScreenEffectRenderer instance, boolean sleeping,
+                                             float partialTick, SubmitNodeCollector collector) {
+        if (VRRenderState.isSpectatedVRView(minecraft.getCameraEntity())) {
+            return;
+        }
+        if (VRRenderState.getPhase().isVanilla()) {
+            instance.renderScreenEffect(sleeping, partialTick, collector);
         }
     }
 

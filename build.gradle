@@ -145,3 +145,77 @@ subprojects {
         options.compilerArgs << "-Xmaxerrs" << "10000"
     }
 }
+
+// PORT-1.21.11: Forge 61's net.minecraftforge.network.ForgePayload implements BOTH
+// CustomQueryPayload and CustomQueryAnswerPayload, whose write(FriendlyByteBuf) methods carry
+// DIFFERENT srg ids (m_294761_ / m_295630_). When remapJar maps named -> srg, tiny-remapper
+// propagates member names across that bridge class, ends up with two candidate names for one
+// method family, and aborts with "Unfixable conflicts" - arch-loom 1.14's TinyRemapperService
+// never sets ignoreConflicts (its other remap paths do), and no newer 1.14 snapshot exists.
+// Forge's own toolchain hit the same clash and shipped ForgePayload with just m_295630_.
+//
+// Visor references none of these classes, so the remapped jar's bytes do not depend on which
+// id wins - only the analysis has to stop seeing two names. The remap tasks are fed a copy of
+// the platform mappings with the answer-side write ids rewritten onto the query-side id: the
+// family becomes uniform, the conflict disappears, and the dev-time mappings plus every other
+// consumer keep the untouched file. If a future Forge/loom bump changes these entries the
+// rewrite quietly matches nothing and the conflict resurfaces loudly - that is intended.
+subprojects {
+    plugins.withId('dev.architectury.loom') {
+        def loomExt = project.extensions.getByName('loom')
+        if (!loomExt.isForge()) {
+            return
+        }
+        def fixedMappings = project.layout.buildDirectory.file('loom-cache/conflict-free-srg-mappings.tiny')
+        def fixTask = project.tasks.register('prepareConflictFreeSrgMappings') {
+            def platformMappings = project.provider {
+                net.fabricmc.loom.LoomGradleExtension.get(project).getPlatformMappingFile().toFile()
+            }
+            inputs.file(platformMappings)
+            outputs.file(fixedMappings)
+            doLast {
+                def answerClasses = [
+                        'net/minecraft/network/protocol/login/custom/CustomQueryAnswerPayload',
+                        'net/minecraft/network/protocol/login/custom/DiscardedQueryAnswerPayload'
+                ]
+                def source = platformMappings.get()
+                def target = fixedMappings.get().asFile
+                target.parentFile.mkdirs()
+                def srgField = -1
+                def namedField = -1
+                def maxField = -1
+                def inAnswerClass = false
+                target.withWriter('UTF-8') { writer ->
+                    source.eachLine('UTF-8') { line ->
+                        def fields = line.split('\t', -1)
+                        if (srgField < 0 && fields.length > 3 && fields[0] == 'tiny') {
+                            for (def i = 3; i < fields.length; i++) {
+                                if (fields[i] == 'srg') srgField = i - 3
+                                if (fields[i] == 'named') namedField = i - 3
+                            }
+                            maxField = srgField > namedField ? srgField : namedField
+                        } else if (fields.length > 0 && fields[0] == 'c') {
+                            inAnswerClass = namedField >= 0
+                                    && fields.length > 1 + namedField
+                                    && answerClasses.contains(fields[1 + namedField])
+                        } else if (inAnswerClass
+                                && srgField >= 0
+                                && fields.length > 3 + maxField
+                                && fields[0] == '' && fields[1] == 'm'
+                                && fields[3 + namedField] == 'write'
+                                && fields[3 + srgField] == 'm_295630_') {
+                            fields[3 + srgField] = 'm_294761_'
+                            line = fields.join('\t')
+                        }
+                        writer.write(line)
+                        writer.write('\n')
+                    }
+                }
+            }
+        }
+        project.tasks.withType(net.fabricmc.loom.task.AbstractRemapJarTask).configureEach {
+            dependsOn(fixTask)
+            customMappings.from(fixedMappings)
+        }
+    }
+}
