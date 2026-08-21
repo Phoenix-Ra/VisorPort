@@ -368,35 +368,30 @@ public final class VisorPipelines {
     }
 
 
-    // ==================== MIRROR ====================
+    // ==================== BLIT ====================
 
     /**
-     * The desktop mirror blit.
+     * A framebuffer copy as a textured quad: destination rectangle as NDC positions, source
+     * rectangle as UVs, every channel copied verbatim, nothing blended, nothing discarded.
      * <p>
-     * This used to be {@code glBlitFramebuffer} straight from the eye target. There is no
-     * framebuffer to read from any more - {@code RenderTarget} owns textures, not FBOs - so the
-     * copy became an actual textured quad: destination rectangle as NDC positions, source crop as
-     * UVs. Alpha is masked off so the mirror cannot disturb the channel the mixed-reality
-     * compositor reads.
+     * This is the fallback half of {@code RenderShaderHelper.blit} - on the GL backend the copy
+     * is a real {@code glBlitFramebuffer}, and this pipeline only serves textures that are not
+     * GL textures. It is built on Visor's own {@code visor:core/vr_blit} rather than vanilla's
+     * {@code core/position_tex} on purpose: that fragment shader discards every texel whose
+     * alpha is exactly 0, and a copy must not care what the alpha channel holds (the XR
+     * swapchain images, the level's fog-coloured clear and the GUI target's background all sit
+     * at alpha 0). {@code vr_blit} also declares no uniform block at all - the quad is already
+     * in NDC - so there is nothing to bind and nothing to write before the pass opens.
      */
-    public static final RenderPipeline MIRROR_BLIT = RenderPipeline.builder()
-            .withLocation(visor("pipeline/mirror_blit"))
-            .withVertexShader("core/position_tex")
-            .withFragmentShader("core/position_tex")
+    public static final RenderPipeline BLIT = RenderPipeline.builder()
+            .withLocation(visor("pipeline/blit"))
+            .withVertexShader(visor("core/vr_blit"))
+            .withFragmentShader(visor("core/vr_blit"))
             .withSampler("Sampler0")
-            // PORT-1.21.11: core/position_tex reads ModelViewMat and ColorModulator out of
-            // DynamicTransforms and ProjMat out of Projection. Only Projection is auto-bound by
-            // name; an undeclared DynamicTransforms is not bound at all - GlProgram logged
-            // "Found unknown and unsupported uniform DynamicTransforms in visor:pipeline/
-            // mirror_blit" and the mirror quad then took its model-view and its tint from
-            // whatever the previous draw happened to leave at that binding point.
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withUniform("Projection", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
             .withoutBlend()
             .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
             .withDepthWrite(false)
-            .withColorWrite(true, false)
             .withCull(false)
             .build();
 

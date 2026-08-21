@@ -2,17 +2,23 @@ package org.vmstudio.visor.core.client.render.helpers;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.buffers.Std140Builder;
+import com.mojang.blaze3d.opengl.DirectStateAccess;
+import com.mojang.blaze3d.opengl.GlDevice;
+import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.ScissorState;
 import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.*;
 import org.jetbrains.annotations.NotNull;
-import org.lwjgl.system.MemoryStack;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
+import org.vmstudio.visor.core.client.render.VisorPipelines;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -63,10 +69,6 @@ public class RenderShaderHelper {
         if (quadPosTex != null) {
             quadPosTex.close();
             quadPosTex = null;
-        }
-        if (identityProjection != null) {
-            identityProjection.close();
-            identityProjection = null;
         }
     }
 
@@ -147,9 +149,9 @@ public class RenderShaderHelper {
      * Draws a screen-space quad over {@code target}: {@code x0..y1} are NDC, {@code u0..v1} are
      * source UVs.
      * <p>
-     * The cached full-screen quad cannot serve here because both rectangles vary - the mirror
-     * places each eye somewhere different and crops the source - so the geometry goes through the
-     * shared immediate vertex buffer instead of getting its own VBO.
+     * The cached full-screen quad cannot serve here because both rectangles vary - the
+     * {@link #blit} fallback places its destination anywhere and crops the source - so the
+     * geometry goes through the shared immediate vertex buffer instead of getting its own VBO.
      * <p>
      * {@code bindings} carries the same pass-only contract as {@link #renderFullscreenQuad}.
      */
@@ -183,6 +185,96 @@ public class RenderShaderHelper {
                 }
             }
         }
+    }
+
+
+    /**
+     * Copies the {@code src} pixel rectangle of {@code source}'s colour attachment onto the
+     * {@code dst} pixel rectangle of {@code destination}: {@code glBlitFramebuffer}, with its
+     * argument shape and its conventions - both rectangles have their origin at the bottom-left,
+     * a flipped rectangle flips the copy, a size mismatch scales through {@code filter}, and
+     * every channel is copied verbatim, alpha included, whatever it holds.
+     * <p>
+     * PORT-1.21.11: a {@link RenderTarget} no longer owns a framebuffer object, but the GL
+     * backend still keeps one per colour texture ({@link GlTexture#getFbo}) - it is how render
+     * passes and {@code presentTexture} attach - so the copy is still a real framebuffer blit,
+     * bound through {@link GlStateManager} so its read/draw tracking stays right. That matters
+     * more than it looks: the OpenXR swapchain images are {@code GL_SRGB8_ALPHA8}, and a shader
+     * sampling them would decode sRGB on read with nothing re-encoding on write (vanilla never
+     * enables {@code GL_FRAMEBUFFER_SRGB}), so a textured-quad copy of an eye comes out
+     * visibly darker. A blit with sRGB conversion off moves bytes. The quad path is kept only
+     * as the fallback for textures that are not GL textures, and it deliberately draws with
+     * Visor's own {@link VisorPipelines#BLIT} rather than vanilla's {@code core/position_tex},
+     * which discards alpha-0 texels - a copy must not.
+     * <p>
+     * {@code CommandEncoder.copyTextureToTexture} is not a substitute: it cannot scale, and its
+     * width/height arguments land in {@code glBlitNamedFramebuffer}'s srcX1/srcY1 slots, so the
+     * only source rectangle it can express is one anchored at the texture origin.
+     */
+    public static void blit(@NotNull Supplier<String> label,
+                            @NotNull RenderTarget source,
+                            int srcX0, int srcY0, int srcX1, int srcY1,
+                            @NotNull RenderTarget destination,
+                            int dstX0, int dstY0, int dstX1, int dstY1,
+                            @NotNull FilterMode filter) {
+        GpuTexture src = source.getColorTexture();
+        GpuTexture dst = destination.getColorTexture();
+        if (src == null || dst == null) {
+            // mid-reinit: a target whose buffers are gone has nothing to copy from or to
+            return;
+        }
+
+        if (RenderSystem.getDevice() instanceof GlDevice device
+                && src instanceof GlTexture glSrc
+                && dst instanceof GlTexture glDst) {
+            DirectStateAccess dsa = device.directStateAccess();
+            int readFbo = glSrc.getFbo(dsa, null);
+            int drawFbo = glDst.getFbo(dsa, null);
+            int previousRead = GlStateManager.getFrameBuffer(GL30.GL_READ_FRAMEBUFFER);
+            int previousDraw = GlStateManager.getFrameBuffer(GL30.GL_DRAW_FRAMEBUFFER);
+
+            // A blit ignores the colour and depth masks but honours the scissor test; a pass
+            // may have left one enabled, and the next pass sets its own anyway.
+            GlStateManager._disableScissorTest();
+            GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, readFbo);
+            GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, drawFbo);
+            GlStateManager._glBlitFrameBuffer(
+                    srcX0, srcY0, srcX1, srcY1,
+                    dstX0, dstY0, dstX1, dstY1,
+                    GL11.GL_COLOR_BUFFER_BIT,
+                    filter == FilterMode.LINEAR ? GL11.GL_LINEAR : GL11.GL_NEAREST);
+            GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, previousRead);
+            GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, previousDraw);
+            return;
+        }
+
+        // Fallback: the same copy as a textured quad, destination rectangle as NDC and source
+        // rectangle as UVs.
+        float sw = source.width;
+        float sh = source.height;
+        float dw = destination.width;
+        float dh = destination.height;
+        renderScreenQuad(
+                label,
+                VisorPipelines.BLIT,
+                pass -> pass.bindTexture("Sampler0", source.getColorTextureView(),
+                        RenderSystem.getSamplerCache().getClampToEdge(filter)),
+                destination.getColorTextureView(),
+                2f * dstX0 / dw - 1f, 2f * dstY0 / dh - 1f,
+                2f * dstX1 / dw - 1f, 2f * dstY1 / dh - 1f,
+                srcX0 / sw, srcY0 / sh,
+                srcX1 / sw, srcY1 / sh);
+    }
+
+    /** Copies the whole of {@code source} over the whole of {@code destination}. */
+    public static void blit(@NotNull Supplier<String> label,
+                            @NotNull RenderTarget source,
+                            @NotNull RenderTarget destination,
+                            @NotNull FilterMode filter) {
+        blit(label,
+                source, 0, 0, source.width, source.height,
+                destination, 0, 0, destination.width, destination.height,
+                filter);
     }
 
 
@@ -327,49 +419,11 @@ public class RenderShaderHelper {
     /** {@code ModelOffset} - Visor never uses it, but the std140 block still has the slot. */
     private static final Vector3fc ZERO_OFFSET = new Vector3f();
 
-    /**
-     * An identity matrix: {@code TextureMat} on every Visor draw (none transforms UVs), and
-     * both {@code ModelViewMat} and {@code ProjMat} for the draws whose geometry is already
-     * in NDC - see {@link #writeIdentityTransform} and {@link #identityProjection}.
-     */
+    /** An identity matrix: {@code TextureMat} on every Visor draw (none transforms UVs). */
     private static final Matrix4fc IDENTITY = new Matrix4f();
 
     /** The {@code ColorModulator} a plain untinted draw wants. */
     public static final Vector4fc NO_TINT = new Vector4f(1f, 1f, 1f, 1f);
-
-
-    /**
-     * {@code DynamicTransforms} for a quad supplied in NDC: identity model-view, untinted.
-     * <p>
-     * Both blocks matter even for a draw that looks like a plain copy. {@code core/position_tex}
-     * reads {@code ModelViewMat} and {@code ColorModulator} out of {@code DynamicTransforms} and
-     * {@code ProjMat} out of {@code Projection}; a pipeline that leaves either undeclared gets
-     * "Found unknown and unsupported uniform" from {@code GlProgram} and then no binding at all,
-     * so the shader reads whatever the previous draw left at that binding point.
-     * <p>
-     * Like {@link #writeTransform}, this must be called before the pass is opened.
-     */
-    public static GpuBufferSlice writeIdentityTransform() {
-        return RenderSystem.getDynamicUniforms()
-                .writeTransform(IDENTITY, NO_TINT, ZERO_OFFSET, IDENTITY);
-    }
-
-    /** The matching {@code Projection} block. 64 bytes of constants, so it is built once. */
-    public static GpuBufferSlice identityProjection() {
-        if (identityProjection == null) {
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                identityProjection = RenderSystem.getDevice().createBuffer(
-                        () -> "visor identity projection",
-                        GpuBuffer.USAGE_UNIFORM,
-                        Std140Builder.onStack(stack, RenderSystem.PROJECTION_MATRIX_UBO_SIZE)
-                                .putMat4f(IDENTITY)
-                                .get());
-            }
-        }
-        return identityProjection.slice();
-    }
-
-    private static GpuBuffer identityProjection;
 
 
     // ---------- targets ----------
@@ -385,6 +439,22 @@ public class RenderShaderHelper {
         RenderSystem.getDevice().createCommandEncoder()
                 .clearColorAndDepthTextures(target.getColorTexture(), argb,
                         target.getDepthTexture(), depth);
+    }
+
+    /**
+     * Clears {@code target}'s colour attachment, and its depth attachment to {@code depth} when
+     * it has one. For targets that may or may not carry depth.
+     */
+    public static void clear(@NotNull RenderTarget target, int argb, double depth) {
+        if (target.getColorTexture() == null) {
+            return;
+        }
+        if (target.getDepthTexture() != null) {
+            clearColorAndDepth(target, argb, depth);
+        } else {
+            RenderSystem.getDevice().createCommandEncoder()
+                    .clearColorTexture(target.getColorTexture(), argb);
+        }
     }
 
 
