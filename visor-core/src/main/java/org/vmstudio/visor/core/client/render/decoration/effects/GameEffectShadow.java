@@ -45,8 +45,13 @@ public class GameEffectShadow extends VRGameEffect {
                        float partialTicks) {
 
 
+
         // --- Prepare variables ---
-        AABB box = MC.player.getBoundingBox();
+        var player = MC.player;
+        if(player == null){
+            return;
+        }
+        AABB box = player.getBoundingBox();
         float playerWidth  = (float) box.getXsize();
         float playerLength = (float) box.getZsize();
 
@@ -90,6 +95,9 @@ public class GameEffectShadow extends VRGameEffect {
     @Override
     public boolean isVisible(@NotNull VRDecorator currentDecorator) {
         if(VRRenderState.getRenderPass() == VRRenderPass.THIRD_PERSON){
+            return false;
+        }
+        if(MC.player == null){
             return false;
         }
         if (!MC.player.isAlive()) {
