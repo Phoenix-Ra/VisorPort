@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
 import net.minecraft.resources.Identifier;
@@ -29,6 +28,7 @@ import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforgespi.language.IModFileInfo;
 import net.neoforged.neoforgespi.language.ModFileScanData;
@@ -42,8 +42,8 @@ import org.vmstudio.visor.api.common.network.VisorChannel;
 import org.vmstudio.visor.api.common.network.VisorPayload;
 import org.vmstudio.visor.api.common.network.VisorPayloadToClient;
 import org.vmstudio.visor.api.common.network.VisorPayloadToServer;
-import org.vmstudio.visor.loader.neoforge.network.ClientTunnelSupport;
-import org.vmstudio.visor.loader.neoforge.network.VisorRawPayload;
+import org.vmstudio.visor.loader.neoforge.network.ClientChannelSupport;
+import org.vmstudio.visor.loader.neoforge.network.VisorChannelPayload;
 
 import java.io.File;
 import java.lang.annotation.Annotation;
@@ -62,6 +62,8 @@ public class NeoForgeModLoader implements ModLoader {
             = new EnumMap<>(RenderPipelineStage.class);
 
     private final Map<Identifier, VisorChannel> networkChannels = new HashMap<>();
+    /** set once RegisterPayloadHandlersEvent has run - NeoForge accepts no payload types after it */
+    private boolean payloadsRegistered = false;
 
     private boolean levelStageListenerRegistered = false;
 
@@ -193,8 +195,23 @@ public class NeoForgeModLoader implements ModLoader {
     }
 
 
+    /**
+     * NeoForge only takes payload types inside {@link RegisterPayloadHandlersEvent}, and that
+     * event fires after {@code FMLLoadCompleteEvent} - where {@code AddonManagerImpl.register()}
+     * runs every addon's {@code onAddonRegister()} - so by the time it fires all Visor channels
+     * are in {@link #networkChannels} and {@link #registerPayloads} registers each one as its
+     * own raw payload type ({@link VisorChannelPayload}). A channel created any later cannot be
+     * put on the wire any more, hence the hard failure: build channels in
+     * {@code VisorAddon#onAddonRegister()}, as the API documents.
+     */
     @Override
     public void registerNetworkChannel(@NotNull VisorChannel channel) {
+        if (payloadsRegistered) {
+            throw new IllegalStateException(
+                    "VisorChannel " + channel.getChannelId() + " was registered after NeoForge's "
+                            + "payload registration phase; create VisorChannels in "
+                            + "VisorAddon#onAddonRegister()");
+        }
         networkChannels.put(channel.getChannelId(), channel);
     }
 
@@ -202,20 +219,20 @@ public class NeoForgeModLoader implements ModLoader {
     public @NotNull Packet<?> createPacketToClient(@NotNull Identifier channelId,
                                                    @NotNull VisorPayloadToClient payload) {
         return new ClientboundCustomPayloadPacket(
-                VisorRawPayload.of(channelId, writePayload(payload)));
+                VisorChannelPayload.of(channelId, writePayload(payload)));
     }
 
     @Override
     public @NotNull Packet<?> createPacketToServer(@NotNull Identifier channelId,
                                                    @NotNull VisorPayloadToServer payload) {
         return new ServerboundCustomPayloadPacket(
-                VisorRawPayload.of(channelId, writePayload(payload)));
+                VisorChannelPayload.of(channelId, writePayload(payload)));
     }
 
 
     @Override
     public boolean canSendToServer(@NotNull Identifier channelId) {
-        return ClientTunnelSupport.serverAcceptsTunnel();
+        return ClientChannelSupport.serverAccepts(channelId);
     }
 
 
@@ -267,56 +284,77 @@ public class NeoForgeModLoader implements ModLoader {
     // ----- INNER -----
 
 
+    /**
+     * One raw payload type per Visor channel, id = channel id, {@code optional()} so that
+     * vanilla/Paper/Fabric servers and clients (which never negotiate it) still connect.
+     * Serverbound handlers go here; NeoForge 21.11 takes clientbound handlers through the
+     * client-only event below.
+     */
     static void registerPayloads(@NotNull RegisterPayloadHandlersEvent event) {
-        event.registrar(NETWORK_VERSION)
-                .optional()
-                .playBidirectional(
-                        VisorRawPayload.TYPE,
-                        VisorRawPayload.STREAM_CODEC,
-                        NeoForgeModLoader::onTunnelPayload
-                );
+        if (!(ModLoader.get() instanceof NeoForgeModLoader loader)) {
+            return;
+        }
+        PayloadRegistrar registrar = event.registrar(NETWORK_VERSION).optional();
+        for (VisorChannel channel : loader.networkChannels.values()) {
+            var type = VisorChannelPayload.typeOf(channel.getChannelId());
+            var codec = VisorChannelPayload.codecOf(type);
+            if (channel.hasPacketsToServer() && channel.hasPacketsToClient()) {
+                registrar.playBidirectional(type, codec, loader::onServerboundPayload);
+            } else if (channel.hasPacketsToServer()) {
+                registrar.playToServer(type, codec, loader::onServerboundPayload);
+            } else {
+                registrar.playToClient(type, codec);
+            }
+        }
+        loader.payloadsRegistered = true;
     }
 
     /**
      * PORT-1.21.11: NeoForge 21.11 split payload handling by side. The single-handler
-     * {@code playBidirectional} overload now registers the SERVER handler only (it delegates
+     * {@code playBidirectional} overload registers the SERVER handler only (it delegates
      * with {@code clientHandler = null}), and client handlers are registered separately through
      * this client-only mod-bus event - {@code ClientNetworkRegistry.setup()} hard-fails at
-     * startup when a clientbound payload has no client handler. Same tunnel handler, default
-     * thread (MAIN), matching what the registrar gave both directions before the split.
+     * startup when a clientbound payload has no client handler. Default thread (MAIN).
      */
     static void registerClientPayloads(
             net.neoforged.neoforge.client.network.event.@NotNull RegisterClientPayloadHandlersEvent event) {
-        event.register(VisorRawPayload.TYPE, NeoForgeModLoader::onTunnelPayload);
-    }
-
-    private static void onTunnelPayload(VisorRawPayload payload, IPayloadContext context) {
-        if (ModLoader.get() instanceof NeoForgeModLoader loader) {
-            loader.handleTunnelPayload(payload, context);
-        }
-    }
-
-
-    private void handleTunnelPayload(VisorRawPayload payload, IPayloadContext context) {
-        VisorChannel channel = networkChannels.get(payload.channelId());
-        if (channel == null) {
+        if (!(ModLoader.get() instanceof NeoForgeModLoader loader)) {
             return;
         }
+        for (VisorChannel channel : loader.networkChannels.values()) {
+            if (channel.hasPacketsToClient()) {
+                event.register(VisorChannelPayload.typeOf(channel.getChannelId()),
+                        loader::onClientboundPayload);
+            }
+        }
+    }
 
+    private void onServerboundPayload(VisorChannelPayload payload, IPayloadContext context) {
+        VisorChannel channel = networkChannels.get(payload.channelId());
+        if (channel == null
+                || !channel.hasPacketsToServer()
+                || !(context.player() instanceof ServerPlayer sender)) {
+            return;
+        }
         FriendlyByteBuf buffer = payload.toBuffer();
         try {
-            if (context.flow() == PacketFlow.SERVERBOUND) {
-                if (!channel.hasPacketsToServer()
-                        || !(context.player() instanceof ServerPlayer sender)) {
-                    return;
-                }
-                channel.handleToServer(buffer, sender,
-                        response -> context.reply(
-                                VisorRawPayload.of(channel.getChannelId(), writePayload(response))
-                        ));
-            } else if (channel.hasPacketsToClient()) {
-                channel.handleToClient(buffer);
-            }
+            channel.handleToServer(buffer, sender,
+                    response -> context.reply(
+                            VisorChannelPayload.of(channel.getChannelId(), writePayload(response))
+                    ));
+        } finally {
+            buffer.release();
+        }
+    }
+
+    private void onClientboundPayload(VisorChannelPayload payload, IPayloadContext context) {
+        VisorChannel channel = networkChannels.get(payload.channelId());
+        if (channel == null || !channel.hasPacketsToClient()) {
+            return;
+        }
+        FriendlyByteBuf buffer = payload.toBuffer();
+        try {
+            channel.handleToClient(buffer);
         } finally {
             buffer.release();
         }
