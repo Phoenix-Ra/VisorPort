@@ -80,7 +80,11 @@ public class VRErrorReportScreen extends Screen {
 
     @Override
     public void render(@NotNull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        super.renderBackground(gfx, mouseX, mouseY, partialTick);
+        // PORT-1.21.11: no explicit renderBackground any more. super.render already draws the
+        // background, and requesting the menu blur twice in one frame went from "wasteful" to
+        // IllegalStateException("Can only blur once per frame") - which crashed THIS screen,
+        // the one shown while reporting another crash.
+        super.render(gfx, mouseX, mouseY, partialTick);
 
         gfx.drawCenteredString(this.font, this.title, this.width/2, 15, 0xFF5555);
 
@@ -91,8 +95,6 @@ public class VRErrorReportScreen extends Screen {
             gfx.drawString(this.font, line, x, y, 0xFFFFFF, false);
             y += this.font.lineHeight;
         }
-
-        super.render(gfx, mouseX, mouseY, partialTick);
     }
 
     public static void catchError(Throwable t, boolean log) {

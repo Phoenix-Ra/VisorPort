@@ -15,6 +15,9 @@ public class GuiHelper {
 
     /**
      * Renders custom scaled text centered within bounds, scrolling if it overflows.
+     * <p>
+     * Overflowing text bounces between its ends with the same timing as vanilla's
+     * {@code renderScrollingString} (period {@code max(overflow * 0.5s, 3s)}, eased at both ends).
      *
      * @param guiGraphics the gui graphics context
      * @param font        the font to use
@@ -35,71 +38,53 @@ public class GuiHelper {
                                             int width, int height,
                                             float scale,
                                             boolean center) {
-        if (text.isEmpty()) return;
+        if (text.isEmpty() || width <= 0 || height <= 0) return;
+        if (scale <= 0f) scale = 1f;
 
-        if (scale == 1.0f) {
-            int textWidth = font.width(text);
-            int textHeight = font.lineHeight;
-
-            int x = center ? posX + (width - textWidth) / 2 : posX;
-            int y = center ? posY + (height - textHeight) / 2 : posY;
-
-            if (textWidth <= width) {
-                guiGraphics.drawString(font, text, x, y, color, false);
-            } else {
-                int overflow = textWidth - width;
-                double d = (double) Util.getMillis() / 1000.0;
-                double e = Math.max((double) overflow * 0.5, 3.0);
-                double f = Math.sin((Math.PI / 2.0) * Math.cos((Math.PI * 2.0) * d / e)) / 2.0 + 0.5;
-                int offset = (int) Mth.lerp(f, 0.0, (double) overflow);
-
-                guiGraphics.enableScissor(posX, posY, posX + width, posY + height);
-                guiGraphics.drawString(font, text, posX - offset, y, color, false);
-                guiGraphics.disableScissor();
-            }
-            return;
-        }
-
-        float scaledTextWidth = font.width(text) * scale;
-
-        Matrix3x2fStack poseStack = guiGraphics.pose();
-
-        poseStack.pushMatrix();
-        poseStack.translate(posX, posY);
-        poseStack.scale(scale, scale);
-        poseStack.translate(-posX, -posY);
-
-        float areaW = width / scale;
-        float areaH = height / scale;
         int textWidth = font.width(text);
+        float scaledTextWidth = textWidth * scale;
+        float scaledLineHeight = font.lineHeight * scale;
 
-        int y = center
-                ? posY + Math.round((areaH - font.lineHeight) / 2f)
-                : posY;
-
+        // Everything below is in screen space (the caller's coordinate system).
+        float drawX = posX;
         if (scaledTextWidth <= width) {
-            int x = center
-                    ? posX + Math.round((areaW - textWidth) / 2f)
-                    : posX;
-
-            guiGraphics.enableScissor(posX, posY, posX + width, posY + height);
-            guiGraphics.drawString(font, text, x, y, color, false);
-            guiGraphics.disableScissor();
+            if (center) {
+                drawX = posX + (width - scaledTextWidth) / 2f;
+            }
         } else {
-            float overflow = scaledTextWidth - width;
-            double d = (double) Util.getMillis() / 1000.0;
-            double e = Math.max((double) overflow * 0.5, 3.0);
-            double f = Math.sin((Math.PI / 2.0) * Math.cos((Math.PI * 2.0) * d / e)) / 2.0 + 0.5;
-            int offset = (int) Mth.lerp(f, 0.0, (double) overflow);
-
-            int x = posX - Math.round(offset / scale);
-
-            guiGraphics.enableScissor(posX, posY, posX + width, posY + height);
-            guiGraphics.drawString(font, text, x, y, color, false);
-            guiGraphics.disableScissor();
+            drawX = posX - scrollOffset(scaledTextWidth - width);
         }
+        float drawY = center ? posY + (height - scaledLineHeight) / 2f : posY;
 
-        poseStack.popMatrix();
+        // PORT-1.21.11: enableScissor now maps the rectangle through the current pose (it ignored
+        // the pose up to 1.21.4), so the scissor has to be pushed BEFORE the text scale transform.
+        // Pushed after it, the clip region shrinks to scale * (width, height): labels that fit the
+        // full width (and therefore never scroll) get cut off and look like a stuck marquee.
+        guiGraphics.enableScissor(posX, posY, posX + width, posY + height);
+        if (scale == 1f) {
+            guiGraphics.drawString(font, text, Math.round(drawX), Math.round(drawY), color, false);
+        } else {
+            Matrix3x2fStack poseStack = guiGraphics.pose();
+            poseStack.pushMatrix();
+            poseStack.translate(drawX, drawY);
+            poseStack.scale(scale, scale);
+            guiGraphics.drawString(font, text, 0, 0, color, false);
+            poseStack.popMatrix();
+        }
+        guiGraphics.disableScissor();
+    }
+
+    /**
+     * Current horizontal scroll offset of an overflowing label, in whole screen pixels.
+     * Same curve as vanilla {@code ActiveTextCollector#defaultScrollingHelper}.
+     *
+     * @param overflow how many screen pixels the text exceeds its area by (must be positive)
+     */
+    private static int scrollOffset(float overflow) {
+        double d = (double) Util.getMillis() / 1000.0;
+        double e = Math.max((double) overflow * 0.5, 3.0);
+        double f = Math.sin((Math.PI / 2.0) * Math.cos((Math.PI * 2.0) * d / e)) / 2.0 + 0.5;
+        return (int) Mth.lerp(f, 0.0, (double) overflow);
     }
 
     public static void renderScalableText(@NotNull GuiGraphics guiGraphics,

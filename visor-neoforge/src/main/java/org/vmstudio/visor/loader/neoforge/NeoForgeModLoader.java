@@ -277,6 +277,19 @@ public class NeoForgeModLoader implements ModLoader {
                 );
     }
 
+    /**
+     * PORT-1.21.11: NeoForge 21.11 split payload handling by side. The single-handler
+     * {@code playBidirectional} overload now registers the SERVER handler only (it delegates
+     * with {@code clientHandler = null}), and client handlers are registered separately through
+     * this client-only mod-bus event - {@code ClientNetworkRegistry.setup()} hard-fails at
+     * startup when a clientbound payload has no client handler. Same tunnel handler, default
+     * thread (MAIN), matching what the registrar gave both directions before the split.
+     */
+    static void registerClientPayloads(
+            net.neoforged.neoforge.client.network.event.@NotNull RegisterClientPayloadHandlersEvent event) {
+        event.register(VisorRawPayload.TYPE, NeoForgeModLoader::onTunnelPayload);
+    }
+
     private static void onTunnelPayload(VisorRawPayload payload, IPayloadContext context) {
         if (ModLoader.get() instanceof NeoForgeModLoader loader) {
             loader.handleTunnelPayload(payload, context);

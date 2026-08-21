@@ -21,7 +21,12 @@ public class EditBoxImaged extends EditBox {
         );
         this.texture = widgetInfo.getTexture();
         setTextColor(widgetInfo.getTextColor().asInt());
-        setHint(widgetInfo.getHint());
+        // PORT-1.21.11: EditBox.setHint dereferences the component immediately now (it applies
+        // the default grey hint style to unstyled hints), so a null hint went from "no hint" to
+        // an instant NPE. Widgets without a hint simply skip the call.
+        if (widgetInfo.getHint() != null) {
+            setHint(widgetInfo.getHint());
+        }
         setMaxLength(widgetInfo.getTextMaxLength());
 
         setFilter(widgetInfo.getFilter());

@@ -216,6 +216,18 @@ subprojects {
         project.tasks.withType(net.fabricmc.loom.task.AbstractRemapJarTask).configureEach {
             dependsOn(fixTask)
             customMappings.from(fixedMappings)
+            // PORT-1.21.11: loom 1.14 half-wires modern Forge's mapping situation. It KNOWS
+            // Forge >= 50 runs on mojang names at runtime (setupMinecraft sets
+            // runtimeIntermediaryNamespace to 'mojang' via forgeProvider.usesMojangAtRuntime()),
+            // but productionNamespace - which every remap task targets - was already finalized
+            // to the platform default 'srg' a few lines earlier. The shipped jar came out
+            // srg-named, annotation strings included, and every mixin missed at runtime
+            // ("@Shadow method m_20089_ was not located..."). Align the remap target with the
+            // runtime namespace loom itself computed. Lazy: forgeProvider only exists after
+            // loom's own afterEvaluate setup, and tasks can be realized before that.
+            targetNamespace = project.provider {
+                loomExt.forgeProvider.usesMojangAtRuntime() ? 'mojang' : 'srg'
+            }
         }
     }
 }
