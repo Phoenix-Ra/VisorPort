@@ -228,7 +228,7 @@ public abstract class VRRendererBase implements VRRenderer {
         }
 
         if (minecraft.screen != null) {
-            minecraft.resizeDisplay();
+            minecraft.resizeGui();
         }
 
         var windowModif = (WindowExtension) (Object) minecraft.getWindow();
@@ -289,7 +289,7 @@ public abstract class VRRendererBase implements VRRenderer {
             );
         }
 
-        Minecraft.getInstance().resizeDisplay();
+        Minecraft.getInstance().resizeGui();
     }
 
 

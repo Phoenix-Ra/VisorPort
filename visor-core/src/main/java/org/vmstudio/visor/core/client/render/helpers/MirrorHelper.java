@@ -7,7 +7,7 @@ import org.vmstudio.visor.extensions.client.WindowExtension;
 import org.vmstudio.visor.core.client.render.VRShaders;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.core.client.utils.ClientUtils;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.List;
 
@@ -184,7 +184,7 @@ public class MirrorHelper {
         int guiScale = Math.max(1, MC.getWindow().getGuiScale());
         float scale = TEXT_SCALE / guiScale;
 
-        GuiGraphics gui = RenderGuiHelper.beginGui();
+        GuiGraphicsExtractor gui = RenderGuiHelper.beginGui();
         gui.pose().scale(scale, scale);
 
         int wrapWidth = vrWidth / CHAR_WIDTH;
@@ -195,7 +195,7 @@ public class MirrorHelper {
         int lineHeight = MC.font.lineHeight + 1;
         int y = lineHeight;
         for (String line : lines) {
-            gui.drawString(MC.font, line, TEXT_X_OFFSET, y, TEXT_COLOR);
+            gui.text(MC.font, line, TEXT_X_OFFSET, y, TEXT_COLOR);
             y += lineHeight;
         }
 

@@ -22,7 +22,7 @@ import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.gui.overlays.options.OverlayOptionsButtonTemplate;
 import org.vmstudio.visor.core.client.gui.overlays.options.OverlayOptionsButtonTemplate.ActionType;
 import org.vmstudio.visor.core.client.gui.overlays.options.OverlayOptionsButtonTemplate.VisibilityAction;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
@@ -678,7 +678,7 @@ public class OptionsScreenButtonTemplate extends OptionsScreen<OverlayOptionsBut
     }
 
     @Override
-    protected void onRender(GuiGraphics guiGraphics,
+    protected void onRender(GuiGraphicsExtractor guiGraphics,
                             int mouseX, int mouseY,
                             float partialTick) {
         switch (page) {
@@ -740,7 +740,7 @@ public class OptionsScreenButtonTemplate extends OptionsScreen<OverlayOptionsBut
 
     // Rendering
 
-    private void renderMainPage(GuiGraphics guiGraphics) {
+    private void renderMainPage(GuiGraphicsExtractor guiGraphics) {
 
         int startX = cursorBoundsX + 10;
         int fullW = cursorBoundsWidth - 20;
@@ -749,16 +749,16 @@ public class OptionsScreenButtonTemplate extends OptionsScreen<OverlayOptionsBut
         int labelY = cursorBoundsY + 13;
 
         // Row 1
-        guiGraphics.drawString(font, Component.translatable(LANG + "width"),
+        guiGraphics.text(font, Component.translatable(LANG + "width"),
                 startX, labelY, 0xFFFFFF);
-        guiGraphics.drawString(font, Component.translatable(LANG + "height"),
+        guiGraphics.text(font, Component.translatable(LANG + "height"),
                 rightX, labelY, 0xFFFFFF);
 
         // Row 2
         labelY += ROW_SPACING;
-        guiGraphics.drawString(font, Component.translatable(LANG + "text"),
+        guiGraphics.text(font, Component.translatable(LANG + "text"),
                 startX, labelY, 0xFFFFFF);
-        guiGraphics.drawString(font, Component.translatable(LANG + "text_color"),
+        guiGraphics.text(font, Component.translatable(LANG + "text_color"),
                 rightX, labelY, 0xFFFFFF);
 
         // Row 3
@@ -768,10 +768,10 @@ public class OptionsScreenButtonTemplate extends OptionsScreen<OverlayOptionsBut
         if (optionsGroup.getActionType() == ActionType.KEY) {
             Component keyLabel = Component.translatable(LANG + "key");
             int keyLabelW = font.width(keyLabel);
-            guiGraphics.drawString(font, keyLabel,
+            guiGraphics.text(font, keyLabel,
                     startX + (fullW - keyLabelW) / 2, labelY, 0xFFFFFF);
         } else if (optionsGroup.getActionType() == ActionType.COMMAND) {
-            guiGraphics.drawString(font, Component.translatable(LANG + "command"),
+            guiGraphics.text(font, Component.translatable(LANG + "command"),
                     startX, labelY, 0xFFFFFF);
         }
 
@@ -779,69 +779,69 @@ public class OptionsScreenButtonTemplate extends OptionsScreen<OverlayOptionsBut
         labelY += ROW_SPACING * 2;
         if (optionsGroup.getCustomizationType()
                 == OverlayOptionsButtonTemplate.CustomizationType.COLOR) {
-            guiGraphics.drawString(font, Component.translatable(LANG + "fill_color"),
+            guiGraphics.text(font, Component.translatable(LANG + "fill_color"),
                     startX, labelY, 0xFFFFFF);
-            guiGraphics.drawString(font, Component.translatable(LANG + "hover_color"),
+            guiGraphics.text(font, Component.translatable(LANG + "hover_color"),
                     rightX, labelY, 0xFFFFFF);
         } else {
-            guiGraphics.drawString(font, Component.translatable(LANG + "texture"),
+            guiGraphics.text(font, Component.translatable(LANG + "texture"),
                     startX, labelY, 0xFFFFFF);
-            guiGraphics.drawString(font, Component.translatable(LANG + "hover_texture"),
+            guiGraphics.text(font, Component.translatable(LANG + "hover_texture"),
                     startX, labelY + ROW_SPACING, 0xFFFFFF);
         }
     }
 
-    private void renderColorPage(GuiGraphics guiGraphics,
+    private void renderColorPage(GuiGraphicsExtractor guiGraphics,
                                  int mouseX, int mouseY,
                                  float partialTick) {
 
         int startX = cursorBoundsX + 10;
         int titleY = cursorBoundsY + 12 + 3;
 
-        guiGraphics.drawString(font, colorTarget.title(), startX, titleY, 0xFFFFFF);
+        guiGraphics.text(font, colorTarget.title(), startX, titleY, 0xFFFFFF);
 
         if (colorPicker != null) {
             colorPicker.onPreRender(guiGraphics, mouseX, mouseY, partialTick);
         }
     }
 
-    private void renderOverlaysPage(GuiGraphics guiGraphics) {
+    private void renderOverlaysPage(GuiGraphicsExtractor guiGraphics) {
         int startX = cursorBoundsX + 10;
         int titleY = cursorBoundsY + 12 + 3;
 
-        guiGraphics.drawString(font, Component.translatable(LANG + "overlays.title"),
+        guiGraphics.text(font, Component.translatable(LANG + "overlays.title"),
                 startX, titleY, 0xFFFFFF);
 
         if (overlayList == null) {
-            guiGraphics.drawString(font, Component.translatable(LANG + "overlays.empty"),
+            guiGraphics.text(font, Component.translatable(LANG + "overlays.empty"),
                     startX, cursorBoundsY + cursorBoundsHeight / 2, 0xFFAAAAAA);
         }
     }
 
-    private void renderVrActionSetsPage(GuiGraphics guiGraphics) {
+    private void renderVrActionSetsPage(GuiGraphicsExtractor guiGraphics) {
         int startX = cursorBoundsX + 10;
         int titleY = cursorBoundsY + 12 + 3;
 
-        guiGraphics.drawString(font, Component.translatable(LANG + "vr_action_sets.title"),
+        guiGraphics.text(font, Component.translatable(LANG + "vr_action_sets.title"),
                 startX, titleY, 0xFFFFFF);
 
         if (actionSetList == null) {
-            guiGraphics.drawString(font, Component.translatable(LANG + "vr_action_sets.empty"),
+            guiGraphics.text(font, Component.translatable(LANG + "vr_action_sets.empty"),
                     startX, cursorBoundsY + cursorBoundsHeight / 2, 0xFFAAAAAA);
         }
     }
 
-    private void renderVrActionsPage(GuiGraphics guiGraphics) {
+    private void renderVrActionsPage(GuiGraphicsExtractor guiGraphics) {
         int startX = cursorBoundsX + 10;
         int titleY = cursorBoundsY + 12 + 3;
 
         VRActionSet set = browsedActionSet();
-        guiGraphics.drawString(font,
+        guiGraphics.text(font,
                 set != null ? set.getName() : Component.translatable(LANG + "vr_actions.title"),
                 startX, titleY, 0xFFFFFF);
 
         if (vrActionList == null) {
-            guiGraphics.drawString(font, Component.translatable(LANG + "vr_actions.empty"),
+            guiGraphics.text(font, Component.translatable(LANG + "vr_actions.empty"),
                     startX, cursorBoundsY + cursorBoundsHeight / 2, 0xFFAAAAAA);
         }
     }

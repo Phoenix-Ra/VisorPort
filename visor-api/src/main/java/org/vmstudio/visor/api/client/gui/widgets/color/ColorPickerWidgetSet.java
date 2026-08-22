@@ -11,7 +11,7 @@ import org.vmstudio.visor.api.client.gui.widgets.EditBoxImaged;
 import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoButtonImaged;
 import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoEditBox;
 import org.vmstudio.visor.api.client.gui.widgets.sets.WidgetSet;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
@@ -161,7 +161,7 @@ public class ColorPickerWidgetSet implements WidgetSet {
     }
 
     @Override
-    public void onPreRender(@NotNull GuiGraphics guiGraphics,
+    public void onPreRender(@NotNull GuiGraphicsExtractor guiGraphics,
                             int mouseX, int mouseY,
                             float partialTicks) {
         drawPreviewSwatch(guiGraphics);
@@ -284,7 +284,7 @@ public class ColorPickerWidgetSet implements WidgetSet {
     }
 
 
-    private void drawPreviewSwatch(@NotNull GuiGraphics guiGraphics) {
+    private void drawPreviewSwatch(@NotNull GuiGraphicsExtractor guiGraphics) {
         AtumColor color = getColor();
         if (color.getAlphaInt() < ALPHA_OPAQUE) {
             ColorsHelper.drawTransparencyChecker(

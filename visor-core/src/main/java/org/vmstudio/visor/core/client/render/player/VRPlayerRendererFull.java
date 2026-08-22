@@ -22,7 +22,7 @@ import net.minecraft.client.model.geom.builders.CubeDeformation;
 import net.minecraft.client.model.geom.builders.LayerDefinition;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.state.CameraRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
@@ -103,7 +103,7 @@ public class VRPlayerRendererFull extends AvatarRenderer<AbstractClientPlayer> {
             poseStack.scale(scale, scale, scale);
         }
 
-        // Not super.render(...): on Forge/NeoForge that binds to a synthetic bridge in
+        // Not super.extractRenderState(...): on Forge/NeoForge that binds to a synthetic bridge in
         // AvatarRenderer and recurses back into this method. See PlayerRenderMixins.
         ((PlayerRendererExtension) this).visor$renderVanilla(renderState, poseStack, collector, cameraState);
 

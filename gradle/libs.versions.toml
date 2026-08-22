@@ -2,13 +2,16 @@
 
 [versions]
 #Gradle Addons
-shadow              = "8.1.1"
-architectury        = "3.5-SNAPSHOT"
-# Pinned to the 1.14 line on purpose: loom jumps 1.14 -> 1.17 (no 1.15/1.16) and 1.17
-# is built against the Gradle 9 API (Configuration.extendsFrom(Provider[])), which
-# Gradle 8.14.3 does not have. Moving to 1.17 means bumping the wrapper to Gradle 9 and
-# replacing com.github.johnrengelman.shadow, which is abandoned and Gradle-9-incompatible.
-architectury-loom   = "1.14-SNAPSHOT"
+# PORT-26.1: com.github.johnrengelman.shadow is abandoned and does not run on Gradle 9.
+# com.gradleup.shadow is the maintained fork and the drop-in successor; the task/DSL names
+# (shadowJar, relocate, configurations) are unchanged.
+shadow              = "9.6.1"
+architectury        = "3.5.169"
+# PORT-26.1: was pinned to the 1.14 line to stay on Gradle 8.14.3. That pin is gone: MC 26.1 is
+# unobfuscated, and only loom >= 1.14 supports it - via a DIFFERENT PLUGIN ID (see [plugins]).
+# Loom 1.14 already requires Gradle 9.2 and 1.16 requires Gradle 9.4, so the wrapper moves to 9.x
+# and shadow had to be replaced along with it.
+architectury-loom   = "1.17.491"
 
 
 #Annotations
@@ -16,36 +19,48 @@ lombok                 = "1.18.46"
 jetbrains              = "26.1.0"
 
 #Core
-minecraftVersion       = "1.21.11"
-parchment              = "2025.12.20"
-lwjgl                  = "3.3.6"
+# PORT-26.1: 26.1 is the first UNOBFUSCATED Minecraft. The client jar ships real net/minecraft
+# names, Mojang no longer publishes client_mappings/server_mappings, Fabric retired intermediary
+# (26.x resolves to a header-only intermediary:0.0.0 stub) and yarn stopped at 1.21.11. There is
+# no mappings layer left to configure - see the removed `mappings` block in build.gradle.
+# 26.1.2 is the newest patch of the 26.1 line and the one Forge/NeoForge/Sodium/Iris build against.
+minecraftVersion       = "26.1.2"
+# PORT-26.1: parchment removed - parchmentmc publishes nothing for 26.x (parchment-26.1* is a 404),
+# and it has nothing left to add now that the jar carries real names and parameter names.
+lwjgl                  = "3.4.1"
 atum-vr                = "1.13.0beta"
 atum-config            = '1.2.0pre3'
 
 #Fabric
 fabric-loader          = "0.19.3"
-fabric_api             = "0.141.6"
+fabric_api             = "0.155.2"
 mixinExtras            = "0.5.4"
 
 #Forge
-forgeVersion           = "61.2.1"
+# PORT-26.1: full coordinate is 26.1.2-64.1.2
+forgeVersion           = "64.1.2"
 
 #NeoForge
-neoforgeVersion        = "21.11.45"
+# PORT-26.1: NeoForge now versions off the MC version directly (26.1.2.x tracks MC 26.1.2)
+neoforgeVersion        = "26.1.2.97"
 
 #Other mods
-# 0.8.7 is the newest sodium build for 1.21.11 made with loom 1.13.4; everything from
-# 0.8.11 up is built with loom 1.16.1, which loom 1.14 refuses to consume ("Mod was built
-# with a newer version of Loom"). This is modCompileOnly, so it only sets what the sodium
-# compat mixins compile against -- revisit together with the Gradle 9 / loom 1.17 move.
-mods_sodium                 = "mc1.21.11-0.8.7-fabric"
-mods_iris                   = "1.10.7+1.21.11-fabric"
+# PORT-26.1: both rebuilt for the unobfuscated 26.1.2. Sodium 0.9.1 is the newest stable for
+# 26.1.2 (0.9.2 is still alpha); this is compileOnly, so it only sets what the sodium compat
+# mixins compile against.
+mods_sodium                 = "mc26.1.2-0.9.1-fabric"
+mods_iris                   = "1.11.3+26.1-fabric"
 
 
 [plugins]
 architectury         = { id = "architectury-plugin",            version.ref = "architectury" }
-architectury-loom    = { id = "dev.architectury.loom",          version.ref = "architectury-loom" }
-shadow               = { id = "com.github.johnrengelman.shadow",  version.ref = "shadow" }
+# PORT-26.1: loom ships three plugin ids since 1.14 - `dev.architectury.loom` (legacy/compat),
+# `dev.architectury.loom-remap` (obfuscated versions) and `dev.architectury.loom-no-remap` for the
+# unobfuscated ones. On 26.1 the no-remap id is the only one that configures: the others still
+# demand a `named` namespace that no artifact can supply any more. It also removes remapJar and
+# the modImplementation/modApi/modCompileOnly configurations - mods are plain dependencies now.
+architectury-loom    = { id = "dev.architectury.loom-no-remap", version.ref = "architectury-loom" }
+shadow               = { id = "com.gradleup.shadow",            version.ref = "shadow" }
 
 
 [libraries]

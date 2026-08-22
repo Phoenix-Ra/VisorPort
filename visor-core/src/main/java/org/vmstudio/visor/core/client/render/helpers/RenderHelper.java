@@ -234,7 +234,7 @@ public class RenderHelper {
 
         // --- Render ---
         BufferBuilder buf;
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.NEW_ENTITY);
+        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.ENTITY);
 
         for (int i = 0; i < 4; i++) {
             float x = pos[i][0], y = pos[i][1];
@@ -254,7 +254,7 @@ public class RenderHelper {
                     RenderShaderHelper.bindColor(pass, "Sampler0", source);
                     pass.bindTexture("Sampler1", MC.gameRenderer.overlayTexture().getTextureView(),
                             RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
-                    pass.bindTexture("Sampler2", MC.gameRenderer.lightTexture().getTextureView(),
+                    pass.bindTexture("Sampler2", MC.gameRenderer.lightmap(),
                             RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
                 });
     }

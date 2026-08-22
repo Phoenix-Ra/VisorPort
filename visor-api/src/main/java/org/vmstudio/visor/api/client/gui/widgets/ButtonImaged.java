@@ -6,7 +6,7 @@ import org.vmstudio.visor.api.client.gui.helpers.GuiHelper;
 import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoButtonImaged;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -59,7 +59,7 @@ public class ButtonImaged extends AbstractButton {
 
 
     // Tooltip is kept out of the vanilla WidgetTooltipHolder on purpose: the holder lost
-    // custom-positioner support in 1.20.2, so it is submitted manually in renderWidget().
+    // custom-positioner support in 1.20.2, so it is submitted manually in extractWidgetRenderState().
     @Override
     public void setTooltip(@Nullable Tooltip tooltip) {
         this.tooltipOverride = tooltip;
@@ -110,11 +110,11 @@ public class ButtonImaged extends AbstractButton {
                         && Minecraft.getInstance().getLastInputType().isKeyboard());
     }
     @Override
-    protected void renderContents(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractContents(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         if (visorShouldShowTooltip()) {
             var tooltip = getTooltip();
             if (tooltip != null) {
-                // 1.21.9: tooltips are queued on the GuiGraphics being rendered rather than on
+                // 1.21.9: tooltips are queued on the GuiGraphicsExtractor being rendered rather than on
                 // Minecraft's current screen, so an overlay's tooltip lands in the overlay itself.
                 guiGraphics.setTooltipForNextFrame(
                         Minecraft.getInstance().font,

@@ -7,7 +7,7 @@ import org.vmstudio.visor.api.client.gui.helpers.GuiHelper;
 import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoSlider;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarratedElementType;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -82,7 +82,7 @@ public class SliderWidget<T> extends AbstractWidget {
 
 
     @Override
-    protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         // Sync widgetInfo position and size for highlight drawing
         widgetInfo.pos(getX(), getY()).size(getWidth(), getHeight());
         repositionKnob();
@@ -214,7 +214,6 @@ public class SliderWidget<T> extends AbstractWidget {
     public boolean keyPressed(KeyEvent event) {
         int keyCode = event.key();
         int scanCode = event.scancode();
-        int modifiers = event.modifiers();
         if (!this.active) return false;
 
         // Left arrow

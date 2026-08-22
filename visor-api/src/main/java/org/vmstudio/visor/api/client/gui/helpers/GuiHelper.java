@@ -3,7 +3,7 @@ package org.vmstudio.visor.api.client.gui.helpers;
 import org.joml.Matrix3x2fStack;
 import net.minecraft.util.Util;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 
@@ -30,7 +30,7 @@ public class GuiHelper {
      * @param scale       fixed text scale (1.0 = default)
      * @param center      whether to center the text when it fits
      */
-    public static void renderScrollableText(@NotNull GuiGraphics guiGraphics,
+    public static void renderScrollableText(@NotNull GuiGraphicsExtractor guiGraphics,
                                             @NotNull Font font,
                                             @NotNull String text,
                                             int color,
@@ -62,13 +62,13 @@ public class GuiHelper {
         // full width (and therefore never scroll) get cut off and look like a stuck marquee.
         guiGraphics.enableScissor(posX, posY, posX + width, posY + height);
         if (scale == 1f) {
-            guiGraphics.drawString(font, text, Math.round(drawX), Math.round(drawY), color, false);
+            guiGraphics.text(font, text, Math.round(drawX), Math.round(drawY), color, false);
         } else {
             Matrix3x2fStack poseStack = guiGraphics.pose();
             poseStack.pushMatrix();
             poseStack.translate(drawX, drawY);
             poseStack.scale(scale, scale);
-            guiGraphics.drawString(font, text, 0, 0, color, false);
+            guiGraphics.text(font, text, 0, 0, color, false);
             poseStack.popMatrix();
         }
         guiGraphics.disableScissor();
@@ -87,7 +87,7 @@ public class GuiHelper {
         return (int) Mth.lerp(f, 0.0, (double) overflow);
     }
 
-    public static void renderScalableText(@NotNull GuiGraphics guiGraphics,
+    public static void renderScalableText(@NotNull GuiGraphicsExtractor guiGraphics,
                                           @NotNull Font font,
                                           @NotNull String text,
                                           int color,
@@ -106,7 +106,7 @@ public class GuiHelper {
         );
     }
 
-    public static void renderScalableText(@NotNull GuiGraphics guiGraphics,
+    public static void renderScalableText(@NotNull GuiGraphicsExtractor guiGraphics,
                                           @NotNull Font font,
                                           @NotNull String text,
                                           int color,
@@ -149,7 +149,7 @@ public class GuiHelper {
         float baseX = drawX;
         float baseY = drawY;
 
-        guiGraphics.drawString(font, text, Math.round(baseX), Math.round(baseY), color, false);
+        guiGraphics.text(font, text, Math.round(baseX), Math.round(baseY), color, false);
 
 
         // Restore transform state

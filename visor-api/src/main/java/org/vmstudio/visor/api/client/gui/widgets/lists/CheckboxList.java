@@ -10,7 +10,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.vmstudio.visor.api.compatibility.mcversion.McSelectionList;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.sounds.SoundManager;
@@ -72,7 +72,7 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
 
 
     @Override
-    protected void renderContents(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractContents(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         this.hovered = this.isMouseOver(mouseX, mouseY) ? this.getEntryAtPosition(mouseX, mouseY) : null;
         if (VisorAPI.clientState().stateMode().isActive()
                 && isScrolling()
@@ -111,7 +111,7 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
     }
 
     @Override
-    protected void renderRows(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderRows(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         int i = this.getRowLeft();
         int j = this.getRowWidth();
         int k = this.defaultEntryHeight - paddingTop;
@@ -121,7 +121,7 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
             int n = this.getRowTop(m);
             int o = this.getRowBottom(m);
             if (o >= this.listTop() && n <= this.listBottom()) {
-                this.renderItem(guiGraphics, mouseX, mouseY, partialTick, this.children().get(m));
+                this.extractItem(guiGraphics, mouseX, mouseY, partialTick, this.children().get(m));
             }
         }
 
@@ -359,7 +359,7 @@ public class CheckboxList extends McSelectionList<CheckboxList.CheckboxEntry> {
 
 
         @Override
-        public void renderContent(@NotNull GuiGraphics guiGraphics,
+        public void extractContent(@NotNull GuiGraphicsExtractor guiGraphics,
                            int mouseX, int mouseY,
                            boolean hovering,
                            float fractionalTick) {

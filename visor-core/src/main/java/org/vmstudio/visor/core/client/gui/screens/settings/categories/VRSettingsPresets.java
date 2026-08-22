@@ -27,7 +27,7 @@ import org.vmstudio.visor.core.client.settings.VROptionWidgetType;
 import org.vmstudio.visor.api.client.gui.settings.VRPresetSettingsType;
 import org.vmstudio.visor.core.client.settings.presets.types.VRSettingsPresetCustom;
 import net.minecraft.util.Util;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -163,14 +163,14 @@ public class VRSettingsPresets extends VROptionsSet {
     }
 
     @Override
-    public void onPreRender(@NotNull GuiGraphics guiGraphics,
+    public void onPreRender(@NotNull GuiGraphicsExtractor guiGraphics,
                             int mouseX, int mouseY,
                             float partialTicks) {
         submenuWidgetSet.onPreRender(guiGraphics,mouseX, mouseY, partialTicks);
     }
 
     @Override
-    public void onPostRender(@NotNull GuiGraphics guiGraphics,
+    public void onPostRender(@NotNull GuiGraphicsExtractor guiGraphics,
                              int mouseX, int mouseY,
                              float partialTicks) {
         submenuWidgetSet.onPostRender(guiGraphics, mouseX, mouseY, partialTicks);
@@ -336,7 +336,7 @@ public class VRSettingsPresets extends VROptionsSet {
         }
 
         @Override
-        public void onPreRender(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        public void onPreRender(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
             var scaleHelper = getScreen().getScaleHelper();
             BACKGROUND_BUILT_IN.blit(
                     guiGraphics,
@@ -349,7 +349,7 @@ public class VRSettingsPresets extends VROptionsSet {
         }
 
         @Override
-        public void onPostRender(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        public void onPostRender(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
             var scaleHelper = getScreen().getScaleHelper();
 
             //built in
@@ -655,7 +655,7 @@ public class VRSettingsPresets extends VROptionsSet {
         }
 
         @Override
-        public void onPreRender(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        public void onPreRender(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
             var scaleHelper = getScreen().getScaleHelper();
             BACKGROUND_CUSTOM.blit(
                     guiGraphics,
@@ -669,7 +669,7 @@ public class VRSettingsPresets extends VROptionsSet {
         }
 
         @Override
-        public void onPostRender(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        public void onPostRender(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
             var scaleHelper = getScreen().getScaleHelper();
 
             //built in
@@ -930,7 +930,7 @@ public class VRSettingsPresets extends VROptionsSet {
         }
 
         @Override
-        public void onPreRender(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        public void onPreRender(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
             var scaleHelper = getScreen().getScaleHelper();
             BACKGROUND_CREATE.blit(
                     guiGraphics,
@@ -942,7 +942,7 @@ public class VRSettingsPresets extends VROptionsSet {
         }
 
         @Override
-        public void onPostRender(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        public void onPostRender(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
             var scaleHelper = getScreen().getScaleHelper();
 
             //built in

@@ -5,7 +5,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import org.vmstudio.visor.api.client.gui.GuiTexture;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
@@ -126,7 +126,7 @@ public class WidgetInfoValueDrag extends WidgetInfoImage{
         return this;
     }
 
-    public void drawHighlight(GuiGraphics guiGraphics,
+    public void drawHighlight(GuiGraphicsExtractor guiGraphics,
                               int x, int y, int width, int height,
                               boolean active,
                               boolean hovered,

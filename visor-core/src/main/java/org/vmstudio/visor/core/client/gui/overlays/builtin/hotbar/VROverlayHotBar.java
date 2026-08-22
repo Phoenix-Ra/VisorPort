@@ -26,7 +26,7 @@ import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.core.client.tasks.types.TaskHotBar;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
@@ -159,7 +159,7 @@ public class VROverlayHotBar extends VROverlayRadialSelector
 
 
     @Override
-    public void onRender(GuiGraphics guiGraphics, int pMouseX, int pMouseY, float pPartialTicks) {
+    public void onRender(GuiGraphicsExtractor guiGraphics, int pMouseX, int pMouseY, float pPartialTicks) {
 
 
         VROverlayHotBar hotBarOffhand = (VROverlayHotBar) ClientContext.overlayManager
@@ -202,7 +202,7 @@ public class VROverlayHotBar extends VROverlayRadialSelector
     }
 
     @Override
-    protected void renderRadialImage(GuiGraphics guiGraphics,
+    protected void renderRadialImage(GuiGraphicsExtractor guiGraphics,
                                      float pPartialTicks,
                                      int selectedSlice,
                                      int x, int y, int size
@@ -237,13 +237,13 @@ public class VROverlayHotBar extends VROverlayRadialSelector
             int itemY = ((SelectionBoxHotBar) selectionBox).getItemY();
 
             guiGraphics.pose().pushMatrix();
-            guiGraphics.renderItem(
+            guiGraphics.item(
                     itemStack,
                     x + itemX,
                     y + itemY
 
             );
-            guiGraphics.renderItemDecorations(
+            guiGraphics.itemDecorations(
                     this.font,
                     itemStack,
                     x + itemX,
@@ -306,7 +306,7 @@ public class VROverlayHotBar extends VROverlayRadialSelector
 
     }
 
-    private void renderSelectedItemName(GuiGraphics guiGraphics,
+    private void renderSelectedItemName(GuiGraphicsExtractor guiGraphics,
                                         Inventory inventory,
                                         int selectedSlice,
                                         int x, int y, int size) {
@@ -337,7 +337,7 @@ public class VROverlayHotBar extends VROverlayRadialSelector
                 nameY + nameHeight + ITEM_NAME_PADDING_Y,
                 ITEM_NAME_BACKGROUND
         );
-        guiGraphics.drawString(font, itemName, nameX, nameY, 0xFFFFFFFF);
+        guiGraphics.text(font, itemName, nameX, nameY, 0xFFFFFFFF);
     }
 
     @Override

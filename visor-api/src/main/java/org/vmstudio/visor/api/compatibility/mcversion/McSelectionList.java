@@ -3,7 +3,7 @@ package org.vmstudio.visor.api.compatibility.mcversion;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -81,11 +81,11 @@ public abstract class McSelectionList<E extends McSelectionList.Entry<E>> extend
     //---------- stable render hooks ----------
 
     /** Stable render entry point; replaces the whole vanilla render pass of the list. */
-    protected abstract void renderContents(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick);
+    protected abstract void extractContents(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick);
 
     /** Stable hook rendering all rows; default is vanilla row rendering. */
-    protected void renderRows(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        super.renderListItems(guiGraphics, mouseX, mouseY, partialTick);
+    protected void renderRows(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        super.extractListItems(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     /** Stable hook for the scrollbar x position; default is vanilla placement. */
@@ -129,13 +129,13 @@ public abstract class McSelectionList<E extends McSelectionList.Entry<E>> extend
 
     // 1.21.1: AbstractWidget.render is final; renderWidget is the overridable entry.
     @Override
-    public final void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        renderContents(guiGraphics, mouseX, mouseY, partialTick);
+    public final void extractWidgetRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        extractContents(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     // 1.21.1: renderList was renamed to renderListItems.
     @Override
-    protected final void renderListItems(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected final void extractListItems(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderRows(guiGraphics, mouseX, mouseY, partialTick);
     }
 
@@ -175,10 +175,10 @@ public abstract class McSelectionList<E extends McSelectionList.Entry<E>> extend
     }
 
     @Override
-    protected final void renderListBackground(GuiGraphics guiGraphics) {
+    protected final void extractListBackground(GuiGraphicsExtractor guiGraphics) {
     }
 
     @Override
-    protected final void renderListSeparators(GuiGraphics guiGraphics) {
+    protected final void extractListSeparators(GuiGraphicsExtractor guiGraphics) {
     }
 }

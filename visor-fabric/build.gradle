@@ -9,6 +9,8 @@ architectury {
 
 loom {
     accessWidenerPath = project(":visor-api").file("src/main/resources/visor.accesswidener")
+    // PORT-26.1: replaces `remapJar { injectAccessWidener = true }`
+    injectAccessWidener(tasks.named('shadowJar'))
 }
 
 configurations {
@@ -20,25 +22,25 @@ configurations {
 }
 version = version+"+mc"+libs.versions.minecraftVersion.get()+"-fabric"
 dependencies {
-    compileOnly(project(path: ':visor-api', configuration: 'namedElements'))
+    compileOnly(project(':visor-api'))
 
-    shadowCommon(project(path: ":visor-api", configuration: "namedElements")) { transitive false }
+    shadowCommon(project(':visor-api')) { transitive false }
     shadowCommon(project(path: ":visor-core", configuration: "transformProductionFabric")) { transitive false }
-    common(project(path: ":visor-core", configuration: "namedElements")) { transitive false }
+    common(project(':visor-core')) { transitive false }
 
 
 
     String lwjglVersion = "${libs.versions.lwjgl.get()}"
     String fabricApiVersion = "${libs.versions.fabric.api.get()}+${libs.versions.minecraftVersion.get()}";
 
-    modImplementation(libs.fabric.loader)
-    modApi "net.fabricmc.fabric-api:fabric-api:$fabricApiVersion"
+    implementation(libs.fabric.loader)
+    api "net.fabricmc.fabric-api:fabric-api:$fabricApiVersion"
 
 
 
     // ---- LOCAL DEPENDENCY
-    shadowCommon(modApi(name: 'atumvr-api-1.14.0beta-snapshot#23')) { transitive = false }
-    shadowCommon(modApi(name: 'atumvr-core-1.14.0beta-snapshot#23')) { transitive = false }
+    shadowCommon(api(name: 'atumvr-api-1.14.0beta-snapshot#23')) { transitive = false }
+    shadowCommon(api(name: 'atumvr-core-1.14.0beta-snapshot#23')) { transitive = false }
     // ----
     //shadowCommon(libs.atumvr.api) { transitive = false }
     //shadowCommon(libs.atumvr.core) { transitive = false }
@@ -55,10 +57,10 @@ dependencies {
 
 
 
-    include(modImplementation(fabricApi.module("fabric-resource-loader-v0",  fabricApiVersion)))
+    include(implementation(fabricApi.module("fabric-resource-loader-v0",  fabricApiVersion)))
 
-    include(modImplementation(fabricApi.module("fabric-api-base",  fabricApiVersion)))
-    include(modImplementation(fabricApi.module("fabric-command-api-v2",  fabricApiVersion)))
+    include(implementation(fabricApi.module("fabric-api-base",  fabricApiVersion)))
+    include(implementation(fabricApi.module("fabric-command-api-v2",  fabricApiVersion)))
 
 
 }
@@ -82,7 +84,7 @@ shadowJar {
     configurations = [
             project.configurations.shadowCommon
     ]
-    archiveClassifier.set("dev")
+    archiveClassifier.set("")
 
     relocate("org.yaml","${project.group}.libs.org.yaml")
     relocate("org.tomlj","${project.group}.libs.org.tomlj")
@@ -94,11 +96,10 @@ shadowJar {
 
 }
 
-remapJar {
-    injectAccessWidener = true
-    input.set shadowJar.archiveFile
-    dependsOn shadowJar
-    archiveClassifier.set('')
+// PORT-26.1: loom-no-remap has no remapJar task - nothing needs remapping any more - so
+// shadowJar is now the final artifact and `jar` steps aside to the dev classifier.
+jar {
+    archiveClassifier.set("dev")
 }
 
 sourcesJar {

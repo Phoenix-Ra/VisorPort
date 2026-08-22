@@ -12,7 +12,7 @@ import org.vmstudio.visor.api.client.gui.overlays.options.types.OverlayOptionsPo
 import org.vmstudio.visor.api.client.gui.overlays.framework.template.VROverlayTemplateScreen;
 import org.vmstudio.visor.api.common.addon.VisorAddon;
 import org.vmstudio.visor.core.client.ClientContext;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.player.ChatVisiblity;
 import org.jetbrains.annotations.NotNull;
 
@@ -37,7 +37,7 @@ public class VROverlayChat extends VROverlayTemplateScreen {
 
 
     @Override
-    protected void onRender(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    protected void onRender(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         // 1.21.11: ChatComponent.render takes the Font explicitly and a trailing
         // "change cursor on insertions" flag. Vanilla's HUD path passes false for it
         // (only ChatScreen's own draw turns it on), which is the behaviour this overlay had.

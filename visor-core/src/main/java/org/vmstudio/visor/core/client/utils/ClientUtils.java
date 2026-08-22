@@ -11,7 +11,7 @@ import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import org.joml.Vector2f;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.api.common.player.VRPlayer;
@@ -28,7 +28,7 @@ public class ClientUtils {
     }
 
     public static int getCombinedLightWithMin(BlockAndTintGetter lightReader, BlockPos pos, int minLight) {
-        int i = LevelRenderer.getLightColor(lightReader, pos);
+        int i = LevelRenderer.getLightCoords(lightReader, pos);
         int j = i >> 4 & 15;
 
         if (j < minLight) {
@@ -107,7 +107,7 @@ public class ClientUtils {
     public static int getCombinedLight(BlockAndTintGetter lightReader,
                                        BlockPos pos,
                                        int minLight) {
-        int i = LevelRenderer.getLightColor(lightReader, pos);
+        int i = LevelRenderer.getLightCoords(lightReader, pos);
         int j = i >> 4 & 15;
 
         if (j < minLight) {

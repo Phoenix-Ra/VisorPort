@@ -1,7 +1,7 @@
 package org.vmstudio.visor.core.client.gui.overlays.builtin.keyboard;
 
 import org.vmstudio.visor.core.client.gui.screens.VRKeyboardScreen;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -41,7 +41,7 @@ public class KeyboardButton extends Button.Plain {
      * because the sprite it picks reads {@link #isHovered()}.
      */
     @Override
-    protected void renderContents(GuiGraphics guiGraphics, int i, int j, float f) {
+    protected void extractContents(GuiGraphicsExtractor guiGraphics, int i, int j, float f) {
         VROverlayKeyboard overlayKeyboard = keyboardScreen.getOverlayKeyboard();
         if(overlayKeyboard.getInactiveCursorData().isInGui()){
             int mX = overlayKeyboard.getInactiveCursorData().getCursorX();
@@ -54,7 +54,7 @@ public class KeyboardButton extends Button.Plain {
             hoveredSecondary = false;
         }
 
-        super.renderContents(guiGraphics, i, j, f);
+        super.extractContents(guiGraphics, i, j, f);
     }
 
     @Override

@@ -12,7 +12,7 @@ import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.render.VRRendererBase;
 import org.vmstudio.visor.core.client.render.VisorPipelines;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
+import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Matrix4f;
@@ -91,7 +91,7 @@ public class VREffectsHelper {
     private static boolean stencilEnabledByVisor;
 
     /** Long-lived, because the projection buffer owns GPU memory and must not be per-call. */
-    private static PerspectiveProjectionMatrixBuffer stencilProjection;
+    private static ProjectionMatrixBuffer stencilProjection;
 
 
     public static void drawEyeStencil() {
@@ -199,7 +199,7 @@ public class VREffectsHelper {
 
     private static void applyOrthoProjection(RenderTarget rt, boolean inverse) {
         if (stencilProjection == null) {
-            stencilProjection = new PerspectiveProjectionMatrixBuffer("visor stencil projection");
+            stencilProjection = new ProjectionMatrixBuffer("visor stencil projection");
         }
         Matrix4f ortho = new Matrix4f()
                 .setOrtho(0, rt.width, 0, rt.height, 0, 20f);

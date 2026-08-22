@@ -1,8 +1,11 @@
 package org.vmstudio.visor.core.client.render;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
+import com.mojang.blaze3d.pipeline.ColorTargetState;
+import java.util.Optional;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
+import com.mojang.blaze3d.pipeline.DepthStencilState;
+import com.mojang.blaze3d.platform.CompareOp;
 import com.mojang.blaze3d.platform.DestFactor;
 import com.mojang.blaze3d.platform.SourceFactor;
 import com.mojang.blaze3d.shaders.UniformType;
@@ -89,9 +92,8 @@ public final class VisorPipelines {
             .withFragmentShader("core/position")
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.TRIANGLES)
-            .withoutBlend()
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(ColorTargetState.DEFAULT)
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
@@ -105,9 +107,8 @@ public final class VisorPipelines {
             .withFragmentShader("core/position_color")
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-            .withDepthWrite(true)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
             .withCull(true)
             .build();
 
@@ -118,9 +119,8 @@ public final class VisorPipelines {
             .withFragmentShader("core/position_color")
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
@@ -131,9 +131,8 @@ public final class VisorPipelines {
             .withFragmentShader("core/position_color")
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-            .withBlend(ADDITIVE_GLOW)
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(new ColorTargetState(ADDITIVE_GLOW))
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
@@ -150,9 +149,8 @@ public final class VisorPipelines {
             .withFragmentShader("core/position_color")
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.QUADS)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false))
             .withCull(true)
             .build();
 
@@ -163,9 +161,8 @@ public final class VisorPipelines {
             .withFragmentShader("core/position_color")
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.QUADS)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
@@ -179,9 +176,8 @@ public final class VisorPipelines {
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withSampler("Sampler0")
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-            .withDepthWrite(true)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
             .withCull(true)
             .build();
 
@@ -197,9 +193,8 @@ public final class VisorPipelines {
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withSampler("Sampler0")
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-            .withDepthWrite(true)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
             .withCull(false)
             .build();
 
@@ -210,9 +205,8 @@ public final class VisorPipelines {
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withSampler("Sampler0")
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
@@ -223,9 +217,8 @@ public final class VisorPipelines {
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withSampler("Sampler0")
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
-            .withBlend(ADDITIVE_GLOW)
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(new ColorTargetState(ADDITIVE_GLOW))
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
@@ -237,9 +230,8 @@ public final class VisorPipelines {
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withSampler("Sampler0")
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
-            .withBlend(CROSSHAIR_INVERT)
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(new ColorTargetState(CROSSHAIR_INVERT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
@@ -262,10 +254,10 @@ public final class VisorPipelines {
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withSampler("Sampler0")
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
-            .withoutBlend()
-            .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
-            .withDepthWrite(true)
-            .withColorWrite(false, false)
+            // PORT-26.1: depth-only carve - the old withoutBlend() + withColorWrite(false,false)
+            // pair is now one ColorTargetState with an explicit write mask.
+            .withColorTargetState(new ColorTargetState(Optional.empty(), ColorTargetState.WRITE_NONE))
+            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
             .withCull(false)
             .build();
 
@@ -279,9 +271,8 @@ public final class VisorPipelines {
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withSampler("Sampler0")
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 
@@ -332,11 +323,10 @@ public final class VisorPipelines {
                 .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
                 .withSampler("Sampler0")
                 .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
-                .withBlend(blend)
-                .withDepthTestFunction(depthTest
-                        ? DepthTestFunction.LEQUAL_DEPTH_TEST
-                        : DepthTestFunction.NO_DEPTH_TEST)
-                .withDepthWrite(depthTest)
+                .withColorTargetState(new ColorTargetState(blend))
+                .withDepthStencilState(new DepthStencilState(depthTest
+                        ? CompareOp.LESS_THAN_OR_EQUAL
+                        : CompareOp.ALWAYS_PASS, depthTest))
                 .withCull(false)
                 .build();
     }
@@ -358,11 +348,10 @@ public final class VisorPipelines {
                 .withShaderDefine("ALPHA_CUTOUT", 0.1f)
                 .withShaderDefine("NO_CARDINAL_LIGHTING")
                 .withSampler("Sampler1")
-                .withBlend(blend)
-                .withDepthTestFunction(depthTest
-                        ? DepthTestFunction.LEQUAL_DEPTH_TEST
-                        : DepthTestFunction.NO_DEPTH_TEST)
-                .withDepthWrite(depthTest)
+                .withColorTargetState(new ColorTargetState(blend))
+                .withDepthStencilState(new DepthStencilState(depthTest
+                        ? CompareOp.LESS_THAN_OR_EQUAL
+                        : CompareOp.ALWAYS_PASS, depthTest))
                 .withCull(false)
                 .build();
     }
@@ -389,9 +378,8 @@ public final class VisorPipelines {
             .withFragmentShader(visor("core/vr_blit"))
             .withSampler("Sampler0")
             .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
-            .withoutBlend()
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
+            .withColorTargetState(ColorTargetState.DEFAULT)
+            .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
 

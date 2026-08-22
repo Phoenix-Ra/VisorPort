@@ -11,7 +11,7 @@ import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
 import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
@@ -135,7 +135,7 @@ public class TextBoxEditable extends AbstractWidget {
     }
 
     @Override
-    protected void renderWidget(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractWidgetRenderState(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         calculateLines();
         if (scrolling && lastScrollingCall + 200 < System.currentTimeMillis()) {
             scrolling = false;
@@ -164,9 +164,9 @@ public class TextBoxEditable extends AbstractWidget {
 
         if (this.value.isEmpty()) {
             if (this.hint != null && !this.isFocused()) {
-                guiGraphics.drawString(this.font, this.hint, 0, lineY, textHintColor);
+                guiGraphics.text(this.font, this.hint, 0, lineY, textHintColor);
             } else if (caretVisible() && (this.frame / 6) % 2 == 0) {
-                guiGraphics.drawString(this.font, "_", 0, lineY, this.textColor);
+                guiGraphics.text(this.font, "_", 0, lineY, this.textColor);
             }
         } else {
             if (updateCursorCoordinates) {
@@ -180,7 +180,7 @@ public class TextBoxEditable extends AbstractWidget {
                     String lineText = textLines.get(i);
                     FormattedCharSequence line = FormattedCharSequence.forward(lineText, Style.EMPTY);
 
-                    guiGraphics.drawString(this.font, line, 0, lineY, this.textColor);
+                    guiGraphics.text(this.font, line, 0, lineY, this.textColor);
 
                     if (!readOnly && isLineSelected(i)) {
                         renderSelectionHighlight(guiGraphics, i, lineY, lineHeight);
@@ -193,7 +193,7 @@ public class TextBoxEditable extends AbstractWidget {
                         boolean isCursorAtLineEnd = cursorPos == lineVisualEnd;
 
                         if (isCursorAtLineEnd) {
-                            guiGraphics.drawString(this.font, "_", cursorX, lineY, this.textColor);
+                            guiGraphics.text(this.font, "_", cursorX, lineY, this.textColor);
                         } else {
                             guiGraphics.fill(
                                     RenderPipelines.GUI,
@@ -217,7 +217,7 @@ public class TextBoxEditable extends AbstractWidget {
         renderScrollBar(guiGraphics);
     }
 
-    protected void renderScrollBar(@NotNull GuiGraphics guiGraphics) {
+    protected void renderScrollBar(@NotNull GuiGraphicsExtractor guiGraphics) {
         if (maxScrollOffset <= 0) return;
 
         int trackX = getScrollbarX();
@@ -252,7 +252,7 @@ public class TextBoxEditable extends AbstractWidget {
         }
     }
 
-    private void renderSelectionHighlight(GuiGraphics guiGraphics, int lineIndex, int lineY, int lineHeight) {
+    private void renderSelectionHighlight(GuiGraphicsExtractor guiGraphics, int lineIndex, int lineY, int lineHeight) {
         int minCursor = Math.min(cursorPos, selectionAnchor);
         int maxCursor = Math.max(cursorPos, selectionAnchor);
 
@@ -661,7 +661,6 @@ public class TextBoxEditable extends AbstractWidget {
     public boolean keyPressed(KeyEvent event) {
         int keyCode = event.key();
         int scanCode = event.scancode();
-        int modifiers = event.modifiers();
         if (!this.canConsumeInput()) return false;
 
         this.shiftPressed = McVersionUtilsClient.hasShiftDown();
@@ -810,7 +809,6 @@ public class TextBoxEditable extends AbstractWidget {
     @Override
     public boolean charTyped(CharacterEvent event) {
         char codePoint = (char) event.codepoint();
-        int modifiers = event.modifiers();
         if (!this.canConsumeInput()) return false;
         if (McVersionUtils.isAllowedChatCharacter(codePoint)) {
             if (!readOnly) {

@@ -22,7 +22,7 @@ import org.vmstudio.visor.core.client.render.helpers.MirrorHelper;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.core.client.utils.ClientUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.jetbrains.annotations.NotNull;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.*;
@@ -64,7 +64,7 @@ public class VisorScene implements AtumVRScene {
         profiler.pop();
 
         profiler.push("VROverlay texturing");
-        // PORT-1.21.11: a GuiGraphics is no longer a thing you make once and flush repeatedly -
+        // PORT-1.21.11: a GuiGraphicsExtractor is no longer a thing you make once and flush repeatedly -
         // it records into a GuiRenderState that gets replayed as a unit, so each overlay opens
         // and closes its own. The manager does that per overlay now.
         ClientContext.overlayManager.renderOverlayTextures(

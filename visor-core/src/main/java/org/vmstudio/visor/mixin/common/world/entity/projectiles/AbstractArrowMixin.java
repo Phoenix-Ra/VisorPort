@@ -105,7 +105,7 @@ public abstract class AbstractArrowMixin extends Entity {
                         owner.getY(),
                         owner.getZ(),
                         0.7f, 0.5f,
-                        owner.level().random.nextLong()
+                        owner.level().getRandom().nextLong()
                 )
         );
 

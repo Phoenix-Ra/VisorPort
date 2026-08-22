@@ -7,7 +7,7 @@ import org.vmstudio.visor.api.VisorAPI;
 import org.vmstudio.visor.api.client.gui.GuiTexture;
 import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoWidgetSetList;
 import org.vmstudio.visor.api.client.gui.widgets.sets.DynamicWidgetSet;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
@@ -94,7 +94,7 @@ public class WidgetSetList implements GuiEventListener, Renderable, NarratableEn
 
 
     @Override
-    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         if (VisorAPI.clientState().stateMode().isActive()
                 && scrolling
                 && lastDragCall + 200 < System.currentTimeMillis()) {
@@ -115,7 +115,7 @@ public class WidgetSetList implements GuiEventListener, Renderable, NarratableEn
             entry.onPreRender(guiGraphics, mouseX, mouseY, partialTick);
 
             for (var widget : entry.getWidgets()) {
-                widget.render(guiGraphics, mouseX, mouseY, partialTick);
+                widget.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
             }
         }
 
@@ -130,7 +130,7 @@ public class WidgetSetList implements GuiEventListener, Renderable, NarratableEn
         renderScrollbar(guiGraphics);
     }
 
-    private void renderScrollbar(@NotNull GuiGraphics guiGraphics) {
+    private void renderScrollbar(@NotNull GuiGraphicsExtractor guiGraphics) {
         int maxScroll = getMaxScroll();
         if (maxScroll <= 0) return;
 

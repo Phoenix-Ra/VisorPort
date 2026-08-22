@@ -4,7 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarratedElementType;
@@ -86,22 +86,22 @@ public class DropDownListWidget extends AbstractButton {
      * Renders the base button and, if expanded, the dropdown list along with the interactive scrollbar.
      * <p>
      * PORT-1.21.11: {@code AbstractButton#renderWidget} is final now and is nothing but
-     * {@code renderContents(...)} followed by {@code handleCursor(...)}, so
-     * {@code super.renderWidget(...)} from in here was infinite recursion - the super call came
+     * {@code extractContents(...)} followed by {@code handleCursor(...)}, so
+     * {@code super.extractWidgetRenderState(...)} from in here was infinite recursion - the super call came
      * straight back to this override through the virtual dispatch, which is the
      * {@code StackOverflowError} on any screen holding a dropdown.
      * <p>
-     * {@code super.renderContents(...)} is not the replacement either: it is abstract on
+     * {@code super.extractContents(...)} is not the replacement either: it is abstract on
      * {@code AbstractButton}, which this extends directly. The button-drawing that
-     * 1.21.4's {@code super.renderWidget(...)} did is now the two protected helpers below,
+     * 1.21.4's {@code super.extractWidgetRenderState(...)} did is now the two protected helpers below,
      * copied from {@code Button.Plain#renderContents}.
      */
     @Override
-    protected void renderContents(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractContents(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         // Render the base button (background, border, and label)
-        this.renderDefaultSprite(guiGraphics);
-        this.renderDefaultLabel(guiGraphics.textRendererForWidget(
-                this, GuiGraphics.HoveredTextEffects.NONE));
+        this.extractDefaultSprite(guiGraphics);
+        this.extractDefaultLabel(guiGraphics.textRendererForWidget(
+                this, GuiGraphicsExtractor.HoveredTextEffects.NONE));
 
         if (expanded) {
             int dropdownX = this.getX();
@@ -172,7 +172,7 @@ public class DropDownListWidget extends AbstractButton {
                         }
 
                         guiGraphics.enableScissor(dropdownX + padding, itemY, dropdownX + padding + availableWidth, itemY + ITEM_HEIGHT);
-                        guiGraphics.drawString(font, text, dropdownX + padding - offset, itemY + (ITEM_HEIGHT - 8) / 2, textColor);
+                        guiGraphics.text(font, text, dropdownX + padding - offset, itemY + (ITEM_HEIGHT - 8) / 2, textColor);
                         guiGraphics.disableScissor();
                     } else {
                         if(elementScrollingText == i) {
@@ -180,11 +180,11 @@ public class DropDownListWidget extends AbstractButton {
                         }
                         // Not hovered: draw truncated text
                         String truncatedText = font.plainSubstrByWidth(text, availableWidth);
-                        guiGraphics.drawString(font, truncatedText, dropdownX + padding, itemY + (ITEM_HEIGHT - 8) / 2, textColor);
+                        guiGraphics.text(font, truncatedText, dropdownX + padding, itemY + (ITEM_HEIGHT - 8) / 2, textColor);
                     }
                 } else {
                     // If text fits, center it.
-                    guiGraphics.drawCenteredString(font, text, dropdownX + this.getWidth() / 2, itemY + (ITEM_HEIGHT - 8) / 2, textColor);
+                    guiGraphics.centeredText(font, text, dropdownX + this.getWidth() / 2, itemY + (ITEM_HEIGHT - 8) / 2, textColor);
                 }
             }
 

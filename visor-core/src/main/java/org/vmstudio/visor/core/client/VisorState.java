@@ -200,7 +200,7 @@ public class VisorState implements VisorClientState {
             MC.getSoundManager().reload();
         }
 
-        MC.resizeDisplay();
+        MC.resizeGui();
         MC.getWindow().updateVsync(MC.options.enableVsync().get());
         ClientContext.renderer.prepareReinit("Switched state");
         return true;

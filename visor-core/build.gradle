@@ -8,21 +8,21 @@ loom{
 }
 
 dependencies {
-    compileOnly(project(path: ':visor-api', configuration: 'namedElements'))
+    compileOnly(project(':visor-api'))
 
-    compileOnly(project(path: ':visor-core:stubs', configuration: 'namedElements'))
+    compileOnly(project(':visor-core:stubs'))
 
     // @Environment annotation and mixin extras
-    modImplementation(libs.fabric.loader)
+    implementation(libs.fabric.loader)
 
     // ---- LOCAL DEPENDENCY
-    modApi name: 'atumvr-core-1.14.0beta-snapshot#23'
+    api name: 'atumvr-core-1.14.0beta-snapshot#23'
     // ----
     //api(libs.atumvr.core)
 
     //Other mods
-    modCompileOnly(libs.mod.sodium)
-    modCompileOnly(libs.mod.iris) { transitive = false }
+    compileOnly(libs.mod.sodium)
+    compileOnly(libs.mod.iris) { transitive = false }
 
 
 }

@@ -426,7 +426,8 @@ public abstract class ServerPlayerMixin
                 ((ServerLevel)this.level()).sendParticles(
                         new ItemParticleOption(
                                 ParticleTypes.ITEM,
-                                itemStack
+                                // PORT-26.1: the ctor takes an Item now, not an ItemStack
+                                itemStack.getItem()
                         ),
                         particlePos.x,
                         particlePos.y,
@@ -440,7 +441,8 @@ public abstract class ServerPlayerMixin
                 this.level().addParticle(
                         new ItemParticleOption(
                                 ParticleTypes.ITEM,
-                                itemStack
+                                // PORT-26.1: the ctor takes an Item now, not an ItemStack
+                                itemStack.getItem()
                         ),
                         particlePos.x,
                         particlePos.y,

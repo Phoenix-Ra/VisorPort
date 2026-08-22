@@ -4,7 +4,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.vmstudio.visor.api.client.gui.GuiTexture;
 import org.vmstudio.visor.api.client.gui.overlays.options.OptionTextures;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Renderable;
@@ -97,11 +97,11 @@ public class WidgetsList extends DynamicWidgetSet {
     public void onTick() {
     }
 
-    public void onPreRender(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void onPreRender(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         guiGraphics.enableScissor(contentLeft(), contentTop(), this.x + this.width, this.y + this.height);
     }
 
-    public void onPostRender(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    public void onPostRender(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
         guiGraphics.disableScissor();
     }
 
@@ -274,7 +274,7 @@ public class WidgetsList extends DynamicWidgetSet {
         }
 
         @Override
-        protected void renderWidget(GuiGraphics gg, int mx, int my, float pt) {
+        protected void extractWidgetRenderState(GuiGraphicsExtractor gg, int mx, int my, float pt) {
             if (!this.visible) return;
             int ty = thumbY();
             int th = thumbHeight();

@@ -14,9 +14,9 @@ import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoEditBox;
 import org.vmstudio.visor.api.client.gui.widgets.info.WidgetInfoValueDrag;
 import org.vmstudio.visor.api.client.gui.widgets.sets.ValueEditorInt;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.gui.render.state.BlitRenderState;
+import net.minecraft.client.renderer.state.gui.BlitRenderState;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.joml.Matrix3x2f;
 import org.vmstudio.visor.mixin.client.accessors.GameRendererAccessor;
@@ -291,7 +291,7 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
     }
 
     @Override
-    protected void onRender(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void onRender(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         int editBoxWidth = (cursorBoundsWidth - 30) / 2;
         int startPosX = cursorBoundsX + (cursorBoundsWidth - editBoxWidth) / 2;
 
@@ -344,8 +344,8 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(guiGraphics, mouseX, mouseY, partialTick);
         computePreviewArea();
         drawFramebufferPreview(guiGraphics);
         drawInteractiveRegionOverlay(guiGraphics);
@@ -391,12 +391,12 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
         this.previewScale = scale;
     }
 
-    private void drawFramebufferPreview(GuiGraphics gui) {
+    private void drawFramebufferPreview(GuiGraphicsExtractor gui) {
         RenderTarget target = optionsGroup.getTargetSupplier().get();
         GpuTextureView preview = target == null ? null : target.getColorTextureView();
         if (preview == null) {
             gui.fill(previewX, previewY, previewX + previewW, previewY + previewH, 0xFF202020);
-            gui.renderOutline(previewX, previewY, previewW, previewH, 0x55FFFFFF);
+            gui.outline(previewX, previewY, previewW, previewH, 0x55FFFFFF);
             return;
         }
 
@@ -408,11 +408,11 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
         // which takes a GpuTextureView directly. Submitting one puts the preview in the same
         // replay as everything around it, so ordering against the panel, the projection and the
         // scissor all come from the GUI renderer rather than being reconstructed by hand.
-        // The state is the one RenderGuiHelper.beginGui built this GuiGraphics from - the game
+        // The state is the one RenderGuiHelper.beginGui built this GuiGraphicsExtractor from - the game
         // renderer owns the only GuiRenderState there is.
         // v runs 1 -> 0 top to bottom: a RenderTarget's colour texture is bottom-up, GUI space
         // is top-down. Nothing is scissored here, hence the null scissor rectangle.
-        ((GameRendererAccessor) MC.gameRenderer).visor$getGuiRenderState().submitGuiElement(
+        ((GameRendererAccessor) MC.gameRenderer).visor$getGuiRenderState().addGuiElement(
                 new BlitRenderState(
                         RenderPipelines.GUI_TEXTURED,
                         TextureSetup.singleTexture(preview,
@@ -425,10 +425,10 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
                         0xFFFFFFFF,
                         null));
 
-        gui.renderOutline(previewX, previewY, previewW, previewH, 0x80FFFFFF);
+        gui.outline(previewX, previewY, previewW, previewH, 0x80FFFFFF);
     }
 
-    private void drawInteractiveRegionOverlay(GuiGraphics gui) {
+    private void drawInteractiveRegionOverlay(GuiGraphicsExtractor gui) {
         // Map region rect to preview coordinates
         int rx = previewX + (int) Math.round(optionsGroup.getRegionX() * previewScale);
         int ry = previewY + (int) Math.round(optionsGroup.getRegionY() * previewScale);
@@ -466,7 +466,7 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
         drawKnob(gui, rx + rw, ry + rh);       // bottom-right
     }
 
-    private void drawKnob(GuiGraphics gui, int cx, int cy) {
+    private void drawKnob(GuiGraphicsExtractor gui, int cx, int cy) {
         int x1 = cx - KNOB_HALF;
         int y1 = cy - KNOB_HALF;
         int x2 = x1 + KNOB_SIZE;

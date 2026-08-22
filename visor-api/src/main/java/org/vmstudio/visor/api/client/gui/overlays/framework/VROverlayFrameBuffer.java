@@ -462,21 +462,18 @@ public abstract class VROverlayFrameBuffer implements VROverlay {
     public boolean keyReleased(KeyEvent event) {
         int keyCode = event.key();
         int keyScan = event.scancode();
-        int modifiers = event.modifiers();
         return false;
     }
 
     @Override
     public boolean charTyped(CharacterEvent event) {
         char chr = (char) event.codepoint();
-        int modifiers = event.modifiers();
         return false;
     }
     @Override
     public boolean keyPressed(KeyEvent event) {
         int keyCode = event.key();
         int keyScan = event.scancode();
-        int modifiers = event.modifiers();
         return false;
     }
 

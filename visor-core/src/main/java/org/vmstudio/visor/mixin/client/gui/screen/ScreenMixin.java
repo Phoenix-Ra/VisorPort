@@ -1,7 +1,7 @@
 package org.vmstudio.visor.mixin.client.gui.screen;
 
 import org.vmstudio.visor.core.client.VisorState;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.AbstractContainerEventHandler;
 import net.minecraft.client.gui.screens.Screen;

@@ -6,6 +6,7 @@ import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
+import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.lwjgl.system.MemoryStack;
 import org.vmstudio.visor.api.client.player.pose.VRPlayerPoseClient;
@@ -94,7 +95,7 @@ public class RenderPoseHelper {
         // "one constant ambient direction" flag is DimensionType.cardinalLightType() == NETHER now.
         boolean constantAmbient = MC.level != null
                 && MC.level.dimensionType().cardinalLightType()
-                == DimensionType.CardinalLightType.NETHER;
+                == CardinalLighting.Type.NETHER;
         Vector3fc light1 = constantAmbient ? NETHER_LEVEL_LIGHT_1 : LEVEL_LIGHT_1;
 
         Matrix4f view = getViewRotation(renderPass);

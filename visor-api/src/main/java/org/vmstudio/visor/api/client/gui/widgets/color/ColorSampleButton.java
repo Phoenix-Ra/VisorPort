@@ -3,7 +3,7 @@ package org.vmstudio.visor.api.client.gui.widgets.color;
 import lombok.Getter;
 import lombok.Setter;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
@@ -42,7 +42,7 @@ public class ColorSampleButton extends AbstractButton {
     }
 
     @Override
-    protected void renderContents(GuiGraphics guiGraphics,
+    protected void extractContents(GuiGraphicsExtractor guiGraphics,
                                 int mouseX, int mouseY,
                                 float partialTick) {
         int x = getX();

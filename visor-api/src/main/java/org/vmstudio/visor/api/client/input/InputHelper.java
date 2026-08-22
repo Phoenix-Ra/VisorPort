@@ -161,13 +161,13 @@ public class InputHelper {
         Screen screen = keyboardAccessor.getAttachedTo();
         if(screen != null){
             //overlays
-            screen.charTyped(new CharacterEvent(character, modifiers));
+            screen.charTyped(new CharacterEvent(character));
             return true;
         }
         Minecraft mc = Minecraft.getInstance();
         if(mc.screen != null) {
             Minecraft.getInstance().keyboardHandler.charTyped(Minecraft.getInstance().getWindow().handle(),
-                    new CharacterEvent(character, modifiers));
+                    new CharacterEvent(character));
 
         }
         return false;

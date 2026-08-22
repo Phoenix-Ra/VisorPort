@@ -10,9 +10,9 @@ import org.vmstudio.visor.api.client.gui.overlays.VROverlay;
 import org.vmstudio.visor.api.client.gui.overlays.VROverlayPose;
 import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.render.GuiRenderer;
-import net.minecraft.client.gui.render.state.GuiRenderState;
+import net.minecraft.client.renderer.state.gui.GuiRenderState;
 import net.minecraft.client.renderer.fog.FogRenderer;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.render.VisorPipelines;
@@ -41,9 +41,9 @@ public class RenderGuiHelper {
 
 
     /**
-     * Starts an off-schedule GUI recording and returns the {@link GuiGraphics} to draw into.
+     * Starts an off-schedule GUI recording and returns the {@link GuiGraphicsExtractor} to draw into.
      * <p>
-     * PORT-1.21.11: {@code new GuiGraphics(mc, bufferSource)} plus {@code flush()} is gone. GUI
+     * PORT-1.21.11: {@code new GuiGraphicsExtractor(mc, bufferSource)} plus {@code flush()} is gone. GUI
      * drawing now appends to a {@link GuiRenderState} that the {@link GuiRenderer} replays in one
      * pass, so anything drawing a GUI outside vanilla schedule has to reset the state, record, and
      * ask the renderer to replay it. The replay lands on whatever {@code Minecraft.mainRenderTarget}
@@ -51,14 +51,14 @@ public class RenderGuiHelper {
      * <p>
      * Always pair with {@link #flushGui()}.
      */
-    public static GuiGraphics beginGui() {
+    public static GuiGraphicsExtractor beginGui() {
         return beginGui(0, 0);
     }
 
-    public static GuiGraphics beginGui(int mouseX, int mouseY) {
+    public static GuiGraphicsExtractor beginGui(int mouseX, int mouseY) {
         GuiRenderState state = ((GameRendererAccessor) MC.gameRenderer).visor$getGuiRenderState();
         state.reset();
-        return new GuiGraphics(MC, state, mouseX, mouseY);
+        return new GuiGraphicsExtractor(MC, state, mouseX, mouseY);
     }
 
     /** Replays everything recorded since {@link #beginGui} onto the current main render target. */
@@ -66,7 +66,7 @@ public class RenderGuiHelper {
         GameRendererAccessor gameRenderer = (GameRendererAccessor) MC.gameRenderer;
         gameRenderer.visor$getGuiRenderer().render(
                 gameRenderer.visor$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE));
-        gameRenderer.visor$getGuiRenderer().incrementFrameNumber();
+        gameRenderer.visor$getGuiRenderer().endFrame();
     }
 
 

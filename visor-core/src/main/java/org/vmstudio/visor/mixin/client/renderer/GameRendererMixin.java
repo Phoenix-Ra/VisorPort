@@ -35,7 +35,7 @@ import net.minecraft.util.Util;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
+import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.ScreenEffectRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.core.BlockPos;
@@ -145,7 +145,7 @@ public abstract class GameRendererMixin
     private static final int VISOR_PROJECTION_RING_SIZE = 32;
 
     @Unique
-    private PerspectiveProjectionMatrixBuffer[] visor$projectionRing;
+    private ProjectionMatrixBuffer[] visor$projectionRing;
 
     @Unique
     private int visor$projectionRingIndex;
@@ -220,7 +220,7 @@ public abstract class GameRendererMixin
      * first instruction of the GUI half, so overwriting the argument there still lets the level
      * render and still gates the GUI.
      */
-    @ModifyVariable(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/render/state/GuiRenderState;reset()V"), method = "render(Lnet/minecraft/client/DeltaTracker;Z)V", ordinal = 0, argsOnly = true)
+    @ModifyVariable(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/state/gui/GuiRenderState;reset()V"), method = "render(Lnet/minecraft/client/DeltaTracker;Z)V", ordinal = 0, argsOnly = true)
     private boolean visor$renderGui(boolean doRender) {
         if (VRRenderState.getPhase().isVanilla()) {
             return doRender;
@@ -850,7 +850,7 @@ public abstract class GameRendererMixin
      * PORT-1.21.11: a projection is a pointer now, not a value, and this cannot be one buffer.
      * {@code RenderSystem.setProjectionMatrix} took a {@code Matrix4f} in 1.21.4 and copied it
      * into a CPU field, so overwriting the projection as often as VR likes cost nothing. It
-     * takes a {@code GpuBufferSlice} in 1.21.11, and a {@code PerspectiveProjectionMatrixBuffer}
+     * takes a {@code GpuBufferSlice} in 1.21.11, and a {@code ProjectionMatrixBuffer}
      * owns exactly ONE slot: {@code getBuffer} rewrites that slot in place and returns the same
      * final slice every call. So one instance can only ever hold one projection at a time, and
      * every write invalidates the value that previously-handed-out slices resolve to -
@@ -872,13 +872,13 @@ public abstract class GameRendererMixin
     private GpuBufferSlice visor$uploadProjection(Matrix4f projection) {
         if (this.visor$projectionRing == null) {
             this.visor$projectionRing =
-                    new PerspectiveProjectionMatrixBuffer[VISOR_PROJECTION_RING_SIZE];
+                    new ProjectionMatrixBuffer[VISOR_PROJECTION_RING_SIZE];
         }
         int slot = this.visor$projectionRingIndex;
         this.visor$projectionRingIndex = (slot + 1) % VISOR_PROJECTION_RING_SIZE;
-        PerspectiveProjectionMatrixBuffer buffer = this.visor$projectionRing[slot];
+        ProjectionMatrixBuffer buffer = this.visor$projectionRing[slot];
         if (buffer == null) {
-            buffer = new PerspectiveProjectionMatrixBuffer("visor vr projection " + slot);
+            buffer = new ProjectionMatrixBuffer("visor vr projection " + slot);
             this.visor$projectionRing[slot] = buffer;
         }
         return buffer.getBuffer(projection);

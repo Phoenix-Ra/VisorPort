@@ -108,9 +108,10 @@ public class RenderShaderHelper {
      * Draws the shared NDC quad over {@code target} with {@code pipeline}.
      * <p>
      * {@code bindings} runs after the pipeline is bound and is where textures and uniforms go.
-     * The pipeline must be declared NO_DEPTH_TEST with {@code withDepthWrite(false)} and no
-     * depth bias, otherwise it reports that it wants a depth texture and the command encoder
-     * rejects the pass for not supplying one.
+     * The pipeline must be declared with {@code withDepthStencilState(new
+     * DepthStencilState(CompareOp.ALWAYS_PASS, false))} and no depth bias, otherwise it reports
+     * that it wants a depth texture and the command encoder rejects the pass for not supplying
+     * one. (26.1 folded the old NO_DEPTH_TEST + withDepthWrite(false) pair into that record.)
      * <p>
      * PORT-1.21.11: {@code bindings} may only call {@code pass} methods. The pass is open by the
      * time it runs, and an open pass makes the command encoder reject <em>every</em> other
@@ -224,7 +225,9 @@ public class RenderShaderHelper {
             return;
         }
 
-        if (RenderSystem.getDevice() instanceof GlDevice device
+        // PORT-26.1: GpuDevice is a wrapper now - the GL device lives in its `backend` field
+        // (both widened in visor.accesswidener), so unwrap before testing for the GL backend.
+        if (RenderSystem.getDevice().backend instanceof GlDevice device
                 && src instanceof GlTexture glSrc
                 && dst instanceof GlTexture glDst) {
             DirectStateAccess dsa = device.directStateAccess();

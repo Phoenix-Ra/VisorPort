@@ -5,7 +5,7 @@ import org.vmstudio.visor.api.client.gui.overlays.framework.VROverlayScreen;
 import org.vmstudio.visor.api.common.addon.VisorAddon;
 import org.vmstudio.visor.api.common.addon.component.ComponentPriority;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import org.jetbrains.annotations.NotNull;
 import net.minecraft.client.input.CharacterEvent;
@@ -42,12 +42,12 @@ public abstract class VROverlayTemplateScreenInScreen<T extends Screen> extends 
     }
 
     @Override
-    protected void onRender(GuiGraphics guiGraphics,
+    protected void onRender(GuiGraphicsExtractor guiGraphics,
                             int mouseX, int mouseY,
                             float partialTicks) {
 
         if(screen!=null) {
-            screen.renderWithTooltipAndSubtitles(guiGraphics, mouseX, mouseY, partialTicks);
+            screen.extractRenderStateWithTooltipAndSubtitles(guiGraphics, mouseX, mouseY, partialTicks);
         }
 
     }
@@ -97,7 +97,6 @@ public abstract class VROverlayTemplateScreenInScreen<T extends Screen> extends 
     public boolean keyPressed(KeyEvent event) {
         int keyCode = event.key();
         int keyScan = event.scancode();
-        int modifiers = event.modifiers();
         if(screen==null) return true;
         return screen.keyPressed(event);
     }
@@ -106,7 +105,6 @@ public abstract class VROverlayTemplateScreenInScreen<T extends Screen> extends 
     public boolean keyReleased(KeyEvent event) {
         int keyCode = event.key();
         int keyScan = event.scancode();
-        int modifiers = event.modifiers();
         if(screen==null) return true;
         return screen.keyReleased(event);
     }
@@ -114,7 +112,6 @@ public abstract class VROverlayTemplateScreenInScreen<T extends Screen> extends 
     @Override
     public boolean charTyped(CharacterEvent event) {
         char chr = (char) event.codepoint();
-        int modifiers = event.modifiers();
         if(screen==null) return true;
         return screen.charTyped(event);
     }

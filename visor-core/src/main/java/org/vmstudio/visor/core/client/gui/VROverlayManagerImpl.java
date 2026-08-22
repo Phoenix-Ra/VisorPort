@@ -26,7 +26,7 @@ import org.vmstudio.visor.core.client.render.helpers.RenderGuiHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.jetbrains.annotations.NotNull;
 import org.vmstudio.visor.api.client.gui.overlays.options.types.*;
@@ -142,9 +142,9 @@ public class VROverlayManagerImpl implements VROverlayManager {
                 this.texturingOverlay = overlayScreen;
                 try {
                     //render overlay texture - one record/replay cycle per overlay
-                    GuiGraphics guiGraphics = RenderGuiHelper.beginGui(
+                    GuiGraphicsExtractor guiGraphics = RenderGuiHelper.beginGui(
                             overlayScreen.getMouseX(), overlayScreen.getMouseY());
-                    overlayScreen.renderWithTooltipAndSubtitles(
+                    overlayScreen.extractRenderStateWithTooltipAndSubtitles(
                             guiGraphics,
                             overlayScreen.getMouseX(),
                             overlayScreen.getMouseY(),

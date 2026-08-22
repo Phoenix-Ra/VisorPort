@@ -19,7 +19,7 @@ import org.vmstudio.visor.api.common.VRException;
 import org.vmstudio.visor.api.common.addon.component.ComponentPriority;
 import org.vmstudio.visor.api.common.addon.VisorAddon;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -185,11 +185,11 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
     protected void onTick() {}
 
 
-    protected void onPreRender(GuiGraphics guiGraphics,
+    protected void onPreRender(GuiGraphicsExtractor guiGraphics,
                                int mouseX, int mouseY,
                                float partialTicks) {}
 
-    protected void onRender(GuiGraphics guiGraphics,
+    protected void onRender(GuiGraphicsExtractor guiGraphics,
                             int mouseX, int mouseY,
                             float partialTicks) {}
 
@@ -275,7 +275,7 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
 
 
     @Override
-    public final void render(@NotNull GuiGraphics guiGraphics,
+    public final void extractRenderState(@NotNull GuiGraphicsExtractor guiGraphics,
                              int pMouseX, int pMouseY,
                              float partialTicks
     ) {
@@ -307,7 +307,7 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
                     partialTicks
             );
 
-            super.render(guiGraphics, pMouseX, pMouseY, partialTicks);
+            super.extractRenderState(guiGraphics, pMouseX, pMouseY, partialTicks);
 
             onRender(
                     guiGraphics,
@@ -334,7 +334,7 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
 
 
     @Override
-    public void renderBackground(@NotNull GuiGraphics guiGraphics,
+    public void extractBackground(@NotNull GuiGraphicsExtractor guiGraphics,
                                  int mouseX, int mouseY, float partialTick) {
         //empty
     }
@@ -675,7 +675,6 @@ public abstract class VROverlayScreen extends Screen implements VROverlay {
     @Override
     public boolean charTyped(CharacterEvent event) {
         char chr = (char) event.codepoint();
-        int modifiers = event.modifiers();
         return super.charTyped(event);
     }
 

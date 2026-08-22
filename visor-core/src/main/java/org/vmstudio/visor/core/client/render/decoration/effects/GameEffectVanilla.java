@@ -21,7 +21,7 @@ public class GameEffectVanilla extends VRGameEffect {
 
     /**
      * PORT-1.21.11: the animation moved off {@code GameRenderer} onto its private
-     * {@code ScreenEffectRenderer}, takes a {@link PoseStack} rather than a {@code GuiGraphics},
+     * {@code ScreenEffectRenderer}, takes a {@link PoseStack} rather than a {@code GuiGraphicsExtractor},
      * and submits render nodes instead of drawing. Both members are reached through
      * {@code visor.accesswidener}; the nodes are flushed straight away so the effect still lands
      * inside this decorator's pass rather than leaking into whatever draws next.

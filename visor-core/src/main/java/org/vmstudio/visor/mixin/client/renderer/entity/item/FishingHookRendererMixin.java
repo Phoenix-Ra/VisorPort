@@ -33,7 +33,7 @@ public abstract class FishingHookRendererMixin extends EntityRenderer<FishingHoo
     // PORT-1.21.11: EntityRenderer#render -> #submit. The descriptor is still spelled out because
     // FishingHookRenderer also carries a synthetic submit(EntityRenderState, ...) bridge that the
     // bare name would match as well.
-    @Inject(at = @At(value = "HEAD"), method = "submit(Lnet/minecraft/client/renderer/entity/state/FishingHookRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/CameraRenderState;)V",
+    @Inject(at = @At(value = "HEAD"), method = "submit(Lnet/minecraft/client/renderer/entity/state/FishingHookRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
     cancellable = true)
     private void visor$noRenderOnGameScreen(CallbackInfo ci) {
         if(MC.screen != null){

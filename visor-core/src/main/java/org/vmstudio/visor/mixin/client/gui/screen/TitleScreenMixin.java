@@ -5,7 +5,7 @@ import org.vmstudio.visor.api.client.VRStateMode;
 import org.vmstudio.visor.api.client.gui.widgets.lists.DropDownListWidget;
 import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -46,7 +46,7 @@ public abstract class TitleScreenMixin extends Screen {
     }
 
     @Inject(at = @At("TAIL"), method = "render")
-    public void visor$renderVrInitFailedWarning(GuiGraphics gfx, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+    public void visor$renderVrInitFailedWarning(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         if (!VisorState.isVrInitFailed()) {
             return;
         }
@@ -61,7 +61,7 @@ public abstract class TitleScreenMixin extends Screen {
 
         gfx.fill(x - 1, y - 1, x + boxW + 1, y + boxH + 1, 0xFF5DD9FF);
         gfx.fill(x, y, x + boxW, y + boxH, 0xE6050B14);
-        gfx.drawCenteredString(font, msg, this.width / 2, y + padY, 0xFFFFFFFF);
+        gfx.centeredText(font, msg, this.width / 2, y + padY, 0xFFFFFFFF);
     }
 
     @Inject(method = "init", at = @At("TAIL"), order = 9999)
@@ -81,7 +81,7 @@ public abstract class TitleScreenMixin extends Screen {
     }
 
     @Inject(at = @At("TAIL"), method = "render")
-    public void visor$renderToolTip(GuiGraphics guiGraphics, int i, int j, float f, CallbackInfo ci) {
+    public void visor$renderToolTip(GuiGraphicsExtractor guiGraphics, int i, int j, float f, CallbackInfo ci) {
         if (VisorState.get() == VRStateMode.INITIALIZED
                 && VRClientSettings.getVrPlayMode().canPlayVR()) {
             Component text = Component.translatable("visor.messages.vr_auto_switch");
@@ -107,11 +107,11 @@ public abstract class TitleScreenMixin extends Screen {
      * inherited method, so this became an override that delegates to super outside VR.
      */
     @Override
-    protected void renderPanorama(GuiGraphics guiGraphics, float partialTick) {
+    protected void extractPanorama(GuiGraphicsExtractor guiGraphics, float partialTick) {
         if (VisorState.get().isActive()) {
             return;
         }
-        super.renderPanorama(guiGraphics, partialTick);
+        super.extractPanorama(guiGraphics, partialTick);
     }
 
     @Unique

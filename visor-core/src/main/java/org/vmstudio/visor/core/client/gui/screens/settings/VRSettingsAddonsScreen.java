@@ -4,7 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
 import org.vmstudio.visor.api.common.addon.VisorAddon;
 import org.vmstudio.visor.core.client.ClientContext;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
@@ -104,7 +104,6 @@ public class VRSettingsAddonsScreen extends Screen {
     public boolean keyPressed(KeyEvent event) {
         int keyCode = event.key();
         int scanCode = event.scancode();
-        int modifiers = event.modifiers();
         if (keyCode == InputConstants.KEY_ESCAPE) {
             ClientContext.settingsManager.saveOptions();
             MC.setScreen(this.previousScreen);
@@ -114,14 +113,14 @@ public class VRSettingsAddonsScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-        this.renderBackground(guiGraphics, mouseX, mouseY, partialTicks);
+    public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTicks) {
+        this.extractBackground(guiGraphics, mouseX, mouseY, partialTicks);
 
-        this.list.render(guiGraphics, mouseX, mouseY, partialTicks);
+        this.list.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
 
-        guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 15, 0xFFFFFF);
+        guiGraphics.centeredText(this.font, this.title, this.width / 2, 15, 0xFFFFFF);
 
-        super.render(guiGraphics, mouseX, mouseY, partialTicks);
+        super.extractRenderState(guiGraphics, mouseX, mouseY, partialTicks);
     }
 
 
@@ -142,7 +141,7 @@ public class VRSettingsAddonsScreen extends Screen {
         }
 
         @Override
-        protected void renderListBackground(GuiGraphics guiGraphics) {
+        protected void extractListBackground(GuiGraphicsExtractor guiGraphics) {
             guiGraphics.fill(
                     this.getX(), this.getY(),
                     this.getRight(), this.getBottom(),
@@ -186,7 +185,7 @@ public class VRSettingsAddonsScreen extends Screen {
         }
 
         @Override
-        public void renderContent(GuiGraphics gui, int mouseX, int mouseY,
+        public void extractContent(GuiGraphicsExtractor gui, int mouseX, int mouseY,
                                   boolean hovered, float partialTicks) {
             // 1.21.11: the entry owns its own bounds instead of being handed them each frame
             int top = this.getContentY();
@@ -200,12 +199,12 @@ public class VRSettingsAddonsScreen extends Screen {
 
             leftButton.setX(startX);
             leftButton.setY(top);
-            leftButton.render(gui, mouseX, mouseY, partialTicks);
+            leftButton.extractRenderState(gui, mouseX, mouseY, partialTicks);
 
             if (rightButton != null) {
                 rightButton.setX(startX + btnW + spacing);
                 rightButton.setY(top);
-                rightButton.render(gui, mouseX, mouseY, partialTicks);
+                rightButton.extractRenderState(gui, mouseX, mouseY, partialTicks);
             }
         }
 

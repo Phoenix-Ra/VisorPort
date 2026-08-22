@@ -4,7 +4,7 @@ import org.vmstudio.visor.core.client.exceptions.VisorException;
 import org.vmstudio.visor.api.common.utils.LoggerUtils;
 import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -79,20 +79,20 @@ public class VRErrorReportScreen extends Screen {
     }
 
     @Override
-    public void render(@NotNull GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
+    public void extractRenderState(@NotNull GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         // PORT-1.21.11: no explicit renderBackground any more. super.render already draws the
         // background, and requesting the menu blur twice in one frame went from "wasteful" to
         // IllegalStateException("Can only blur once per frame") - which crashed THIS screen,
         // the one shown while reporting another crash.
-        super.render(gfx, mouseX, mouseY, partialTick);
+        super.extractRenderState(gfx, mouseX, mouseY, partialTick);
 
-        gfx.drawCenteredString(this.font, this.title, this.width/2, 15, 0xFF5555);
+        gfx.centeredText(this.font, this.title, this.width/2, 15, 0xFF5555);
 
         int y = 40;
         for (var line : summaryLines) {
             int lineWidth = this.font.width(line);
             int x = (this.width - lineWidth) / 2;
-            gfx.drawString(this.font, line, x, y, 0xFFFFFF, false);
+            gfx.text(this.font, line, x, y, 0xFFFFFF, false);
             y += this.font.lineHeight;
         }
     }

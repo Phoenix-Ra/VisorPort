@@ -10,6 +10,11 @@ pluginManagement {
     }
 }
 
+// PORT-26.1: lets Gradle auto-provision the Java 25 toolchain on machines/CI that lack one.
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
 dependencyResolutionManagement {
     repositories {
         mavenCentral()

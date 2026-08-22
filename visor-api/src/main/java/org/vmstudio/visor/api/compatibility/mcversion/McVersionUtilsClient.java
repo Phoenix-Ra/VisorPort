@@ -4,7 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
@@ -59,12 +59,12 @@ public class McVersionUtilsClient {
                 && mouseY < widget.getY() + widget.getHeight();
     }
 
-    //---------- gui blitting (GuiGraphics#blit gained a RenderType factory in 1.21.2) ----------
+    //---------- gui blitting (GuiGraphicsExtractor#blit gained a RenderType factory in 1.21.2) ----------
 
     /**
      * Draws a texture region scaled to the target size.
      *
-     * @param gui           the GuiGraphics instance
+     * @param gui           the GuiGraphicsExtractor instance
      * @param texture       the texture to sample
      * @param x             X coordinate to draw at
      * @param y             Y coordinate to draw at
@@ -77,7 +77,7 @@ public class McVersionUtilsClient {
      * @param textureWidth  full texture width
      * @param textureHeight full texture height
      */
-    public static void blitStretched(GuiGraphics gui, Identifier texture,
+    public static void blitStretched(GuiGraphicsExtractor gui, Identifier texture,
                                      int x, int y,
                                      int targetWidth, int targetHeight,
                                      int srcX, int srcY,
@@ -98,7 +98,7 @@ public class McVersionUtilsClient {
      * larger than the texture. The source region is taken to be the target size,
      * so the UVs run past 1.0 and the sampler wraps.
      *
-     * @param gui           the GuiGraphics instance
+     * @param gui           the GuiGraphicsExtractor instance
      * @param texture       the texture to sample
      * @param x             X coordinate to draw at
      * @param y             Y coordinate to draw at
@@ -109,7 +109,7 @@ public class McVersionUtilsClient {
      * @param textureWidth  full texture width
      * @param textureHeight full texture height
      */
-    public static void blitTiled(GuiGraphics gui, Identifier texture,
+    public static void blitTiled(GuiGraphicsExtractor gui, Identifier texture,
                                  int x, int y,
                                  int targetWidth, int targetHeight,
                                  int srcX, int srcY,

@@ -1,6 +1,6 @@
 package org.vmstudio.visor.core.client.gui.screens;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.screens.*;
@@ -211,13 +211,13 @@ public class VRPauseMenuScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
-        super.renderBackground(gfx, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        super.extractBackground(gfx, mouseX, mouseY, partialTick);
 
         int cx = this.width / 2;
         int startY = this.height / 2 - totalColumnHeight() / 2;
 
-        gfx.drawCenteredString(this.font, Component.translatable("visor.screen.pause_menu.title"), cx, startY, 0xFFFFFFFF);
+        gfx.centeredText(this.font, Component.translatable("visor.screen.pause_menu.title"), cx, startY, 0xFFFFFFFF);
 
         int dividerColor = 0xFF555555;
 
@@ -239,11 +239,11 @@ public class VRPauseMenuScreen extends Screen {
                 gfx.fill(sx, lineY, sx + 18, lineY + 1, dividerColor);
                 gfx.fill(sx + 22 + lblW, lineY, sx + COLUMN_W, lineY + 1, dividerColor);
 
-                gfx.drawString(this.font, sectionHeaderTexts.get(i), sx + 20, sy, 0xFF6AE3EA, false);
+                gfx.text(this.font, sectionHeaderTexts.get(i), sx + 20, sy, 0xFF6AE3EA, false);
             }
         }
 
-        super.render(gfx, mouseX, mouseY, partialTick);
+        super.extractRenderState(gfx, mouseX, mouseY, partialTick);
     }
 
     private int totalColumnHeight() {

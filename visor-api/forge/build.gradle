@@ -11,8 +11,9 @@ loom {
     accessWidenerPath = project(":visor-api").file("src/main/resources/visor.accesswidener")
 
     forge {
-        convertAccessWideners = true
-        extraAccessWideners.add loom.accessWidenerPath.get().asFile.name
+        // PORT-26.1: the boolean flag + extraAccessWideners pair drove the (now absent) remapJar.
+        // The task-based overload writes META-INF/accesstransformer.cfg into shadowJar instead.
+        convertAccessWideners(tasks.named('shadowJar'), loom.accessWidenerPath.get().asFile.name)
 
         mixinConfig "visor.mixins.json"
         mixinConfig "visor.mixins.forge.json"
@@ -36,8 +37,8 @@ version = version+"+mc"+libs.versions.minecraftVersion.get()+"-api-forge"
 
 dependencies {
 
-    shadowCommon(project(path: ":visor-api", configuration: "namedElements")) { transitive = false }
-    common(project(path: ":visor-api", configuration: "namedElements")) { transitive false }
+    shadowCommon(project(':visor-api')) { transitive = false }
+    common(project(':visor-api')) { transitive false }
 
 
     //
@@ -50,9 +51,9 @@ dependencies {
 
 
     // ---- LOCAL DEPENDENCY
-    // modCompileOnly: flatDir jars have no maven coordinates, so they must stay out of the published POM (bundled via shadowCommon instead)
-    shadowCommon(modCompileOnly(name: 'atumvr-api-1.14.0beta-snapshot#23')) { transitive = false }
-    shadowCommon(modCompileOnly(name: 'atumvr-core-1.14.0beta-snapshot#23')) { transitive = false }
+    // compileOnly: flatDir jars have no maven coordinates, so they must stay out of the published POM (bundled via shadowCommon instead)
+    shadowCommon(compileOnly(name: 'atumvr-api-1.14.0beta-snapshot#23')) { transitive = false }
+    shadowCommon(compileOnly(name: 'atumvr-core-1.14.0beta-snapshot#23')) { transitive = false }
     // ----
     //shadowCommon(libs.atumvr.api) { transitive = false }
     //shadowCommon(libs.atumvr.core) { transitive = false }
@@ -80,7 +81,7 @@ shadowJar {
             project.configurations.shadowCommon,
             project.configurations.bundle
     ]
-    archiveClassifier.set("dev")
+    archiveClassifier.set("")
 
     relocate("org.yaml","${project.group}.libs.org.yaml")
     relocate("org.tomlj","${project.group}.libs.org.tomlj")
@@ -94,10 +95,10 @@ shadowJar {
 
 }
 
-remapJar {
-    input.set shadowJar.archiveFile
-    dependsOn shadowJar
-    archiveClassifier.set('')
+// PORT-26.1: loom-no-remap has no remapJar task - nothing needs remapping any more - so
+// shadowJar is now the final artifact and `jar` steps aside to the dev classifier.
+jar {
+    archiveClassifier.set("dev")
 }
 
 sourcesJar {

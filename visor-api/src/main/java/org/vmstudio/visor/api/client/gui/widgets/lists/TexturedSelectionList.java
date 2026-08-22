@@ -13,7 +13,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Tooltip;
 import org.vmstudio.visor.api.compatibility.mcversion.McSelectionList;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -155,7 +155,7 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
     //Rendering
 
     @Override
-    protected void renderContents(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void extractContents(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         // Determine hovered entry across columns
         this.hoveredEntry = null;
         if (this.isMouseOver(mouseX, mouseY)) {
@@ -208,7 +208,7 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
     }
 
     @Override
-    protected void renderRows(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+    protected void renderRows(@NotNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
         int i = this.getRowLeft();
         int j = this.getRowWidth();
         int k = this.defaultEntryHeight - paddingTop;
@@ -218,12 +218,12 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
             int n = this.getRowTop(m);
             int o = this.getRowBottom(m);
             if (o >= this.listTop() && n <= this.listBottom()) {
-                this.renderItem(guiGraphics, mouseX, mouseY, partialTick, this.children().get(m));
+                this.extractItem(guiGraphics, mouseX, mouseY, partialTick, this.children().get(m));
             }
         }
     }
 
-    private void updateTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+    private void updateTooltip(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY) {
         Function<String, Component> factory = widgetInfo.getTooltip();
         if (factory == null) return;
 
@@ -476,7 +476,7 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
             return false;
         }
 
-        public void renderRowBackground(@NotNull GuiGraphics guiGraphics,
+        public void renderRowBackground(@NotNull GuiGraphicsExtractor guiGraphics,
                            int mouseX, int mouseY,
                            boolean hovering,
                            float fractionalTick) {
@@ -520,7 +520,7 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
         }
 
         @Override
-        public void renderContent(@NotNull GuiGraphics guiGraphics,
+        public void extractContent(@NotNull GuiGraphicsExtractor guiGraphics,
                            int mouseX, int mouseY,
                            boolean hovering,
                            float fractionalTick) {

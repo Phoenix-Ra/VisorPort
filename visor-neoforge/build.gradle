@@ -10,6 +10,13 @@ architectury {
 loom {
    accessWidenerPath = project(":visor-api").file("src/main/resources/visor.accesswidener")
 
+    // PORT-26.1: turns the bundled visor.accesswidener into META-INF/accesstransformer.cfg.
+    // Replaces `remapJar { atAccessWideners.add ... }`, which no longer exists.
+    neoForge {
+        convertAccessWideners(tasks.named('shadowJar'), loom.accessWidenerPath.get().asFile.name)
+    }
+
+
 
 }
 
@@ -28,11 +35,11 @@ configurations {
 version = version+"+mc"+libs.versions.minecraftVersion.get()+"-neoforge"
 
 dependencies {
-    compileOnly(project(path: ':visor-api', configuration: 'namedElements'))
+    compileOnly(project(':visor-api'))
 
-    shadowCommon(project(path: ":visor-api", configuration: "namedElements")) { transitive = false }
+    shadowCommon(project(':visor-api')) { transitive = false }
     shadowCommon(project(path: ":visor-core", configuration: "transformProductionNeoForge")) { transitive = false }
-    common(project(path: ":visor-core", configuration: "namedElements")) { transitive false }
+    common(project(':visor-core')) { transitive false }
 
 
     //
@@ -43,8 +50,8 @@ dependencies {
 
 
     // ---- LOCAL DEPENDENCY
-    shadowCommon(modApi(name: 'atumvr-api-1.14.0beta-snapshot#23')) { transitive = false }
-    shadowCommon(modApi(name: 'atumvr-core-1.14.0beta-snapshot#23')) { transitive = false }
+    shadowCommon(api(name: 'atumvr-api-1.14.0beta-snapshot#23')) { transitive = false }
+    shadowCommon(api(name: 'atumvr-core-1.14.0beta-snapshot#23')) { transitive = false }
     // ----
     //shadowCommon(libs.atumvr.api) { transitive = false }
     //shadowCommon(libs.atumvr.core) { transitive = false }
@@ -85,7 +92,7 @@ shadowJar {
             project.configurations.shadowCommon,
             project.configurations.bundle
     ]
-    archiveClassifier.set("dev")
+    archiveClassifier.set("")
 
     relocate("org.yaml","${project.group}.libs.org.yaml")
     relocate("org.tomlj","${project.group}.libs.org.tomlj")
@@ -100,13 +107,10 @@ shadowJar {
 
 }
 
-remapJar {
-    // turns the bundled visor.accesswidener into META-INF/accesstransformer.cfg
-    atAccessWideners.add loom.accessWidenerPath.get().asFile.name
-
-    input.set shadowJar.archiveFile
-    dependsOn shadowJar
-    archiveClassifier.set('')
+// PORT-26.1: loom-no-remap has no remapJar task - nothing needs remapping any more - so
+// shadowJar is now the final artifact and `jar` steps aside to the dev classifier.
+jar {
+    archiveClassifier.set("dev")
 }
 
 sourcesJar {

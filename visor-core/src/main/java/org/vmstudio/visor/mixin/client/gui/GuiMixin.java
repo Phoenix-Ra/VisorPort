@@ -10,7 +10,7 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.Gui;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.contextualbar.ContextualBarRenderer;
 import net.minecraft.client.gui.screens.ChatScreen;
@@ -38,7 +38,7 @@ public abstract class GuiMixin implements GuiExtension {
     \* ********************************** */
     // 1.21.4: renderConfusionOverlay moved here from GameRenderer
     @Inject(at = @At("HEAD"), method = "renderConfusionOverlay", cancellable = true)
-    private void visor$noConfusionOverlayInGUI(GuiGraphics guiGraphics, float f, CallbackInfo ci) {
+    private void visor$noConfusionOverlayInGUI(GuiGraphicsExtractor guiGraphics, float f, CallbackInfo ci) {
         if (VRRenderState.getPhase().isVRGui()) {
             ci.cancel();
         }
@@ -70,20 +70,20 @@ public abstract class GuiMixin implements GuiExtension {
     // renderHotbarAndDecorations draws in two passes - the bar background, then the filled bar.
     // Skipping both passes is what cancelling the two old methods did.
     @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;renderBackground(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/DeltaTracker;)V"),
+            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;extractBackground(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V"),
             method = "renderHotbarAndDecorations")
     public void visor$noVanillaContextualBarBackground(ContextualBarRenderer instance,
-                                                       GuiGraphics guiGraphics,
+                                                       GuiGraphicsExtractor guiGraphics,
                                                        DeltaTracker deltaTracker) {
         if(visor$keepsVanillaHud()) {
-            instance.renderBackground(guiGraphics, deltaTracker);
+            instance.extractBackground(guiGraphics, deltaTracker);
         }
     }
     @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/DeltaTracker;)V"),
+            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V"),
             method = "renderHotbarAndDecorations")
     public void visor$noVanillaContextualBar(ContextualBarRenderer instance,
-                                             GuiGraphics guiGraphics,
+                                             GuiGraphicsExtractor guiGraphics,
                                              DeltaTracker deltaTracker) {
         if(visor$keepsVanillaHud()) {
             instance.render(guiGraphics, deltaTracker);
@@ -93,9 +93,9 @@ public abstract class GuiMixin implements GuiExtension {
     // 1.21.11: that layer is a static helper on ContextualBarRenderer, called straight from
     // renderHotbarAndDecorations, so it is skipped at the call site instead of cancelled
     @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;renderExperienceLevel(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;I)V"),
+            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;renderExperienceLevel(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;I)V"),
             method = "renderHotbarAndDecorations")
-    public void visor$noVanillaExperienceLevel(GuiGraphics guiGraphics, Font font, int level) {
+    public void visor$noVanillaExperienceLevel(GuiGraphicsExtractor guiGraphics, Font font, int level) {
         if(visor$keepsVanillaHud()) {
             ContextualBarRenderer.renderExperienceLevel(guiGraphics, font, level);
         }
@@ -114,10 +114,10 @@ public abstract class GuiMixin implements GuiExtension {
     // 1.21.11: ChatComponent.render gained an explicit Font and a trailing
     // "change cursor on insertions" flag
     @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/components/ChatComponent;render(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;IIIZZ)V"),
+            target = "Lnet/minecraft/client/gui/components/ChatComponent;render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;IIIZZ)V"),
             method = "renderChat")
     public void visor$noVanillaGuiChat(ChatComponent instance,
-                                       GuiGraphics guiGraphics,
+                                       GuiGraphicsExtractor guiGraphics,
                                        Font font,
                                        int i, int j, int k, boolean focused,
                                        boolean changeCursorOnInsertions) {
@@ -158,13 +158,13 @@ public abstract class GuiMixin implements GuiExtension {
     }
 
     @Inject(method = "renderTextureOverlay", at = @At("HEAD"), cancellable = true)
-    public void visor$noTextureOverlay(GuiGraphics guiGraphics, Identifier resourceLocation, float f, CallbackInfo ci) {
+    public void visor$noTextureOverlay(GuiGraphicsExtractor guiGraphics, Identifier resourceLocation, float f, CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
 
     @Inject(method = "renderPortalOverlay", at = @At("HEAD"), cancellable = true)
-    public void visor$noPortalOverlay(GuiGraphics guiGraphics, float f, CallbackInfo ci) {
+    public void visor$noPortalOverlay(GuiGraphicsExtractor guiGraphics, float f, CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }

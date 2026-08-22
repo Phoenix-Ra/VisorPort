@@ -1,4 +1,4 @@
-accessWidener	v1	named
+accessWidener	v1	official
 
 
 accessible method net/minecraft/client/multiplayer/ClientLevel getBlockStatePredictionHandler ()Lnet/minecraft/client/multiplayer/prediction/BlockStatePredictionHandler;
@@ -35,7 +35,10 @@ accessible method net/minecraft/world/entity/Entity collide (Lnet/minecraft/worl
 #accessible class net/minecraft/client/renderer/block/model/ItemModelGenerator$SpanFacing
 #accessible method net/minecraft/client/renderer/block/model/ItemModelGenerator$SpanFacing isHorizontal ()Z
 # 1.21.4 resolves the tints up front, so the ItemStack argument became an int[] of colors
-accessible method net/minecraft/client/renderer/entity/ItemRenderer renderQuadList (Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Ljava/util/List;[III)V
+# PORT-26.1: net.minecraft.client.renderer.entity.ItemRenderer no longer exists at all (only
+# ThrownItemRenderer / gui.render.pip.OversizedItemRenderer remain), and nothing in Visor calls
+# renderQuadList any more - the entry has been dead weight since the item-model rework.
+#accessible method net/minecraft/client/renderer/entity/ItemRenderer renderQuadList (Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Ljava/util/List;[III)V
 
 #Vertex
 accessible class net/minecraft/client/renderer/OutlineBufferSource$EntityOutlineGenerator
@@ -109,6 +112,14 @@ accessible field net/minecraft/client/KeyMapping key Lcom/mojang/blaze3d/platfor
 # to get the current blend state
 accessible field com/mojang/blaze3d/opengl/GlStateManager BLEND Lcom/mojang/blaze3d/opengl/GlStateManager$BlendState;
 accessible class com/mojang/blaze3d/opengl/GlStateManager$BlendState
+
+# PORT-26.1: the raw framebuffer blit in RenderShaderHelper needs DirectStateAccess, and both
+# steps to it were closed off. GlDevice lost its `public` modifier, and RenderSystem.getDevice()
+# no longer returns it at all - GpuDevice became a wrapper class holding the real backend in a
+# private field, with no public accessor. So widen both: the field to unwrap, and the class to
+# cast to. directStateAccess() itself is still public.
+accessible class com/mojang/blaze3d/opengl/GlDevice
+accessible field com/mojang/blaze3d/systems/GpuDevice backend Lcom/mojang/blaze3d/systems/GpuDeviceBackend;
 
 # to render vr hands
 accessible method net/minecraft/client/renderer/ItemInHandRenderer renderArmWithItem (Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V

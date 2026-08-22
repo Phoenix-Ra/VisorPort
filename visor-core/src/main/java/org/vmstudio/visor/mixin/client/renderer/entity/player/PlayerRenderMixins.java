@@ -10,7 +10,7 @@ import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.state.CameraRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.entity.*;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
@@ -175,7 +175,7 @@ public class PlayerRenderMixins {
 
     /**
      * Vanilla AvatarRenderer declares no render() at all - the nearest declaration is
-     * LivingEntityRenderer#render(S, ...) - so javac compiles super.render(...) in our
+     * LivingEntityRenderer#render(S, ...) - so javac compiles super.extractRenderState(...) in our
      * AvatarRenderer subclasses to
      * "invokespecial AvatarRenderer.render(LivingEntityRenderState, ...)", the erasure of the
      * inherited method. On Fabric that resolves straight up to LivingEntityRenderer#render.
@@ -219,7 +219,7 @@ public class PlayerRenderMixins {
         // now inlines both SubmitNodeCollector#submitNameTag calls and never touches super, so the
         // two hooks in EntityRendererMixin have to be repeated here or players - the only entities
         // that ever carry a VR player - lose them entirely.
-        @Inject(method = "submitNameTag(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/CameraRenderState;)V",
+        @Inject(method = "submitNameTag(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
                 at = @At("HEAD"), cancellable = true)
         private void visor$hideSpectatedVRNameTag(AvatarRenderState renderState, PoseStack poseStack,
                                                   SubmitNodeCollector collector,
@@ -232,9 +232,9 @@ public class PlayerRenderMixins {
         }
 
         // No ordinal: the score line and the name line both need to face the headset.
-        @WrapOperation(method = "submitNameTag(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/CameraRenderState;)V",
+        @WrapOperation(method = "submitNameTag(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
                 at = @At(value = "INVOKE",
-                        target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitNameTag(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZIDLnet/minecraft/client/renderer/state/CameraRenderState;)V"))
+                        target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitNameTag(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZIDLnet/minecraft/client/renderer/state/level/CameraRenderState;)V"))
         private void visor$vrNameTagCameraOrient(SubmitNodeCollector collector, PoseStack poseStack,
                                                  Vec3 nameTagAttachment, int yOffset, Component text,
                                                  boolean seeThrough, int lightCoords,
