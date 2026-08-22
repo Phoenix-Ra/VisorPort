@@ -1,20 +1,15 @@
 package org.vmstudio.visor.mixin.client.renderer.entity.player;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Camera;
 import net.minecraft.client.model.player.PlayerModel;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.entity.*;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.PlayerModelType;
@@ -27,7 +22,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import org.vmstudio.visor.api.client.player.VRClientPlayer;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
 import org.vmstudio.visor.api.client.render.decoration.VRBodyRenderer;
 import org.vmstudio.visor.core.client.ClientContext;
@@ -35,7 +29,6 @@ import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.player.VRClientPlayers;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.extensions.client.entity.EntityRenderDispatcherExtension;
-import org.vmstudio.visor.extensions.client.entity.EntityRenderStateExtension;
 import org.vmstudio.visor.extensions.client.entity.PlayerRendererExtension;
 
 public class PlayerRenderMixins {
@@ -214,54 +207,10 @@ public class PlayerRenderMixins {
             super.submit(renderState, poseStack, collector, cameraState);
         }
 
-        // PORT-1.21.11: in 1.21.4 PlayerRenderer#renderNameTag delegated both the score line and
-        // the name line to super, so hooking EntityRenderer covered players too. AvatarRenderer
-        // now inlines both SubmitNodeCollector#submitNameTag calls and never touches super, so the
-        // two hooks in EntityRendererMixin have to be repeated here or players - the only entities
-        // that ever carry a VR player - lose them entirely.
-        @Inject(method = "submitNameTag(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
-                at = @At("HEAD"), cancellable = true)
-        private void visor$hideSpectatedVRNameTag(AvatarRenderState renderState, PoseStack poseStack,
-                                                  SubmitNodeCollector collector,
-                                                  CameraRenderState cameraState, CallbackInfo ci) {
-            VRClientPlayer vrPlayer = ((EntityRenderStateExtension) renderState).visor$getVRPlayer();
-            if (vrPlayer != null
-                    && VRRenderState.isSpectatedVRView(vrPlayer.getMcPlayer())) {
-                ci.cancel();
-            }
-        }
-
-        // No ordinal: the score line and the name line both need to face the headset.
-        @WrapOperation(method = "submitNameTag(Lnet/minecraft/client/renderer/entity/state/AvatarRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
-                at = @At(value = "INVOKE",
-                        target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitNameTag(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZIDLnet/minecraft/client/renderer/state/level/CameraRenderState;)V"))
-        private void visor$vrNameTagCameraOrient(SubmitNodeCollector collector, PoseStack poseStack,
-                                                 Vec3 nameTagAttachment, int yOffset, Component text,
-                                                 boolean seeThrough, int lightCoords,
-                                                 double distanceToCameraSq, CameraRenderState cameraState,
-                                                 Operation<Void> original,
-                                                 @Local(argsOnly = true) AvatarRenderState renderState) {
-            float heightScale = 1.0f;
-            VRClientPlayer vrPlayer = ((EntityRenderStateExtension) renderState).visor$getVRPlayer();
-            if (vrPlayer != null) {
-                heightScale = vrPlayer.getFullHeightScale();
-            }
-
-            Quaternionf vanillaOrientation = cameraState.orientation;
-            cameraState.orientation = ((EntityRenderDispatcherExtension) this.entityRenderDispatcher)
-                    .visor$getVRBillboardOrientation(
-                            renderState.x,
-                            renderState.y + renderState.boundingBoxHeight * heightScale
-                                    + 0.5f * heightScale,
-                            renderState.z
-                    );
-            try {
-                original.call(collector, poseStack, nameTagAttachment, yOffset, text, seeThrough,
-                        lightCoords, distanceToCameraSq, cameraState);
-            } finally {
-                cameraState.orientation = vanillaOrientation;
-            }
-        }
+        // PORT-26.1: the name-tag hooks that had to be duplicated here in 1.21.11 are gone
+        // again. AvatarRenderer.submitNameDisplay(state, pose, collector, camera) now delegates
+        // to EntityRenderer's final submitNameDisplay(..., offset), which EntityRendererMixin
+        // hooks for every entity - players included.
 
     }
 

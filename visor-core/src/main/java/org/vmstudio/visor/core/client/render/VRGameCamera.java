@@ -1,61 +1,64 @@
 package org.vmstudio.visor.core.client.render;
 
-
-import org.vmstudio.visor.api.common.player.VRPose;
-import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
-import org.vmstudio.visor.api.client.render.VRRenderPass;
-import org.vmstudio.visor.api.common.utils.VRMathUtils;
-import org.vmstudio.visor.core.client.player.VRClientPlayers;
-import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.util.Mth;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
-
+import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
+import org.vmstudio.visor.api.client.render.VRRenderPass;
+import org.vmstudio.visor.api.common.player.VRPose;
+import org.vmstudio.visor.api.common.utils.VRMathUtils;
 import org.vmstudio.visor.core.client.ClientContext;
+import org.vmstudio.visor.core.client.VisorState;
+import org.vmstudio.visor.core.client.player.VRClientPlayers;
+import org.vmstudio.visor.core.client.render.helpers.CullFrustumHelper;
+import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
+import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 
+import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 
+/**
+ * PORT-26.1: {@code Camera.setup(level, entity, thirdPerson, mirrored, partialTicks)} is gone.
+ * {@code Camera.update(DeltaTracker)} now owns everything that used to be spread over
+ * GameRenderer: entity alignment, fov, far plane, cull frustum and the projection, and
+ * {@code extractRenderState} copies it all into the {@link CameraRenderState} the renderer
+ * consumes. Visor drives {@code update}/{@code extract} once per VR pass, and this camera
+ * answers every one of those with the pass pose and the pass projection.
+ */
 public class VRGameCamera extends Camera {
 
-    // 1.21.11 narrowed Camera.setup's first parameter from BlockGetter back to Level
+    private static final float HUD_FOV = 70.0F;
+
     @Override
-    public void setup(@NotNull Level level,
-                      @NotNull Entity entity,
-                      boolean thirdPerson,
-                      boolean thirdPersonReverse,
-                      float partialTicks) {
-        if (VRRenderState.getPhase().isVanilla()) {
-            super.setup(level, entity, thirdPerson, thirdPersonReverse, partialTicks);
-            if (VRRenderState.isSpectatedVRView(entity)) {
-                setupSpectatedVR(entity);
+    public void update(DeltaTracker deltaTracker) {
+        if (VRRenderState.getPhase().isVanilla() || VisorState.get().isNotActive()) {
+            super.update(deltaTracker);
+            if (VRRenderState.isSpectatedVRView(this.entity)) {
+                setupSpectatedVR(this.entity);
+                // the vanilla frustum was built from the entity pose, rebuild it from the HMD pose
+                this.prepareCullFrustum(
+                        this.getViewRotationMatrix(new Matrix4f()),
+                        this.createProjectionMatrixForCulling(),
+                        this.position()
+                );
             }
-        } else {
-            setupVR(level, entity);
+            return;
         }
+        updateVR(deltaTracker);
     }
 
-
-    /**
-     * PORT-1.21.11: the environment attribute probe has to be ticked in VR too.
-     * <p>
-     * 1.21.4's {@code Camera.tick()} was nothing but the eye-height interpolation, which VR has
-     * no use for - the head height comes from the HMD - so skipping it outside the vanilla phase
-     * was free. 1.21.11 added {@code attributeProbe.tick(level, position)} to the same method,
-     * and {@code SkyRenderer.extractRenderState} now reads <em>every</em> sky value through
-     * {@code camera.attributeProbe()}: sun angle, moon angle, star angle, sky colour, sunrise
-     * colour. An unticked probe hands back defaults for all of them, which is a black sky.
-     * <p>
-     * The phase is still VR_MIRROR from the end of the previous frame when
-     * {@code GameRenderer.tick()} runs, so the vanilla branch never covered this.
-     * <p>
-     * Only the probe is replayed - the eye-height interpolation stays skipped, as before.
-     */
     @Override
     public void tick() {
-        if (VRRenderState.getPhase().isVanilla()) {
+        if (VRRenderState.getPhase().isVanilla() || VisorState.get().isNotActive()) {
             super.tick();
             return;
         }
@@ -63,7 +66,6 @@ public class VRGameCamera extends Camera {
             this.attributeProbe().tick(this.level, this.position());
         }
     }
-
 
     @Override
     public boolean isDetached() {
@@ -73,48 +75,103 @@ public class VRGameCamera extends Camera {
         return VRRenderState.isSelfModelRenderCamera();
     }
 
+    @Override
+    public void extractRenderState(CameraRenderState cameraState, float cameraEntityPartialTicks) {
+        super.extractRenderState(cameraState, cameraEntityPartialTicks);
+        if (VRRenderState.getPhase().isVanilla() || VisorState.get().isNotActive()) {
+            return;
+        }
+        cameraState.projectionMatrix.set(visor$passProjection());
+        cameraState.depthFar = this.depthFar;
+    }
 
+    @Override
+    public Matrix4f getViewRotationProjectionMatrix(Matrix4f dest) {
+        if (VRRenderState.getPhase().isVanilla() || VisorState.get().isNotActive()) {
+            return super.getViewRotationProjectionMatrix(dest);
+        }
+        dest.set(visor$passProjection());
+        return dest.mul(this.getViewRotationMatrix(new Matrix4f()));
+    }
 
-    private void setupVR(Level level, Entity entity) {
+    private Matrix4fc visor$passProjection() {
+        return ((GameRendererExtension) MC.gameRenderer).visor$getPassProjection();
+    }
+
+    private void updateVR(DeltaTracker deltaTracker) {
+        LocalPlayer player = MC.player;
+        if (player == null || this.level == null) {
+            return;
+        }
+        if (this.entity == null) {
+            this.setEntity(player);
+        }
+        float partialTicks = this.getCameraEntityPartialTicks(deltaTracker);
+        setupVR(this.level, this.entity);
+
+        GameRendererExtension gameRenderer = (GameRendererExtension) MC.gameRenderer;
+        gameRenderer.visor$setupClipPlanes();
+        this.depthFar = gameRenderer.visor$getFarClipPlane();
+        this.fov = calculateVRFov(partialTicks);
+        this.hudFov = modifyFovBasedOnDeathOrFluid(partialTicks, HUD_FOV);
+
+        Matrix4f passProjection = new Matrix4f(visor$passProjection());
+        this.prepareCullFrustum(
+                this.getViewRotationMatrix(new Matrix4f()),
+                CullFrustumHelper.widenCullProjection(passProjection),
+                this.position()
+        );
+        float width = Math.max(1, MC.getWindow().getWidth());
+        float height = Math.max(1, MC.getWindow().getHeight());
+        this.setupPerspective(
+                gameRenderer.visor$getNearClipPlane(),
+                this.depthFar,
+                this.fov,
+                width,
+                height
+        );
+        this.initialized = true;
+    }
+
+    /**
+     * 1.21.11 answered {@code getFov} with the plain option value while VR showed the main menu
+     * and with the vanilla death/fluid-modified value otherwise; the sprint/flying fov modifier
+     * never applied because {@code tickFov} was skipped in VR.
+     */
+    private float calculateVRFov(float partialTicks) {
+        float fov = MC.options.fov().get().intValue();
+        if (VRRenderState.getSceneType().isMainMenu()) {
+            return fov;
+        }
+        return modifyFovBasedOnDeathOrFluid(partialTicks, fov);
+    }
+
+    private float modifyFovBasedOnDeathOrFluid(float partialTicks, float fov) {
+        if (this.entity instanceof LivingEntity cameraEntity && cameraEntity.isDeadOrDying()) {
+            float duration = Math.min(cameraEntity.deathTime + partialTicks, 20.0F);
+            fov /= (1.0F - 500.0F / (duration + 500.0F)) * 2.0F + 1.0F;
+        }
+        FogType state = this.getFluidInCamera();
+        if (state == FogType.LAVA || state == FogType.WATER) {
+            float effectScale = MC.options.fovEffectScale().get().floatValue();
+            fov *= Mth.lerp(effectScale, 1.0F, 0.85714287F);
+        }
+        return fov;
+    }
+
+    private void setupVR(net.minecraft.world.level.Level level, Entity entity) {
         this.initialized = true;
         this.level = level;
         this.entity = entity;
 
         VRRenderPass renderPass = VRRenderState.getRenderPass();
-        VRPose cameraElement = ClientContext.localPlayer
-                .getPoseData(PlayerPoseType.RENDER)
-                .getCameraPose(renderPass);
+        var renderPose = ClientContext.localPlayer.getPoseData(PlayerPoseType.RENDER);
+        VRPose cameraElement = renderPose.getCameraPose(renderPass);
 
-        // Position
-        // 1.21.11's Vec3 takes a Vector3fc, so the old downcast to Vector3f is gone
         this.setPosition(new Vec3(
-                RenderPoseHelper.getCameraPosition(
-                        renderPass,
-                        ClientContext.localPlayer.getPoseData(PlayerPoseType.RENDER)
-                )
+                RenderPoseHelper.getCameraPosition(renderPass, renderPose)
         ));
-
-        // Orientation
-        this.xRot = -cameraElement.getPitchDegrees();
-        this.yRot =  cameraElement.getYawDegrees();
-
-        // Look, Up, Left vectors
-        // (VRMathUtils.LEFT_VECTOR is already -X, matching Camera's 1.21.1
-        // LEFT basis — unlike the legacy +X constant older builds used)
-        var dir = cameraElement.getDirection();
-        var upVec = cameraElement.getCustomVector(VRMathUtils.UP_VECTOR);
-        var leftVec = cameraElement.getCustomVector(VRMathUtils.LEFT_VECTOR);
-
-        writeBasis(this.forwardVector(), dir.x(), dir.y(), dir.z());
-        writeBasis(this.upVector(), upVec.x, upVec.y, upVec.z);
-        writeBasis(this.leftVector(), leftVec.x, leftVec.y, leftVec.z);
-
-        // 1.21.1 builds the world view matrix directly from rotation()
-        // (and changed the camera basis/Euler convention), so copy the
-        // exact tracked orientation instead of rebuilding yaw+pitch —
-        // this also preserves headset roll.
-        cameraElement.getRotation()
-                .getNormalizedRotation(this.rotation());
+        applyPose(cameraElement);
     }
 
     private void setupSpectatedVR(Entity entity) {
@@ -123,31 +180,36 @@ public class VRGameCamera extends Camera {
             return;
         }
         VRPose hmd = vrPlayer.getPoseData(PlayerPoseType.RENDER).getHmd();
-
         this.setPosition(new Vec3(hmd.getPosition()));
+        applyPose(hmd);
+    }
 
-        // Orientation
-        this.xRot = -hmd.getPitchDegrees();
-        this.yRot =  hmd.getYawDegrees();
+    private void applyPose(VRPose pose) {
+        this.xRot = -pose.getPitchDegrees();
+        this.yRot = pose.getYawDegrees();
 
-        var dir = hmd.getDirection();
-        var upVec = hmd.getCustomVector(VRMathUtils.UP_VECTOR);
-        var leftVec = hmd.getCustomVector(VRMathUtils.LEFT_VECTOR);
+        var dir = pose.getDirection();
+        var upVec = pose.getCustomVector(VRMathUtils.UP_VECTOR);
+        var leftVec = pose.getCustomVector(VRMathUtils.LEFT_VECTOR);
 
         writeBasis(this.forwardVector(), dir.x(), dir.y(), dir.z());
         writeBasis(this.upVector(), upVec.x, upVec.y, upVec.z);
         writeBasis(this.leftVector(), leftVec.x, leftVec.y, leftVec.z);
 
-        hmd.getRotation()
-                .getNormalizedRotation(this.rotation());
+        pose.getRotation().getNormalizedRotation(this.rotation());
+        // the cached view matrices are keyed on a dirty mask that only setRotation() touches
+        this.visor$markRotationDirty();
     }
 
-    // PORT-1.21.11: getLookVector()/getUpVector()/getLeftVector() became
-    // forwardVector()/upVector()/leftVector() and now hand out a read-only Vector3fc while the
-    // backing fields stayed private. The getters still return the live Vector3f instances, so
-    // writing through the cast is the same in-place basis update the 1.21.4 code did.
     private static void writeBasis(Vector3fc basis, float x, float y, float z) {
         ((Vector3f) basis).set(x, y, z);
     }
 
+    /**
+     * 26.1 caches the view-rotation matrices and only rebuilds them when {@code setRotation}
+     * flips a dirty bit; writing the quaternion directly has to flip it too.
+     */
+    private void visor$markRotationDirty() {
+        this.matrixPropertiesDirty |= 3;
+    }
 }

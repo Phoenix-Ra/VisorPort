@@ -42,6 +42,10 @@ import net.minecraft.world.entity.player.Player;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
+import org.vmstudio.visor.core.client.tasks.types.movement.TaskTeleport;
+import com.mojang.blaze3d.platform.Window;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
@@ -82,9 +86,6 @@ public abstract class MinecraftMixin implements MinecraftExtension {
 
     @Shadow
     public LocalPlayer player;
-
-    @Shadow
-    public boolean noRender;
 
     @Shadow
     public abstract Entity getCameraEntity();
@@ -178,6 +179,19 @@ public abstract class MinecraftMixin implements MinecraftExtension {
      */
     @Inject(at = @At("HEAD"), method = "runTick(Z)V")
     public void visor$runVR(boolean tick, CallbackInfo callback) {
+        visor$startGameLoop();
+        visor$frameStartedByRunTick = true;
+    }
+
+    /**
+     * Set by {@link #visor$runVR} and consumed by the next {@code renderFrame}: whether the VR
+     * frame for that render was already started at the top of the game loop.
+     */
+    @Unique
+    private boolean visor$frameStartedByRunTick;
+
+    @Unique
+    private void visor$startGameLoop() {
         VisorState.updateState();
         if(ClientContext.visor != null) {
             ClientContext.visor
@@ -185,8 +199,29 @@ public abstract class MinecraftMixin implements MinecraftExtension {
         }
     }
 
-    @Inject(method = "runTick", at = @At(value = "CONSTANT", args = "stringValue=render"))
+    /**
+     * PORT-26.1: runTick() no longer renders itself; the whole frame (update / pick / extract /
+     * render / present) moved into renderFrame(boolean). The "render" profiler section that
+     * used to mark the start of rendering is gone with it, so this hooks the head of renderFrame.
+     * <p>
+     * PORT-26.1: renderFrame(false) is also called on its own, without runTick, by doWorldLoad's
+     * "waitForServer" loop, by the disconnect wait loop and by setScreenAndShow. On 1.21.11 all
+     * three went through runTick(false), so {@link #visor$runVR} started an OpenXR frame for
+     * every frame drawn. Without it, nothing begins a frame for the loading screen: the runtime
+     * gets no frames for the whole world load, xrWaitFrame stops pacing the loop, XrRenderer
+     * skips the scene because no frame is in flight, and the model-view push made by
+     * onGameRenderStart was never popped - "max stack size of 16 reached" after sixteen loading
+     * frames. So the game-loop start runs here whenever runTick did not already run it for this
+     * frame. It stays on runTick for the normal loop so input and poses are still polled before
+     * the ticks, as before.
+     */
+    @Inject(method = "renderFrame", at = @At("HEAD"))
     public void visor$preRenderVR(boolean tick, CallbackInfo callback) {
+        if (!visor$frameStartedByRunTick) {
+            visor$startGameLoop();
+        }
+        visor$frameStartedByRunTick = false;
+
         if(ClientContext.visor != null) {
             ClientContext.visor
                     .preRenderVR(
@@ -199,42 +234,50 @@ public abstract class MinecraftMixin implements MinecraftExtension {
     }
 
     /**
-     * Modifies vanilla GameRenderer.render() call
-     * to update renderer state and start VRGui phase instead
-     *
-     * @param renderLevel s
-     * @return s
+     * PORT-26.1: the frame is three GameRenderer calls now - update(), extract(), render() - each
+     * taking the same advanceGameTime flag that render(DeltaTracker, boolean) took alone. The VR
+     * GUI phase starts right before the first of them and turns the flag off for all three, so
+     * the vanilla frame only produces the GUI (into Visor's GUI target); the eye/mirror passes
+     * render the level themselves from visor$renderVR.
      */
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;render(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "runTick")
-    public boolean visor$startVRGuiPhase(boolean renderLevel) {
+    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame")
+    private void visor$startVRGuiPhase(boolean advanceGameTime, CallbackInfo ci) {
         if (VisorState.get().isActive()) {
-
-            ClientContext.renderer.onGameRenderStart(renderLevel);
-
-            if (VRRenderState.getPhase().isVRGui()) {
-                return false; //disable level rendering
-            } else {
-                return renderLevel; //fallback on exception
-            }
+            ClientContext.renderer.onGameRenderStart(advanceGameTime);
         }
-        return renderLevel;
+    }
+
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame", index = 1)
+    private boolean visor$guiPhaseUpdate(boolean advanceGameTime) {
+        return visor$vanillaFrameRendersLevel(advanceGameTime);
+    }
+
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;extract(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame", index = 1)
+    private boolean visor$guiPhaseExtract(boolean advanceGameTime) {
+        return visor$vanillaFrameRendersLevel(advanceGameTime);
+    }
+
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;render(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame", index = 1)
+    private boolean visor$guiPhaseRender(boolean advanceGameTime) {
+        return visor$vanillaFrameRendersLevel(advanceGameTime);
+    }
+
+    @Unique
+    private boolean visor$vanillaFrameRendersLevel(boolean advanceGameTime) {
+        if (VisorState.get().isActive() && VRRenderState.getPhase().isVRGui()) {
+            return false;
+        }
+        return advanceGameTime;
     }
 
     /**
-     * Calls VR rendering after mc rendered
-     * <p>
-     * 1.21.1: anchored at the "blit" profiler constant — right after
-     * gameRenderer.render() + fpsPie drew into the main target, before it
-     * is unbound and blitted to screen. nanoTime is the frame-start
-     * Util.getNanos() local, the only long in scope here.
-     *
-     * @param renderLevel s
-     * @param ci          s
-     * @param nanoTime    s
+     * PORT-26.1: the VR passes run after the vanilla frame finished rendering the GUI and before
+     * the result is presented; "blit" became the "present" section of renderFrame. The first
+     * long local is still the frame start timestamp. Minecraft.noRender no longer exists.
      */
-    @Inject(at = @At(value = "CONSTANT", args = "stringValue=blit"), method = "runTick")
+    @Inject(at = @At(value = "CONSTANT", args = "stringValue=present"), method = "renderFrame")
     public void visor$renderVR(boolean renderLevel, CallbackInfo ci, @Local(ordinal = 0) long nanoTime) {
-        if (ClientContext.visor != null && !this.noRender) {
+        if (ClientContext.visor != null) {
             ClientContext.visor
                     .renderVR(
                             new RenderContext(
@@ -264,8 +307,12 @@ public abstract class MinecraftMixin implements MinecraftExtension {
      * crash on the first frame after a target reinit.
      * <p>
      * One call site in {@code runTick}, so no {@code ordinal}.
+     * <p>
+     * PORT-26.1: the blit lives in {@code renderFrame}'s "present" section now and reads
+     * {@code this.mainRenderTarget} at blit time again; the redirect stays for the
+     * destroyed-target guard below.
      */
-    @Redirect(method = "runTick", at = @At(value = "INVOKE",
+    @Redirect(method = "renderFrame", at = @At(value = "INVOKE",
             target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V"))
     private void visor$blitLiveTarget(RenderTarget capturedAtFrameStart) {
         RenderTarget live = this.mainRenderTarget != null
@@ -281,12 +328,10 @@ public abstract class MinecraftMixin implements MinecraftExtension {
 
 
     /**
-     * Ensures the render phase
-     * and main render target are correct on resize
-     *
-     * @param ci
+     * PORT-26.1: resizeDisplay() became resizeGui(); the render target resize it also used to do
+     * moved into GameRenderer.render() (see GameRendererMixin#visor$noVanillaResizeInVR).
      */
-    @Inject(at = @At("HEAD"), method = "resizeDisplay")
+    @Inject(at = @At("HEAD"), method = "resizeGui")
     void visor$ensurePhaseOnResize(CallbackInfo ci) {
         if (VisorState.get().isInitialized()) {
             if (VisorState.get().isActive()) {
@@ -600,7 +645,7 @@ public abstract class MinecraftMixin implements MinecraftExtension {
     }
 
 
-    @Inject(method = "setCameraEntity", at = @At("HEAD"))
+    @Inject(method = "setCameraEntity", at = @At("HEAD"), cancellable = true)
     private void visor$rideEntity(Entity entity, CallbackInfo ci) {
         var state = VisorState.get();
         if (!state.isInitialized() || entity == null) {
@@ -628,23 +673,41 @@ public abstract class MinecraftMixin implements MinecraftExtension {
     }
 
     /**
-     * Disables vanilla hit result calculation on tick.
-     *
-     * @param instance s
-     * @param f        s
+     * PORT-26.1: GameRenderer.pick(F) is now the private Minecraft.pick(F). Vanilla calls it once
+     * per tick (with 1.0) and once per frame from renderFrame. In VR the tick-time raycast is
+     * skipped as before, and the frame-time one is replaced by the hand-aware pick that used to
+     * wrap GameRenderer.pick.
      */
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;pick(F)V"), method = "tick")
-    public void visor$noVanillaHitResult(GameRenderer instance, float f) {
+    @WrapOperation(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;pick(F)V"), method = "tick")
+    private void visor$noVanillaHitResult(Minecraft instance, float partialTick, Operation<Void> original) {
         if (VisorState.get().isNotActive()) {
-            instance.pick(f);
+            original.call(instance, partialTick);
         }
     }
 
+    @WrapMethod(method = "pick(F)V")
+    private void visor$vrPick(float partialTick, Operation<Void> original) {
+        if (VisorState.get().isNotActive()) {
+            original.call(partialTick);
+            return;
+        }
+        ((GameRendererExtension) this.gameRenderer).visor$pick(
+                partialTick,
+                tick -> original.call(tick)
+        );
+        if (this.screen == null) {
+            TaskTeleport.updateTeleportDestination(this.player);
+        }
+    }
 
-     /* ************************ *\
-   //--------PUBLIC METHODS--------\\
-     \* ************************ */
-
+    /**
+     * PORT-26.1: the pause-on-focus-loss check moved from GameRenderer.render() into
+     * Minecraft.pauseIfInactive() and reads Window.isFocused() instead of isWindowActive().
+     */
+    @Redirect(at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/Window;isFocused()Z"), method = "pauseIfInactive")
+    private boolean visor$noPauseGameIfWindowNotFocused(Window instance) {
+        return VisorState.get().isActive() || instance.isFocused();
+    }
 
     @Override
     public float visor$getPartialTicks() {

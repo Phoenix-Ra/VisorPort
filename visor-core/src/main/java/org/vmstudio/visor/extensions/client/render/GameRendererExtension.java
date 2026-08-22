@@ -48,11 +48,7 @@ public interface GameRendererExtension {
     float visor$getFarClipPlane();
 
 
-    boolean visor$isInWater();
-
     boolean visor$isOnFire();
-
-    boolean visor$isInPortal();
 
     boolean visor$isInBlock();
 
@@ -81,4 +77,31 @@ public interface GameRendererExtension {
     VRCameraEntityCache visor$getCameraEntityCache();
 
     Matrix4f visor$getThirdPersonProjection();
+
+    /**
+     * PORT-26.1: the projection of the render pass currently being drawn (eye, third person,
+     * mirror, gui). 1.21.11 served it through GameRenderer.getProjectionMatrix(fov); that method
+     * is gone and the projection now lives on Camera, which asks for it here.
+     */
+    Matrix4f visor$getPassProjection();
+
+    /**
+     * PORT-26.1: the vanilla raycast moved from GameRenderer.pick(F) to the private
+     * Minecraft.pick(F). MinecraftMixin wraps it and hands the original here.
+     */
+    void visor$pick(float partialTick, VanillaPick original);
+
+    @FunctionalInterface
+    interface VanillaPick {
+        void pick(float partialTick);
+    }
+
+    /**
+     * PORT-26.1: brackets one VR world pass (update + extract + render). Moves the camera entity
+     * onto the VR camera and refreshes the per-pass overlay status; {@link #visor$endWorldPass()}
+     * puts the entity back.
+     */
+    void visor$beginWorldPass(float partialTicks);
+
+    void visor$endWorldPass();
 }

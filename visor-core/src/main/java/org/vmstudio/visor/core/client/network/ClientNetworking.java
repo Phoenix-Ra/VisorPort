@@ -268,7 +268,7 @@ public class ClientNetworking {
 
     protected static void receivedHandShake(){
         if (!Minecraft.getInstance().isLocalServer()) {
-            MC.gui.getChat().addMessage(
+            MC.gui.getChat().addClientSystemMessage(
                     Component.translatable(
                             "visor.messages.server_supports"
                     )
@@ -276,7 +276,7 @@ public class ClientNetworking {
         }
         if (VisorState.get().isActive()
                 && ClientContext.localPlayer.getFullHeight() == -1.0F) {
-            MC.gui.getChat().addMessage(
+            MC.gui.getChat().addClientSystemMessage(
                     Component.translatable("visor.messages.calibrate_height")
             );
         }

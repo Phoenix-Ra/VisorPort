@@ -76,6 +76,12 @@ public abstract class VRRendererBase implements VRRenderer {
     protected boolean reinitTargets = true;
     protected boolean resizeTargets = false;
 
+    /**
+     * True while the model-view entry pushed by {@link #onGameRenderStart} is still on the
+     * stack, i.e. until {@link #onGameRenderEnd} pops it.
+     */
+    private boolean guiPhaseModelViewPushed = false;
+
 
 
     public VRRendererBase() {
@@ -120,12 +126,33 @@ public abstract class VRRendererBase implements VRRenderer {
         // render pass. All that is left of this block is the clear.
         RenderShaderHelper.clearColorAndDepth(MC.mainRenderTarget, 0, 1.0);
 
-        // push pose to pop it in scene
+        // push pose to pop it in onGameRenderEnd, once the vanilla frame has drawn the GUI
         RenderSystem.getModelViewStack().pushMatrix();
+        guiPhaseModelViewPushed = true;
 
         ((GameRendererExtension)MC.gameRenderer).visor$setVRGuiVisible(
                 renderLevel && MC.getEntityRenderDispatcher().camera != null
         );
+    }
+
+    /**
+     * Closes what {@link #onGameRenderStart} opened: pops the model-view entry it pushed around
+     * the vanilla GUI render, restoring the stack for the VR passes. Called once per frame at the
+     * present stage, before the VR scene renders, and a no-op when nothing was pushed.
+     * <p>
+     * The pop used to live at the top of {@code VisorScene.render}, but the scene is not reached
+     * on every frame that pushed: {@code XrRenderer.renderFrame} skips it when no OpenXR frame is
+     * in flight or when the runtime asked not to render (headset idle, dashboard open). Every such
+     * frame leaked one entry, and JOML's {@code Matrix4fStack} throws "max stack size of 16
+     * reached" on the seventeenth. Pairing push and pop through this flag instead makes the
+     * balance independent of whether the scene ran.
+     */
+    public void onGameRenderEnd() {
+        if (!guiPhaseModelViewPushed) {
+            return;
+        }
+        guiPhaseModelViewPushed = false;
+        RenderSystem.getModelViewStack().popMatrix();
     }
 
     public void updateState() throws Throwable {

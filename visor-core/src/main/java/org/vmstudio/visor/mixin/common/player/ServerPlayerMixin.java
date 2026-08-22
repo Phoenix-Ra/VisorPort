@@ -353,14 +353,17 @@ public abstract class ServerPlayerMixin
                 || stack.getUseAnimation() == ItemUseAnimation.BLOCK);
     }
 
-    @Inject(method = "attack", at = @At("HEAD"), cancellable = true)
-    private void visor$noAttackWhileBlocking(Entity target, CallbackInfo ci) {
+    /**
+     * PORT-26.1: ServerPlayer no longer overrides attack() (the spectator branch that made it
+     * override moved elsewhere), so the injector now sits on Player.attack in Common_PlayerMixin
+     * and calls back here.
+     */
+    @Override
+    protected boolean visor$blocksAttackWhileBlocking() {
         if (VRServerSettings.isAttacksWhileBlocking()) {
-            return;
+            return false;
         }
-        if (visor$getVrPlayer() != null && visor$getPlayer().isBlocking()) {
-            ci.cancel();
-        }
+        return visor$getVrPlayer() != null && visor$getPlayer().isBlocking();
     }
 
     @Override

@@ -329,6 +329,13 @@ public class VisorClientImpl implements VisorClient {
     }
     public void renderVR(RenderContext context){
         try {
+            // Pops the model-view entry onGameRenderStart pushed for the VR GUI phase. Runs before
+            // the active check on purpose: VR may have been torn down by an error between the two
+            // points of the same frame, and the entry must go either way.
+            if (ClientContext.renderer != null) {
+                ClientContext.renderer.onGameRenderEnd();
+            }
+
             if(VisorState.get().isNotActive()){
                 //NON-VR ONLY
                 return;

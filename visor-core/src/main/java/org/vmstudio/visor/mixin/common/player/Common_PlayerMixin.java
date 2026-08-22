@@ -83,6 +83,23 @@ public abstract class Common_PlayerMixin extends Common_LivingEntityMixin
 
     }
 
+    /**
+     * PORT-26.1: attack() is only declared on Player now (1.21.11's ServerPlayer override is
+     * gone), so the "no attacks while blocking" rule is injected here and decided by the
+     * server-side subclass mixin.
+     */
+    @Inject(method = "attack", at = @At("HEAD"), cancellable = true)
+    private void visor$noAttackWhileBlocking(Entity target, CallbackInfo ci) {
+        if (visor$blocksAttackWhileBlocking()) {
+            ci.cancel();
+        }
+    }
+
+    @Unique
+    protected boolean visor$blocksAttackWhileBlocking() {
+        return false;
+    }
+
     // PORT-1.21.11: the roomscale shield hooks moved to Common_LivingEntityMixin -
     // Player#hurtCurrentlyUsedShield is gone and the blocking item's durability loss now happens
     // in LivingEntity#applyItemBlocking, which Player does not override.

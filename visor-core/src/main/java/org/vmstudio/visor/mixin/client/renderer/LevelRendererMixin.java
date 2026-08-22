@@ -43,10 +43,8 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import org.vmstudio.visor.core.client.render.helpers.CullFrustumHelper;
 
 import org.vmstudio.visor.core.client.ClientContext;
 
@@ -106,12 +104,8 @@ public abstract class LevelRendererMixin implements ResourceManagerReloadListene
   //--------RENDERING--------\\
     \* ****************** */
 
-    // PORT-1.21.11: prepareCullFrustum is (frustumMatrix, projectionMatrix, cameraPos) now - the
-    // Vec3 moved from the front of the list to the back, so the projection sits at index 2.
-    @ModifyVariable(method = "prepareCullFrustum", at = @At("HEAD"), index = 2, argsOnly = true)
-    private Matrix4f visor$widenCullFrustum(Matrix4f projection) {
-        return CullFrustumHelper.widenCullProjection(projection);
-    }
+    // PORT-26.1: prepareCullFrustum moved from LevelRenderer into Camera.update(); the per-pass
+    // widening of the culling projection now happens in VRGameCamera.updateVR.
 
 
     // PORT-1.21.11: collectVisibleEntities -> extractVisibleEntities (the extract/submit split).

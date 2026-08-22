@@ -123,7 +123,7 @@ public class ClientUtils {
         Screenshot.grab(minecraft.gameDirectory, fb, (text) ->
         {
             minecraft.execute(() -> {
-                minecraft.gui.getChat().addMessage(text);
+                minecraft.gui.getChat().addClientSystemMessage(text);
             });
         });
     }
@@ -147,7 +147,7 @@ public class ClientUtils {
                 / VRPlayer.DEFAULT_FULL_HEIGHT
         ));
         Minecraft.getInstance().gui.getChat()
-                .addMessage(
+                .addClientSystemMessage(
                         Component.literal(
                                 LangHelper.getText(
                                         "visor.messages.height_set",
@@ -161,7 +161,7 @@ public class ClientUtils {
     public static void calibrateHeight() {
         if (!tryCalibrateHeight()) {
             Minecraft.getInstance().gui.getChat()
-                    .addMessage(
+                    .addClientSystemMessage(
                             Component.literal(
                                     LangHelper.getText(
                                             "visor.messages.height_calibration_failed"

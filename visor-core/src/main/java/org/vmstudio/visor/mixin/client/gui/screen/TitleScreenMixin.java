@@ -45,7 +45,7 @@ public abstract class TitleScreenMixin extends Screen {
         }
     }
 
-    @Inject(at = @At("TAIL"), method = "render")
+    @Inject(at = @At("TAIL"), method = "extractRenderState")
     public void visor$renderVrInitFailedWarning(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         if (!VisorState.isVrInitFailed()) {
             return;
@@ -80,7 +80,7 @@ public abstract class TitleScreenMixin extends Screen {
         }
     }
 
-    @Inject(at = @At("TAIL"), method = "render")
+    @Inject(at = @At("TAIL"), method = "extractRenderState")
     public void visor$renderToolTip(GuiGraphicsExtractor guiGraphics, int i, int j, float f, CallbackInfo ci) {
         if (VisorState.get() == VRStateMode.INITIALIZED
                 && VRClientSettings.getVrPlayMode().canPlayVR()) {

@@ -17,7 +17,7 @@ public abstract class ScreenMixin extends AbstractContainerEventHandler implemen
     @Shadow public int width;
     @Shadow public int height;
 
-    @Inject(method = {"renderBackground", "renderPanorama", "renderTransparentBackground"}, at = @At("HEAD"), cancellable = true)
+    @Inject(method = {"extractBackground", "extractPanorama", "extractTransparentBackground"}, at = @At("HEAD"), cancellable = true)
     public void visor$noBackground(CallbackInfo ci) {
         if (VisorState.get().isActive()) {
             ci.cancel();
@@ -25,7 +25,7 @@ public abstract class ScreenMixin extends AbstractContainerEventHandler implemen
 
     }
 
-    @Inject(at = @At("HEAD"), method = "renderBlurredBackground", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractBlurredBackground", cancellable = true)
     private void visor$noBlurredBackground(CallbackInfo ci) {
         if (VisorState.get().isActive()) {
             ci.cancel();

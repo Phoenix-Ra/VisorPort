@@ -55,7 +55,13 @@ public class EntityRendererMixin {
     // copies the resulting Matrix4f into the submit node right there). One camera state is shared
     // by every submit of the frame, so the per-name-tag override has to be a swap around this one
     // call; nothing reads the field in between, and it is restored before returning.
-    @WrapOperation(method = "submitNameTag",
+    /**
+     * PORT-26.1: EntityRenderer.submitNameTag(state, pose, collector, camera) became the final,
+     * generic submitNameDisplay(state, pose, collector, camera, offset) that both the score line
+     * and the name line go through - AvatarRenderer's override delegates to it too, so the hooks
+     * that PlayerRenderMixins had to duplicate in 1.21.11 are covered from here again.
+     */
+    @WrapOperation(method = "submitNameDisplay(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;I)V",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitNameTag(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZIDLnet/minecraft/client/renderer/state/level/CameraRenderState;)V"))
     private void visor$vrNameTagCameraOrient(SubmitNodeCollector collector, PoseStack poseStack,
@@ -88,10 +94,11 @@ public class EntityRendererMixin {
         }
     }
 
-    @Inject(method = "submitNameTag", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "submitNameDisplay(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;I)V",
+            at = @At("HEAD"), cancellable = true)
     private void visor$hideSpectatedVRNameTag(EntityRenderState renderState, PoseStack poseStack,
                                               SubmitNodeCollector collector,
-                                              CameraRenderState cameraState, CallbackInfo ci) {
+                                              CameraRenderState cameraState, int offset, CallbackInfo ci) {
         VRClientPlayer vrPlayer = ((EntityRenderStateExtension) renderState).visor$getVRPlayer();
         if (vrPlayer != null
                 && VRRenderState.isSpectatedVRView(vrPlayer.getMcPlayer())) {

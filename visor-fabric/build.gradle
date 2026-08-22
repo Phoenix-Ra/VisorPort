@@ -11,6 +11,12 @@ loom {
     accessWidenerPath = project(":visor-api").file("src/main/resources/visor.accesswidener")
     // PORT-26.1: replaces `remapJar { injectAccessWidener = true }`
     injectAccessWidener(tasks.named('shadowJar'))
+    // PORT-26.1: remapJar also nested the `include` jars (lwjgl-openxr + its natives, lwjgl-vulkan,
+    // the fabric-api modules) into the jar it produced. loom-no-remap only wires that nesting onto
+    // the plain `jar` task - now the unshipped -dev artifact - so shadowJar went out with no
+    // META-INF/jars and the game failed with NoClassDefFoundError: org/lwjgl/openxr/XrEventDataBuffer.
+    // Nest the same configuration into shadowJar explicitly (public loom DSL; runs as a doLast).
+    nestJars(tasks.named('shadowJar'), configurations.named('include'))
 }
 
 configurations {

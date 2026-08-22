@@ -24,7 +24,7 @@ public class BossHealthOverlayMixin {
     @Shadow
     private Minecraft minecraft;
 
-    @Inject(at = @At("HEAD"), method = "render", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractRenderState", cancellable = true)
     public void visor$noVanillaGuiBossHealth(CallbackInfo ci) {
         if(VisorState.get().isNotActive() || (minecraft.screen == null
                 && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD))) return;

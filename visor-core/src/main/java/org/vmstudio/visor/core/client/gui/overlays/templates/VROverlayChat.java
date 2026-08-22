@@ -13,6 +13,7 @@ import org.vmstudio.visor.api.client.gui.overlays.framework.template.VROverlayTe
 import org.vmstudio.visor.api.common.addon.VisorAddon;
 import org.vmstudio.visor.core.client.ClientContext;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.world.entity.player.ChatVisiblity;
 import org.jetbrains.annotations.NotNull;
 
@@ -41,11 +42,16 @@ public class VROverlayChat extends VROverlayTemplateScreen {
         // 1.21.11: ChatComponent.render takes the Font explicitly and a trailing
         // "change cursor on insertions" flag. Vanilla's HUD path passes false for it
         // (only ChatScreen's own draw turns it on), which is the behaviour this overlay had.
-        minecraft.gui.getChat().render(
+        // PORT-26.1: render(...) became extractRenderState(...) and the "focused" flag turned
+        // into ChatComponent.DisplayMode (FOREGROUND while the chat screen is open, BACKGROUND
+        // for the HUD).
+        minecraft.gui.getChat().extractRenderState(
                 guiGraphics,
                 minecraft.font,
                 minecraft.gui.getGuiTicks(),0, 0,
-                minecraft.screen instanceof ChatScreen,
+                minecraft.screen instanceof ChatScreen
+                        ? ChatComponent.DisplayMode.FOREGROUND
+                        : ChatComponent.DisplayMode.BACKGROUND,
                 false
         );
     }

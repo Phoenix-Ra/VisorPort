@@ -23,7 +23,7 @@ import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.ClientHooks;
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.resources.model.MaterialSet;
+import net.minecraft.client.resources.model.sprite.SpriteGetter;
 import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -261,8 +261,11 @@ public class NeoForgeModLoader implements ModLoader {
                 player, mat, visor$materials(), visor$discardBuffers());
     }
 
-    /** AtlasManager is the client's MaterialSet implementation. */
-    private static MaterialSet visor$materials() {
+    /**
+     * PORT-26.1: MaterialSet became SpriteGetter (net.minecraft.client.resources.model.sprite);
+     * AtlasManager is still the client implementation and the hooks still only post the event.
+     */
+    private static SpriteGetter visor$materials() {
         return Minecraft.getInstance().getAtlasManager();
     }
 

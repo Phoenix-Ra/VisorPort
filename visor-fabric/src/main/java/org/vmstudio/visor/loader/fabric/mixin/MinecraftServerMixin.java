@@ -23,14 +23,14 @@ import java.util.function.BooleanSupplier;
 @Mixin(MinecraftServer.class)
 public abstract class MinecraftServerMixin {
 
+    /**
+     * PORT-26.1: the constructor gained an Optional<GameRules> after WorldStem and a trailing
+     * boolean (propagatesCrashes). An @Inject into <init> must mirror the descriptor exactly or
+     * the injector fails at startup, so the handler only names CallbackInfo and stays valid
+     * across signature changes.
+     */
     @Inject(at = @At("TAIL"), method = "<init>")
-    public void visor$registerAddons(Thread thread, LevelStorageSource.LevelStorageAccess levelStorageAccess, PackRepository packRepository, WorldStem worldStem, Proxy proxy, DataFixer dataFixer, Services services,
-                                     // PORT-1.21.11: the last constructor parameter went
-                                     // ChunkProgressListenerFactory -> LevelLoadListener.
-                                     // An @Inject into <init> must mirror the constructor
-                                     // descriptor exactly or the injector fails at runtime.
-                                     LevelLoadListener levelLoadListener,
-                                     CallbackInfo callbackInfo){
+    public void visor$registerAddons(CallbackInfo callbackInfo){
         if(ModLoader.get().isDedicatedServer()){
             AddonManagerImpl.register();
         }

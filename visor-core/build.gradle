@@ -26,3 +26,18 @@ dependencies {
 
 
 }
+
+// PORT-26.1: the Architectury transformer reads its classpath from a string property built from
+// `architecturyTransformerClasspath` (extends compileClasspath but carries no attributes, so project
+// dependencies resolve to their *jars*: visor-api and visor-core:stubs). TransformingTask never
+// declares those files as inputs, so nothing schedules `:visor-api:jar` / `:visor-core:stubs:jar`;
+// with `compileJava dependsOn clean` the jars are normally gone when transformProduction* runs, the
+// transformer silently drops the missing paths and then dies computing frames with
+// `TypeNotPresentException: Type net/coderbot/iris/pipeline/PipelineManager not present`.
+// On 1.21.11 the `namedElements` project configurations masked this by putting the same jars on
+// compileClasspath. Declaring the classpath the transformer really reads as a task input schedules
+// the jars and re-runs the transform whenever any of them change.
+tasks.withType(dev.architectury.plugin.TransformingTask).configureEach {
+    inputs.files(configurations.named('architecturyTransformerClasspath'))
+            .withPropertyName('architecturyTransformerClasspath')
+}

@@ -19,7 +19,6 @@ import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.state.gui.BlitRenderState;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.joml.Matrix3x2f;
-import org.vmstudio.visor.mixin.client.accessors.GameRendererAccessor;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
@@ -412,7 +411,7 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
         // renderer owns the only GuiRenderState there is.
         // v runs 1 -> 0 top to bottom: a RenderTarget's colour texture is bottom-up, GUI space
         // is top-down. Nothing is scissored here, hence the null scissor rectangle.
-        ((GameRendererAccessor) MC.gameRenderer).visor$getGuiRenderState().addGuiElement(
+        MC.gameRenderer.getGameRenderState().guiRenderState.addGuiElement(
                 new BlitRenderState(
                         RenderPipelines.GUI_TEXTURED,
                         TextureSetup.singleTexture(preview,

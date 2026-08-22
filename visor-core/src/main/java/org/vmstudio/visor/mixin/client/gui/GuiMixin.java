@@ -37,7 +37,7 @@ public abstract class GuiMixin implements GuiExtension {
   //--------DISABLE VANILLA OVERLAYS--------\\
     \* ********************************** */
     // 1.21.4: renderConfusionOverlay moved here from GameRenderer
-    @Inject(at = @At("HEAD"), method = "renderConfusionOverlay", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractConfusionOverlay", cancellable = true)
     private void visor$noConfusionOverlayInGUI(GuiGraphicsExtractor guiGraphics, float f, CallbackInfo ci) {
         if (VRRenderState.getPhase().isVRGui()) {
             ci.cancel();
@@ -45,7 +45,7 @@ public abstract class GuiMixin implements GuiExtension {
     }
 
     // 1.21.1: renderHotbar split into renderHotbarAndDecorations/renderItemHotbar
-    @Inject(at = @At("HEAD"), method = "renderItemHotbar", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractItemHotbar", cancellable = true)
     public void visor$noVanillaHotbar(CallbackInfo ci) {
         if(VisorState.get().isNotActive()
                 || (minecraft.screen == null
@@ -53,13 +53,13 @@ public abstract class GuiMixin implements GuiExtension {
                 && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD))) return;
         ci.cancel();
     }
-    @Inject(at = @At("HEAD"), method = "renderPlayerHealth", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractPlayerHealth", cancellable = true)
     public void visor$noVanillaPlayerHealth(CallbackInfo ci) {
         if(VisorState.get().isNotActive() || (minecraft.screen == null
                 && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD))) return;
         ci.cancel();
     }
-    @Inject(at = @At("HEAD"), method = "renderVehicleHealth", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractVehicleHealth", cancellable = true)
     public void visor$noVanillaVehicleHealth(CallbackInfo ci) {
         if(VisorState.get().isNotActive() || (minecraft.screen == null
                 && ClientContext.visor.isFeatureDisabled(ClientFeature.GUI_DISABLE_HUD))) return;
@@ -71,7 +71,7 @@ public abstract class GuiMixin implements GuiExtension {
     // Skipping both passes is what cancelling the two old methods did.
     @Redirect(at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;extractBackground(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V"),
-            method = "renderHotbarAndDecorations")
+            method = "extractHotbarAndDecorations")
     public void visor$noVanillaContextualBarBackground(ContextualBarRenderer instance,
                                                        GuiGraphicsExtractor guiGraphics,
                                                        DeltaTracker deltaTracker) {
@@ -80,24 +80,24 @@ public abstract class GuiMixin implements GuiExtension {
         }
     }
     @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V"),
-            method = "renderHotbarAndDecorations")
+            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/DeltaTracker;)V"),
+            method = "extractHotbarAndDecorations")
     public void visor$noVanillaContextualBar(ContextualBarRenderer instance,
                                              GuiGraphicsExtractor guiGraphics,
                                              DeltaTracker deltaTracker) {
         if(visor$keepsVanillaHud()) {
-            instance.render(guiGraphics, deltaTracker);
+            instance.extractRenderState(guiGraphics, deltaTracker);
         }
     }
     // 1.21.1: the level number is drawn by its own layer now
     // 1.21.11: that layer is a static helper on ContextualBarRenderer, called straight from
     // renderHotbarAndDecorations, so it is skipped at the call site instead of cancelled
     @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;renderExperienceLevel(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;I)V"),
-            method = "renderHotbarAndDecorations")
+            target = "Lnet/minecraft/client/gui/contextualbar/ContextualBarRenderer;extractExperienceLevel(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;I)V"),
+            method = "extractHotbarAndDecorations")
     public void visor$noVanillaExperienceLevel(GuiGraphicsExtractor guiGraphics, Font font, int level) {
         if(visor$keepsVanillaHud()) {
-            ContextualBarRenderer.renderExperienceLevel(guiGraphics, font, level);
+            ContextualBarRenderer.extractExperienceLevel(guiGraphics, font, level);
         }
     }
     // The guard the cancelled renderJumpMeter/renderExperienceBar/renderExperienceLevel
@@ -113,70 +113,75 @@ public abstract class GuiMixin implements GuiExtension {
     // so it is cancelled in BossHealthOverlayMixin instead of redirected here
     // 1.21.11: ChatComponent.render gained an explicit Font and a trailing
     // "change cursor on insertions" flag
+    /**
+     * PORT-26.1: ChatComponent.render(graphics, font, ticks, mouseX, mouseY, focused, cursor)
+     * became extractRenderState(graphics, font, ticks, mouseX, mouseY, DisplayMode, cursor);
+     * the HUD path passes DisplayMode.BACKGROUND where it used to pass focused=false.
+     */
     @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/components/ChatComponent;render(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;IIIZZ)V"),
-            method = "renderChat")
+            target = "Lnet/minecraft/client/gui/components/ChatComponent;extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;Lnet/minecraft/client/gui/Font;IIILnet/minecraft/client/gui/components/ChatComponent$DisplayMode;Z)V"),
+            method = "extractChat")
     public void visor$noVanillaGuiChat(ChatComponent instance,
                                        GuiGraphicsExtractor guiGraphics,
                                        Font font,
-                                       int i, int j, int k, boolean focused,
+                                       int ticks, int mouseX, int mouseY,
+                                       ChatComponent.DisplayMode displayMode,
                                        boolean changeCursorOnInsertions) {
         if(VisorState.get().isNotActive()) {
-            instance.render(guiGraphics, font, i, j, k, focused, changeCursorOnInsertions);
+            instance.extractRenderState(guiGraphics, font, ticks, mouseX, mouseY, displayMode, changeCursorOnInsertions);
             return;
         }
         if(minecraft.screen instanceof ChatScreen) {
-            instance.render(guiGraphics, font, i, j, k, focused, changeCursorOnInsertions);
+            instance.extractRenderState(guiGraphics, font, ticks, mouseX, mouseY, displayMode, changeCursorOnInsertions);
         }
     }
 
-
-    @Inject(at = @At("HEAD"), method = "renderVignette", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractVignette", cancellable = true)
     public void visor$noVanillaVignette(CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
-    @Inject(at = @At("HEAD"), method = "renderSpyglassOverlay", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractSpyglassOverlay", cancellable = true)
     public void visor$noVanillaSpyglassOverlay(CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
-    @Inject(at = @At("HEAD"), method = "renderEffects", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractEffects", cancellable = true)
     public void visor$noVanillaEffects(CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
-    @Inject(at = @At("HEAD"), method = "renderSelectedItemName", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractSelectedItemName", cancellable = true)
     public void visor$noVanillaSelectedItemName(CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
-    @Inject(at = @At("HEAD"), method = "renderSavingIndicator", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractSavingIndicator", cancellable = true)
     public void visor$noAutoSaveText(CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
 
-    @Inject(method = "renderTextureOverlay", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "extractTextureOverlay", at = @At("HEAD"), cancellable = true)
     public void visor$noTextureOverlay(GuiGraphicsExtractor guiGraphics, Identifier resourceLocation, float f, CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
 
-    @Inject(method = "renderPortalOverlay", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "extractPortalOverlay", at = @At("HEAD"), cancellable = true)
     public void visor$noPortalOverlay(GuiGraphicsExtractor guiGraphics, float f, CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
 
-    @Inject(at = @At("HEAD"), method = "renderCrosshair", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "extractCrosshair", cancellable = true)
     public void visor$noCrosshair(CallbackInfo ci) {
         if(VisorState.get().isNotActive()) return;
         ci.cancel();
     }
 
     // 1.21.1: sleep overlay drawn by its own layer method
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getSleepTimer()I"), method = "renderSleepOverlay")
+    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/player/LocalPlayer;getSleepTimer()I"), method = "extractSleepOverlay")
     public int visor$noSleepOverlay(LocalPlayer instance) {
         return VisorState.get().isActive()
                 ? 0

@@ -1,46 +1,28 @@
 package org.vmstudio.visor.mixin.client.renderer;
 
-
-import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import net.minecraft.client.DeltaTracker;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.ProjectionType;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.ProjectionType;
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.PoseStack;
 import me.phoenixra.atumvr.api.enums.EyeType;
-import org.vmstudio.visor.api.ModLoader;
-import org.vmstudio.visor.api.client.ClientFeature;
-import org.vmstudio.visor.api.common.player.VRPose;
-import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
-import org.vmstudio.visor.api.client.render.VRRenderPass;
-import org.vmstudio.visor.api.common.HandType;
-import org.vmstudio.visor.api.server.VRServerSettings;
-import org.vmstudio.visor.compatibility.immportals.ImmPortalsCompatHelper;
-import org.vmstudio.visor.core.client.VisorState;
-import org.vmstudio.visor.core.client.tasks.types.movement.TaskTeleport;
-import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
-import org.vmstudio.visor.core.client.render.VRCameraEntityCache;
-import org.vmstudio.visor.core.client.render.VRGameCamera;
-import org.vmstudio.visor.core.client.render.helpers.RenderHelper;
-import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
-import org.vmstudio.visor.core.client.render.helpers.VREffectsHelper;
-import org.vmstudio.visor.core.client.render.VRRenderState;
-
-import org.vmstudio.visor.api.client.settings.VRClientSettings;
-import org.vmstudio.visor.api.client.settings.enums.MirrorMode;
-import net.minecraft.util.Util;
 import net.minecraft.client.Camera;
+import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.ProjectionMatrixBuffer;
 import net.minecraft.client.renderer.ScreenEffectRenderer;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.state.GameRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
+import net.minecraft.util.profiling.Profiler;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
@@ -48,99 +30,114 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.*;
+import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.At.Shift;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.vmstudio.visor.api.ModLoader;
+import org.vmstudio.visor.api.client.ClientFeature;
+import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
+import org.vmstudio.visor.api.client.render.VRRenderPass;
+import org.vmstudio.visor.api.client.settings.VRClientSettings;
+import org.vmstudio.visor.api.client.settings.enums.MirrorMode;
+import org.vmstudio.visor.api.common.HandType;
+import org.vmstudio.visor.api.common.player.VRPose;
+import org.vmstudio.visor.api.server.VRServerSettings;
+import org.vmstudio.visor.compatibility.immportals.ImmPortalsCompatHelper;
+import org.vmstudio.visor.core.client.ClientContext;
+import org.vmstudio.visor.core.client.VisorState;
+import org.vmstudio.visor.core.client.render.VRCameraEntityCache;
+import org.vmstudio.visor.core.client.render.VRGameCamera;
+import org.vmstudio.visor.core.client.render.VRRenderState;
+import org.vmstudio.visor.core.client.render.helpers.RenderHelper;
+import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
+import org.vmstudio.visor.core.client.render.helpers.VREffectsHelper;
+import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
+import org.vmstudio.visor.extensions.client.WindowExtension;
 
 import java.nio.file.Path;
 
-import org.vmstudio.visor.core.client.ClientContext;
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 
+/**
+ * PORT-26.1: GameRenderer.render() was split into update() / extract() / render(), and the
+ * camera-related members (pick, getFov, tickFov, getProjectionMatrix, getDepthFar, the fov
+ * modifiers, lastActiveTime) left this class: picking lives on Minecraft, fov/projection/far
+ * plane on Camera, pause-on-focus-loss on Minecraft. The hooks that depended on them moved
+ * with them (MinecraftMixin, VRGameCamera); what is left here is the per-pass state the rest
+ * of Visor reads through {@link GameRendererExtension}, the projection upload for the VR
+ * decoration passes, and the render()/extract() gating that keeps the GUI out of the eye
+ * targets and the world out of the GUI target.
+ */
 @Mixin(GameRenderer.class)
 public abstract class GameRendererMixin
-        // PORT: ResourceManagerReloadListener dropped - GameRenderer never implemented it
-        // (neither 1.21.4 nor 1.21.11) and it has no onResourceManagerReload, so merging the
-        // interface made the target claim a contract it cannot honour.
         implements AutoCloseable, GameRendererExtension {
+
     @Shadow
     @Final
     Minecraft minecraft;
 
-    @Shadow private boolean effectActive;
-
     @Shadow
-    private float renderDistance;
-    // PORT-1.21.11: GameRenderer.zoom/zoomX/zoomY are gone - vanilla dropped the zoom
-    // transform from getProjectionMatrix, so there is nothing left to mirror into the VR one.
-    @Shadow
-    private float fovModifier;
-
-    @Shadow
-    private float oldFovModifier;
-
-    // PORT-1.21.11: GameRenderer.renderHand is gone - the first person hand render is no longer
-    // gated by a field, renderLevel just calls renderItemInHand unconditionally, so the hook that
-    // used to suppress vanilla hands in VR has to redirect that call instead.
-    @Shadow
-    private void renderItemInHand(float partialTick, boolean sleeping, Matrix4f cameraMatrix) {
-        throw new AssertionError();
-    }
-
-    @Shadow
-    public abstract Matrix4f getProjectionMatrix(float fov);
-
-    @Shadow
-    public abstract float getDepthFar();
-
-    @Shadow
-    private float getFov(Camera mainCamera2, float partialTicks, boolean b) {
-        throw new AssertionError();
-    }
-
-    @Shadow
-    public abstract void pick(float f);
-
-    @Shadow
-    private long lastActiveTime;
+    private boolean effectActive;
 
     @Shadow
     @Final
     private Camera mainCamera;
 
+    @Shadow
+    private void renderItemInHand(CameraRenderState cameraState, float deltaPartialTick, Matrix4fc modelViewMatrix) {
+        throw new AssertionError();
+    }
 
+    @Shadow
+    public abstract GameRenderState getGameRenderState();
 
     @Unique
     public Matrix4f visor$thirdPersonProjection = new Matrix4f();
+
     @Unique
     public float visor$nearClipPlane = 0.02F;
+
     @Unique
     private float visor$farClipPlane = 128.0F;
+
+    @Unique
+    private float visor$renderDistance;
+
     @Unique
     public Vec3 visor$crossVec;
+
     @Unique
     private HandType visor$pickingHand;
+
     @Unique
     private final HitResult[] visor$handHitResult = new HitResult[2];
+
     @Unique
     private final Vec3[] visor$handCrossVec = new Vec3[2];
+
     @Unique
     private final Entity[] visor$handPickEntity = new Entity[2];
+
     @Unique
     public boolean visor$onfire;
+
     @Unique
     public boolean visor$inBlock = false;
+
     @Unique
     public float visor$blockProximity = 0.0f;
 
-    /** Slots in the VR projection ring - see {@link #visor$uploadProjection}. */
     @Unique
     private static final int VISOR_PROJECTION_RING_SIZE = 32;
 
@@ -152,46 +149,36 @@ public abstract class GameRendererMixin
 
     @Unique
     public VRCameraEntityCache visor$cameraEntityCache = new VRCameraEntityCache();
+
     @Unique
     private boolean visor$cameraEntityCached;
+
     @Unique
     private int visor$cameraEntityCacheDepth;
 
+    @Unique
+    private boolean visor$isVRGuiVisible;
 
-
-    /* ******************* *\
-  //--------RENDERING--------\\
-    \* ******************* */
+    // ------------------------------------------------------------------
+    // frame structure
+    // ------------------------------------------------------------------
 
     /**
-     * Cancels GUI rendering for VRWorld stage and render VR main menu room.
-     * <p>
-     * PORT-1.21.11: the old anchor was "getWindow() ordinal 6", the {@code Window window =
-     * getWindow()} load in front of the GUI ortho setup. render() only calls getWindow() six
-     * times now (ordinals 0-5) and there is no ortho setup left, so the world/GUI boundary is
-     * anchored on {@code fogRenderer.endFrame()} instead - the single unconditional call that
-     * closes the world section. Cancelling right after it skips the depth clear, the
-     * GuiRenderState reset and the whole GUI extraction/replay, exactly as cancelling in front
-     * of {@code RenderSystem.clear(256)} used to.
+     * A VR world pass ends where the GUI would start: right after the world was drawn and the
+     * fog frame closed. The GUI is rendered once per frame, into its own target, by the VR GUI
+     * phase. In the main menu there is no world, so the menu decoration is drawn here instead.
      */
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/fog/FogRenderer;endFrame()V", shift = Shift.AFTER), method = "Lnet/minecraft/client/renderer/GameRenderer;render(Lnet/minecraft/client/DeltaTracker;Z)V", cancellable = true)
-    public void visor$onRenderGUI(DeltaTracker deltaTracker, boolean renderWorldIn, CallbackInfo info) {
-
+    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/fog/FogRenderer;endFrame()V", shift = Shift.AFTER), method = "render(Lnet/minecraft/client/DeltaTracker;Z)V", cancellable = true)
+    public void visor$onRenderGUI(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo info) {
         if (VRRenderState.getPhase().isNotVRWorld()) {
-            // Proceed rendering GUI for Vanilla and VRGui stage
             return;
         }
-
+        // render() pushed "render" on the profiler; balance it before leaving early
+        Profiler.get().pop();
         info.cancel();
-
-
-        // Render Main Menu View
         if (VRRenderState.getSceneType().isMainMenu()) {
-
             GL11.glDisable(GL11.GL_STENCIL_TEST);
-
             PoseStack poseStack = new PoseStack();
-            //render VR main menu
             ClientContext.decorationRenderer.renderMainMenu(
                     poseStack,
                     deltaTracker.getGameTimeDeltaPartialTick(false)
@@ -199,40 +186,78 @@ public abstract class GameRendererMixin
         }
     }
 
-    @Unique
-    private boolean visor$isVRGuiVisible;
+    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/fog/FogRenderer;endFrame()V"), method = "render(Lnet/minecraft/client/DeltaTracker;Z)V")
+    public void visor$matrix(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo info) {
+        if (VisorState.get().isNotActive()) return;
+        RenderSystem.setProjectionMatrix(
+                visor$uploadProjection(visor$getPassProjection()),
+                ProjectionType.PERSPECTIVE
+        );
+        RenderSystem.getModelViewStack().identity();
+    }
 
     @Override
-    public boolean visor$isVRGuiVisible(){
+    public boolean visor$isVRGuiVisible() {
         return visor$isVRGuiVisible;
     }
 
     @Override
-    public void visor$setVRGuiVisible(boolean flag){
+    public void visor$setVRGuiVisible(boolean flag) {
         visor$isVRGuiVisible = flag;
     }
 
     /**
-     * Draw GUI only after first level render
-     * <p>
-     * PORT-1.21.11: same argument, new anchor. {@code renderWorldIn} still gates both the world
-     * block and the {@code gui.render(...)} extraction; {@code guiRenderState.reset()} is the
-     * first instruction of the GUI half, so overwriting the argument there still lets the level
-     * render and still gates the GUI.
+     * The VR GUI phase runs extract() with advanceGameTime=false so the level is not extracted
+     * into the GUI target's frame, but the HUD still has to be extracted when there is a world
+     * behind the GUI. 1.21.11 did the same by rewriting the renderLevel local before the GUI
+     * extraction; 26.1 hands that flag to extractGui() as an argument.
      */
-    @ModifyVariable(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/state/gui/GuiRenderState;reset()V"), method = "render(Lnet/minecraft/client/DeltaTracker;Z)V", ordinal = 0, argsOnly = true)
-    private boolean visor$renderGui(boolean doRender) {
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;extractGui(Lnet/minecraft/client/DeltaTracker;ZZ)V"), method = "extract(Lnet/minecraft/client/DeltaTracker;Z)V", index = 1)
+    private boolean visor$extractGuiWithWorld(boolean shouldRenderLevel) {
         if (VRRenderState.getPhase().isVanilla()) {
-            return doRender;
+            return shouldRenderLevel;
         }
         return visor$isVRGuiVisible();
     }
 
     /**
-     * If no crosshair rendered,
-     * don't render block outline as well
-     * @param cir
+     * World passes never render the GUI (see {@link #visor$onRenderGUI}), so extracting it per
+     * pass would only burn time and wipe the state the GUI phase already recorded.
      */
+    @Inject(at = @At("HEAD"), method = "extractGui", cancellable = true)
+    private void visor$noGuiExtractionInWorldPass(CallbackInfo ci) {
+        if (VRRenderState.getPhase().isVRWorld()) {
+            ci.cancel();
+        }
+    }
+
+    /**
+     * 26.1 resizes the main render target from render() whenever the window reports a resize.
+     * In VR "the main render target" is whichever Visor target the current pass draws into, and
+     * those are sized by Visor (WindowMixin#visor$onResize -> prepareResize), not by the window.
+     */
+    @Inject(at = @At("TAIL"), method = "extractWindow")
+    private void visor$noVanillaResizeInVR(CallbackInfo ci) {
+        if (VisorState.get().isNotActive()) {
+            return;
+        }
+        var windowState = this.getGameRenderState().windowRenderState;
+        if (!windowState.isResized) {
+            return;
+        }
+        windowState.isResized = false;
+        // keep the vanilla target at the real window size so it is right when VR is turned off
+        RenderTarget vanillaTarget = VRRenderState.getVanillaTarget();
+        var window = (WindowExtension) (Object) this.minecraft.getWindow();
+        int width = Math.max(1, window.visor$getActualScreenWidth());
+        int height = Math.max(1, window.visor$getActualScreenHeight());
+        if (vanillaTarget != null
+                && vanillaTarget != this.minecraft.getMainRenderTarget()
+                && (vanillaTarget.width != width || vanillaTarget.height != height)) {
+            vanillaTarget.resize(width, height);
+        }
+    }
+
     @Inject(at = @At("HEAD"), method = "shouldRenderBlockOutline", cancellable = true)
     public void visor$shouldDrawBlockOutline(CallbackInfoReturnable<Boolean> cir) {
         if (VRRenderState.getPhase().isVRWorld()) {
@@ -242,128 +267,227 @@ public abstract class GameRendererMixin
         }
     }
 
-
-
-    /* **************** *\
-      //--------CAMERA--------\\
-        \* **************** */
     @Redirect(method = "<init>", at = @At(value = "NEW", target = "net/minecraft/client/Camera"))
     public Camera visor$replaceCamera() {
         return new VRGameCamera();
     }
 
-    @Inject(at = @At("HEAD"), method = "getFov(Lnet/minecraft/client/Camera;FZ)F", cancellable = true)
-    public void visor$fov(Camera camera, float f, boolean bl, CallbackInfoReturnable<Float> info) {
+    @Redirect(at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/GameRenderer;effectActive:Z"), method = "render")
+    public boolean visor$noPostEffectOnThirdPerson(GameRenderer instance) {
+        return this.effectActive && VRRenderState.getRenderPass() != VRRenderPass.THIRD_PERSON;
+    }
+
+    @Inject(at = @At("HEAD"), method = "takeAutoScreenshot", cancellable = true)
+    public void visor$noScreenshotInMenu(Path path, CallbackInfo ci) {
         if (VisorState.get().isActive() && VRRenderState.getSceneType().isMainMenu()) {
-            info.setReturnValue(Float.valueOf(this.minecraft.options.fov().get()));
+            ci.cancel();
         }
     }
 
-    @Inject(at = @At("HEAD"), method = "getProjectionMatrix(F)Lorg/joml/Matrix4f;", cancellable = true)
-    public void visor$projection(float d, CallbackInfoReturnable<Matrix4f> info) {
-        if (VisorState.get().isNotActive()) {
-            return;
+    @Inject(at = @At("HEAD"), method = "bobHurt", cancellable = true)
+    public void visor$noBobHurt(CameraRenderState cameraState, PoseStack poseStack, CallbackInfo ci) {
+        if (VRRenderState.getPhase().isNotVanilla()) {
+            ci.cancel();
         }
-        PoseStack posestack = new PoseStack();
-        visor$setupClipPlanes();
-        ClientContext.renderer.updateProjection();
-
-        VRRenderPass renderPass = VRRenderState.getRenderPass();
-        if(renderPass == VRRenderPass.EYE_LEFT){
-            posestack.mulPose(
-                    ClientContext.renderer.getEyeProjection(EyeType.LEFT)
-            );
-            info.setReturnValue(
-                    posestack.last().pose()
-            );
-            return;
-        }
-        if (renderPass == VRRenderPass.EYE_RIGHT) {
-            posestack.mulPose(
-                    ClientContext.renderer.getEyeProjection(EyeType.RIGHT)
-            );
-            info.setReturnValue(posestack.last().pose());
-            return;
-        }
-        if (renderPass == VRRenderPass.THIRD_PERSON) {
-            if (VRClientSettings.getMirrorMode() == MirrorMode.MIXED_REALITY) {
-                posestack.mulPose(
-                        new Matrix4f().setPerspective(
-                                VRClientSettings.getMixedRealityFov() * 0.01745329238474369F,
-                                VRClientSettings.getMixedRealityAspectRatio(), this.visor$nearClipPlane,
-                                this.visor$farClipPlane
-                        )
-                );
-            }else {
-                posestack.mulPose(
-                        new Matrix4f().setPerspective(
-                                VRClientSettings.getThirdPersonFov() * 0.01745329238474369F,
-                                (float) this.minecraft.getWindow().getScreenWidth()
-                                        / (float) this.minecraft.getWindow().getScreenHeight(),
-                                this.visor$nearClipPlane, this.visor$farClipPlane
-                        )
-                );
-            }
-            this.visor$thirdPersonProjection = new Matrix4f(posestack.last().pose());
-            info.setReturnValue(posestack.last().pose());
-            return;
-        }
-
-        posestack.mulPose(
-                new Matrix4f()
-                        .setPerspective(
-                                (float) d * Mth.DEG_TO_RAD,
-                                (float) this.minecraft.getWindow().getScreenWidth()
-                                        / (float) this.minecraft.getWindow().getScreenHeight(),
-                                this.visor$nearClipPlane,
-                                this.visor$farClipPlane
-                        )
-        );
-
-        info.setReturnValue(posestack.last().pose());
     }
+
+    @Inject(method = "bobView", at = @At("HEAD"), cancellable = true)
+    public void visor$noBobView(CameraRenderState cameraState, PoseStack poseStack, CallbackInfo ci) {
+        if (VRRenderState.getPhase().isNotVanilla()) {
+            ci.cancel();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // renderLevel
+    // ------------------------------------------------------------------
+
+    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;renderItemInHand(Lnet/minecraft/client/renderer/state/level/CameraRenderState;FLorg/joml/Matrix4fc;)V"), method = "renderLevel")
+    public void visor$noVanillaHands(GameRenderer instance, CameraRenderState cameraState, float deltaPartialTick, Matrix4fc modelViewMatrix) {
+        if (VRRenderState.isSpectatedVRView(minecraft.getCameraEntity())) {
+            return;
+        }
+        if (VRRenderState.getPhase().isVanilla()) {
+            this.renderItemInHand(cameraState, deltaPartialTick, modelViewMatrix);
+        }
+    }
+
+    @Redirect(at = @At(value = "INVOKE",
+            target = "Lcom/mojang/blaze3d/systems/CommandEncoder;clearDepthTexture(Lcom/mojang/blaze3d/textures/GpuTexture;D)V"),
+            method = "renderLevel")
+    public void visor$noVanillaHandDepthClear(CommandEncoder encoder, GpuTexture depthTexture,
+                                              double depth) {
+        if (VRRenderState.isSpectatedVRView(minecraft.getCameraEntity())) {
+            return;
+        }
+        if (VRRenderState.getPhase().isVanilla()) {
+            encoder.clearDepthTexture(depthTexture, depth);
+        }
+    }
+
+    @WrapOperation(at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/ScreenEffectRenderer;renderScreenEffect(ZZFLnet/minecraft/client/renderer/SubmitNodeCollector;Z)V"),
+            method = "renderLevel")
+    public void visor$noVanillaScreenEffects(ScreenEffectRenderer instance, boolean firstPerson,
+                                             boolean sleeping, float partialTick,
+                                             SubmitNodeCollector collector, boolean hideGui,
+                                             Operation<Void> original) {
+        if (VRRenderState.isSpectatedVRView(minecraft.getCameraEntity())) {
+            return;
+        }
+        if (VRRenderState.getPhase().isVanilla()) {
+            original.call(instance, firstPerson, sleeping, partialTick, collector, hideGui);
+        }
+    }
+
+    @Inject(at = @At("TAIL"), method = "renderLevel")
+    public void visor$disableStencil(DeltaTracker deltaTracker, CallbackInfo ci) {
+        if (VRRenderState.getPhase().isNotVanilla()) {
+            VREffectsHelper.disableStencilTest();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // projection
+    // ------------------------------------------------------------------
 
     /**
-     * Rebinds the VR projection once the world section of the frame is over.
-     * <p>
-     * PORT-1.21.11: {@code RenderSystem.viewport} does not exist any more - RenderSystem has no
-     * viewport member at all - so the old anchor located zero callbacks. The rebind is anchored
-     * in front of {@code fogRenderer.endFrame()}, i.e. still at the end of the world section and
-     * still ahead of {@link #visor$onRenderGUI}, which draws the VR main menu room with whatever
-     * projection is bound here. It is needed more than before: renderLevel now ends by pushing
-     * its own {@code hud3dProjectionMatrixBuffer} perspective (built straight from the window
-     * size, bypassing getProjectionMatrix), so without this the VR passes would be left holding
-     * a flat-screen projection.
+     * The projection of the pass being rendered. 1.21.11 served this through an injection into
+     * GameRenderer.getProjectionMatrix(fov); 26.1 builds the projection inside Camera, so
+     * VRGameCamera asks for it here and writes it into the CameraRenderState itself.
      */
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/fog/FogRenderer;endFrame()V"), method = "Lnet/minecraft/client/renderer/GameRenderer;render(Lnet/minecraft/client/DeltaTracker;Z)V")
-    public void visor$matrix(DeltaTracker deltaTracker, boolean renderWorldIn, CallbackInfo info) {
-        if(VisorState.get().isNotActive()) return;
-        RenderSystem.setProjectionMatrix(
-                visor$uploadProjection(
-                        this.getProjectionMatrix(
-                                minecraft.options.fov().get()
-                        )
-                ),
-                ProjectionType.PERSPECTIVE
+    @Override
+    @Unique
+    public Matrix4f visor$getPassProjection() {
+        visor$setupClipPlanes();
+        ClientContext.renderer.updateProjection();
+        VRRenderPass renderPass = VRRenderState.getRenderPass();
+        if (renderPass == VRRenderPass.EYE_LEFT) {
+            return new Matrix4f(ClientContext.renderer.getEyeProjection(EyeType.LEFT));
+        }
+        if (renderPass == VRRenderPass.EYE_RIGHT) {
+            return new Matrix4f(ClientContext.renderer.getEyeProjection(EyeType.RIGHT));
+        }
+        if (renderPass == VRRenderPass.THIRD_PERSON) {
+            Matrix4f projection;
+            if (VRClientSettings.getMirrorMode() == MirrorMode.MIXED_REALITY) {
+                projection = new Matrix4f().setPerspective(
+                        VRClientSettings.getMixedRealityFov() * Mth.DEG_TO_RAD,
+                        VRClientSettings.getMixedRealityAspectRatio(),
+                        this.visor$nearClipPlane,
+                        this.visor$farClipPlane
+                );
+            } else {
+                projection = new Matrix4f().setPerspective(
+                        VRClientSettings.getThirdPersonFov() * Mth.DEG_TO_RAD,
+                        visor$screenAspect(),
+                        this.visor$nearClipPlane,
+                        this.visor$farClipPlane
+                );
+            }
+            this.visor$thirdPersonProjection = new Matrix4f(projection);
+            return projection;
+        }
+        return new Matrix4f().setPerspective(
+                this.mainCamera.getFov() * Mth.DEG_TO_RAD,
+                visor$screenAspect(),
+                this.visor$nearClipPlane,
+                this.visor$farClipPlane
         );
-        RenderSystem.getModelViewStack().identity();
     }
 
+    @Unique
+    private float visor$screenAspect() {
+        return (float) this.minecraft.getWindow().getScreenWidth()
+                / (float) Math.max(1, this.minecraft.getWindow().getScreenHeight());
+    }
 
-    @WrapMethod(method = "pick(F)V")
-    private void visor$vrPick(float partialTick, Operation<Void> original) {
-        if(VisorState.get().isNotActive()){
-            original.call(partialTick);
+    @Override
+    @Unique
+    public void visor$resetProjectionMatrix(float partialTicks) {
+        RenderSystem.setProjectionMatrix(
+                visor$uploadProjection(visor$getPassProjection()),
+                ProjectionType.PERSPECTIVE
+        );
+    }
+
+    @Unique
+    private GpuBufferSlice visor$uploadProjection(Matrix4f projection) {
+        if (this.visor$projectionRing == null) {
+            this.visor$projectionRing =
+                    new ProjectionMatrixBuffer[VISOR_PROJECTION_RING_SIZE];
+        }
+        int slot = this.visor$projectionRingIndex;
+        this.visor$projectionRingIndex = (slot + 1) % VISOR_PROJECTION_RING_SIZE;
+        ProjectionMatrixBuffer buffer = this.visor$projectionRing[slot];
+        if (buffer == null) {
+            buffer = new ProjectionMatrixBuffer("visor vr projection " + slot);
+            this.visor$projectionRing[slot] = buffer;
+        }
+        return buffer.getBuffer(projection);
+    }
+
+    @Inject(method = "close", at = @At("HEAD"))
+    private void visor$closeProjectionBuffer(CallbackInfo ci) {
+        if (this.visor$projectionRing == null) {
             return;
         }
-        // don't update the hitresult when chat is open
+        for (int i = 0; i < this.visor$projectionRing.length; i++) {
+            if (this.visor$projectionRing[i] != null) {
+                this.visor$projectionRing[i].close();
+                this.visor$projectionRing[i] = null;
+            }
+        }
+        this.visor$projectionRing = null;
+        this.visor$projectionRingIndex = 0;
+    }
+
+    @Override
+    @Unique
+    public void visor$setupClipPlanes() {
+        this.visor$renderDistance = (float) (this.minecraft.options.getEffectiveRenderDistance() * 16);
+        float depthFar = Math.max(
+                this.visor$renderDistance * 4.0F,
+                this.minecraft.options.cloudRange().get() * 16
+        );
+        this.visor$farClipPlane = Math.max(
+                this.visor$renderDistance + 1024.0F,
+                depthFar
+        );
+    }
+
+    @Override
+    @Unique
+    public float visor$getNearClipPlane() {
+        return this.visor$nearClipPlane;
+    }
+
+    @Override
+    @Unique
+    public float visor$getFarClipPlane() {
+        return this.visor$farClipPlane;
+    }
+
+    @Override
+    @Unique
+    public Matrix4f visor$getThirdPersonProjection() {
+        return visor$thirdPersonProjection;
+    }
+
+    // ------------------------------------------------------------------
+    // picking
+    // ------------------------------------------------------------------
+
+    /**
+     * Hand-aware replacement of the vanilla raycast; called once per frame from
+     * MinecraftMixin around Minecraft.pick(F).
+     */
+    @Override
+    @Unique
+    public void visor$pick(float partialTick, VanillaPick original) {
         if (this.minecraft.screen != null && this.minecraft.hitResult != null) {
             return;
-        }
-        // skip when data not available yet
-        else if (this.minecraft.getCameraEntity() == null)
-        {
-            // some mods don't like it when the hitresult is null, so set it to a miss
+        } else if (this.minecraft.getCameraEntity() == null) {
             if (this.minecraft.player != null) {
                 this.minecraft.hitResult = BlockHitResult.miss(this.minecraft.player.position(),
                         this.minecraft.player.getDirection(), this.minecraft.player.blockPosition());
@@ -372,18 +496,14 @@ public abstract class GameRendererMixin
             }
             return;
         }
-
         HandType activeHand = ClientContext.localPlayer.getActiveHand();
         visor$pickWithHand(activeHand, partialTick, original);
-
         HandType otherHand = activeHand.opposite();
         if (VRServerSettings.isTwoHandedVR()
                 && ClientContext.rawPoseHandler.getControllerData(otherHand).isTracking()) {
             HitResult activeHit = this.minecraft.hitResult;
             Entity activePickEntity = this.minecraft.crosshairPickEntity;
-
             visor$pickWithHand(otherHand, partialTick, original);
-
             this.minecraft.hitResult = activeHit;
             this.minecraft.crosshairPickEntity = activePickEntity;
             this.visor$crossVec = visor$handCrossVec[activeHand.ordinal()];
@@ -395,38 +515,26 @@ public abstract class GameRendererMixin
     }
 
     @Unique
-    private void visor$pickWithHand(HandType hand, float partialTick, Operation<Void> original) {
+    private void visor$pickWithHand(HandType hand, float partialTick, VanillaPick original) {
         visor$pickingHand = hand;
-
         VRPose handPose = ClientContext.localPlayer
                 .getPoseData(PlayerPoseType.RENDER)
                 .getHand(hand);
-
         AABB originalBB = this.minecraft.getCameraEntity().getBoundingBox();
-        // set the entity position and view to the controller
         this.visor$cacheCameraEntity(this.minecraft.getCameraEntity());
         this.visor$setupCameraEntity(handPose);
-        // move the bounding box as well, this is used for entity hits
         this.minecraft.getCameraEntity().setBoundingBox(originalBB.move(
                 this.minecraft.getCameraEntity().getX() - visor$cameraEntityCache.getX(),
                 this.minecraft.getCameraEntity().getY() - visor$cameraEntityCache.getY(),
                 this.minecraft.getCameraEntity().getZ() - visor$cameraEntityCache.getZ()));
-
-        // call the vanilla method
-        original.call(partialTick);
-
-        // restore entity
+        original.pick(partialTick);
         this.visor$restoreCameraEntity(this.minecraft.getCameraEntity());
         this.minecraft.getCameraEntity().setBoundingBox(originalBB);
-
         visor$applyPortalAwareBlockRay(handPose);
-
         HitResult hitResult = this.minecraft.hitResult;
         if (hitResult != null && hitResult.getType() != HitResult.Type.MISS) {
-            // includes entity hits found by the vanilla trace
             this.visor$crossVec = hitResult.getLocation();
         } else if (this.minecraft.player != null) {
-            // the ray missed: aim the crosshair at the far end of the reach instead
             this.visor$crossVec = visor$aimedPointAtDistance(
                     handPose,
                     this.minecraft.player.blockInteractionRange()
@@ -438,21 +546,6 @@ public abstract class GameRendererMixin
         visor$pickingHand = null;
     }
 
-    /**
-     * Re-runs the block leg of the pick through {@link ImmPortalsCompatHelper} so a controller
-     * aimed through a portal hits what is on the far side.
-     * <p>
-     * PORT-1.21.11: the ray trace itself moved out of GameRenderer entirely - {@code pick(F)V}
-     * now just calls {@code LocalPlayer.raycastHitResult}, and the eye position / view vector /
-     * {@code Entity.pick} call that Visor used to override all live in the private static
-     * {@code LocalPlayer.pick(Entity,DDF)}. Nothing inside GameRenderer is left to inject into,
-     * so the substitution happens here, on the finished result: the entity leg keeps whatever
-     * vanilla found (its ray already starts at the hand, because
-     * {@link #visor$setupCameraEntity} posed the camera entity), and only a non-entity result is
-     * replaced. Without Immersive Portals the helper would only repeat the same
-     * {@code level.clip(OUTLINE, NONE)} vanilla already ran from the same origin, so the whole
-     * thing is skipped there rather than paying for a second trace per hand per frame.
-     */
     @Unique
     private void visor$applyPortalAwareBlockRay(VRPose handPose) {
         if (!ImmPortalsCompatHelper.isLoaded()
@@ -462,7 +555,6 @@ public abstract class GameRendererMixin
         }
         HitResult current = this.minecraft.hitResult;
         if (current != null && current.getType() == HitResult.Type.ENTITY) {
-            // vanilla already rejected every block closer than this entity
             return;
         }
         HitResult blockHit = visor$pickBlock(
@@ -477,236 +569,87 @@ public abstract class GameRendererMixin
         this.minecraft.crosshairPickEntity = null;
     }
 
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;pick(F)V"), method = "renderLevel")
-    public void visor$pickAndSetupCamera(GameRenderer g, float pPartialTicks) {
-        if (VRRenderState.getPhase().isVanilla()) {
-            g.pick(pPartialTicks);
+    @Override
+    @Unique
+    public Vec3 visor$getCrossVec() {
+        return visor$crossVec;
+    }
+
+    @Override
+    @Unique
+    public Vec3 visor$getCrossVec(HandType hand) {
+        return visor$handCrossVec[hand.ordinal()];
+    }
+
+    @Override
+    @Unique
+    public HitResult visor$getHandHitResult(HandType hand) {
+        return visor$handHitResult[hand.ordinal()];
+    }
+
+    @Override
+    @Unique
+    public void visor$applyHandPick(HandType hand) {
+        HitResult hitResult = visor$handHitResult[hand.ordinal()];
+        Vec3 crossVec = visor$handCrossVec[hand.ordinal()];
+        if (hitResult == null || crossVec == null) {
+            this.minecraft.pick(1.0f);
             return;
         }
-        if (VRRenderState.getRenderPass() == VRRenderPass.worldUpdater()) {
-            this.pick(pPartialTicks);
+        this.minecraft.hitResult = hitResult;
+        this.minecraft.crosshairPickEntity = visor$handPickEntity[hand.ordinal()];
+        this.visor$crossVec = crossVec;
+    }
 
-            if(MC.screen == null){
-                TaskTeleport.updateTeleportDestination(MC.player);
-            }
-        }
+    @Unique
+    public Vec3 visor$aimedPointAtDistance(VRPose vrPose,
+                                           double distance) {
+        var dir = vrPose.getDirection();
+        return new Vec3(vrPose
+                .getPosition().add(
+                        dir.x() * (float) distance,
+                        dir.y() * (float) distance,
+                        dir.z() * (float) distance,
+                        new Vector3f()
+                )
+        );
+    }
 
+    @Unique
+    public HitResult visor$pickBlock(VRPose vrPose,
+                                     double blockReachDistance,
+                                     boolean fluid
+    ) {
+        return ImmPortalsCompatHelper.pickBlock(MC.level, vrPose, blockReachDistance, fluid, MC.player);
+    }
+
+    // ------------------------------------------------------------------
+    // world pass bracket (camera entity relocation + per pass overlay status)
+    // ------------------------------------------------------------------
+
+    /**
+     * 1.21.11 did this from the pick() call at the top of renderLevel and undid it at its tail.
+     * 26.1 extracts the level before renderLevel runs, so the camera entity has to sit at the
+     * VR camera for the whole update/extract/render sequence of a pass; VisorScene brackets it.
+     */
+    @Override
+    @Unique
+    public void visor$beginWorldPass(float partialTicks) {
         this.visor$cacheCameraEntity(this.minecraft.getCameraEntity());
         this.visor$setupCameraEntityAsVRCamera();
-        this.visor$setupOverlayStatus(pPartialTicks);
+        this.visor$setupOverlayStatus(partialTicks);
     }
 
-    @Inject(at = @At(value = "TAIL"), method = "renderLevel")
-    public void visor$restoreCamera(DeltaTracker deltaTracker, CallbackInfo i) {
-        if(VRRenderState.getPhase().isNotVanilla()) {
-            this.visor$restoreCameraEntity(
-                    this.minecraft.getCameraEntity()
-            );
-        }
+    @Override
+    @Unique
+    public void visor$endWorldPass() {
+        this.visor$restoreCameraEntity(this.minecraft.getCameraEntity());
     }
 
-
-    /* ********************* *\
-  //--------RAY TRACING--------\\
-    \* ********************* */
-    // PORT-1.21.11: visor$pickPos / visor$pickDirection / visor$pickBlockWithHand used to sit
-    // inside GameRenderer#pick(Entity,DDF)HitResult, overriding the ray origin, the ray
-    // direction and the block trace. That overload is gone from GameRenderer: pick(F)V delegates
-    // to LocalPlayer#raycastHitResult, which runs the trace in the private static
-    // LocalPlayer#pick(Entity,DDF). Leaving the injectors would have thrown
-    // InvalidInjectionException at start-up. Origin and direction are now exact because
-    // visor$setupCameraEntity poses the camera entity the trace reads from (including yRotO, so
-    // the partial-tick lerp no longer drags the ray towards the body yaw); the portal-aware
-    // block trace and the crosshair fallback moved into visor$pickWithHand /
-    // visor$applyPortalAwareBlockRay.
-
-
-    /* ******************************* *\
-      //--------DISABLE VANILLA STUFF--------\\
-        \* ******************************* */
-    @Redirect(at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/GameRenderer;effectActive:Z"), method = "render")
-    public boolean visor$noPostEffectOnThirdPerson(GameRenderer instance) {
-        return this.effectActive && VRRenderState.getRenderPass() != VRRenderPass.THIRD_PERSON;
-    }
-
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;isWindowActive()Z"), method = "render")
-    public boolean visor$noPauseGameIfWindowNotFocused(Minecraft instance) {
-        return VisorState.get().isActive() || instance.isWindowActive();
-    }
-
-
-    @Inject(at = @At("HEAD"), method = "tickFov", cancellable = true)
-    public void visor$noFOVchangeInVR(CallbackInfo ci) {
-        if(VRRenderState.getPhase().isNotVanilla()) {
-            this.oldFovModifier = this.fovModifier = 1.0f;
-            ci.cancel();
-        }
-    }
-
-    @Inject(at = @At("HEAD"), method = "takeAutoScreenshot", cancellable = true)
-    public void visor$noScreenshotInMenu(Path path, CallbackInfo ci) {
-        if (VisorState.get().isActive() && VRRenderState.getSceneType().isMainMenu()) {
-            ci.cancel();
-        }
-    }
-
-    @Inject(at = @At("HEAD"), method = "bobHurt", cancellable = true)
-    public void visor$noBobHurt(PoseStack poseStack,
-                                float f,
-                                CallbackInfo ci) {
-        if(VRRenderState.getPhase().isNotVanilla()) {
-            ci.cancel();
-        }
-    }
-
-    @Inject(method = "bobView", at = @At("HEAD"), cancellable = true)
-    public void visor$noBobView(PoseStack matrixStack,
-                                float f,
-                                CallbackInfo ci) {
-        if(VRRenderState.getPhase().isNotVanilla()) {
-            ci.cancel();
-        }
-    }
-
-
-
-    /**
-     * PORT-1.21.11: {@code renderLevel} used to guard the first person hand render with
-     * {@code if (this.renderHand)}, which this hook redirected. The field is gone and the call is
-     * unconditional now, so the call itself is redirected instead. Vanilla's own suppression
-     * (panoramic screenshots) moved inside {@code renderItemInHand}, which returns early on
-     * {@code isPanoramicMode()} before doing anything else, so nothing is lost by dropping the
-     * old {@code && renderHand}.
-     * <p>
-     * PORT-1.21.11: this covers only HALF of what the old hook did. 1.21.4 was
-     * {@code if (this.renderHand) { RenderSystem.clear(256); this.renderItemInHand(...); }} - the
-     * depth clear sat inside the guarded block, so redirecting the field suppressed it too. In
-     * 1.21.11 the clear moved out in front of the call and is unconditional, so it needs its own
-     * hook: {@link #visor$noVanillaHandDepthClear}.
-     */
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;renderItemInHand(FZLorg/joml/Matrix4f;)V"), method = "renderLevel")
-    public void visor$noVanillaHands(GameRenderer instance, float partialTick, boolean sleeping, Matrix4f cameraMatrix) {
-        if (VRRenderState.isSpectatedVRView(minecraft.getCameraEntity())) {
-            return;
-        }
-        if (VRRenderState.getPhase().isVanilla()) {
-            this.renderItemInHand(partialTick, sleeping, cameraMatrix);
-        }
-    }
-
-    /**
-     * The other half of the old {@code renderHand} redirect. 1.21.4 ran
-     * {@code RenderSystem.clear(256)} inside {@code if (this.renderHand)}; 1.21.11 runs
-     * {@code RenderSystem.getDevice().createCommandEncoder()
-     *   .clearDepthTexture(getMainRenderTarget().getDepthTexture(), 1.0)} unconditionally, one
-     * instruction ahead of the hand render. Left alone it wipes the world depth of every VR eye
-     * pass right after {@code levelRenderer.renderLevel}.
-     * <p>
-     * No {@code ordinal}: {@code clearDepthTexture} occurs exactly once inside {@code renderLevel}
-     * (the other one in this class is in {@code render}, which {@code method = "renderLevel"}
-     * excludes). An ordinal that later goes stale is how these hooks rot silently.
-     */
-    @Redirect(at = @At(value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/systems/CommandEncoder;clearDepthTexture(Lcom/mojang/blaze3d/textures/GpuTexture;D)V"),
-            method = "renderLevel")
-    public void visor$noVanillaHandDepthClear(CommandEncoder encoder, GpuTexture depthTexture,
-                                              double depth) {
-        if (VRRenderState.isSpectatedVRView(minecraft.getCameraEntity())) {
-            return;
-        }
-        if (VRRenderState.getPhase().isVanilla()) {
-            encoder.clearDepthTexture(depthTexture, depth);
-        }
-    }
-
-    /**
-     * The third piece of what the old {@code renderHand} redirect suppressed. In 1.21.4 the
-     * screen-space overlays (fire, underwater, the inside-a-block texture) were drawn from
-     * {@code renderItemInHand}, so cutting the hand render cut them too. In 1.21.11 the call
-     * moved out into {@code renderLevel}, after the hand render and under the same flat hud3d
-     * projection - left alone it stamps those overlays across each VR eye as a screen quad.
-     * Visor draws its own versions (GameEffectOnFire, the in-block vignette), so the vanilla
-     * call runs only for the flat-screen phases, exactly as before. The item activation
-     * animation that also lives in renderScreenEffect is driven by Visor separately, through
-     * {@code GameEffectVanilla}.
-     */
-    @Redirect(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/ScreenEffectRenderer;renderScreenEffect(ZFLnet/minecraft/client/renderer/SubmitNodeCollector;)V"),
-            method = "renderLevel")
-    public void visor$noVanillaScreenEffects(ScreenEffectRenderer instance, boolean sleeping,
-                                             float partialTick, SubmitNodeCollector collector) {
-        if (VRRenderState.isSpectatedVRView(minecraft.getCameraEntity())) {
-            return;
-        }
-        if (VRRenderState.getPhase().isVanilla()) {
-            instance.renderScreenEffect(sleeping, partialTick, collector);
-        }
-    }
-
-    @Inject(at = @At("TAIL"), method = "renderLevel")
-    public void visor$disableStencil(DeltaTracker deltaTracker, CallbackInfo ci) {
-        if(VRRenderState.getPhase().isNotVanilla()) {
-            VREffectsHelper.disableStencilTest();
-        }
-    }
-
-
-    /* ************** *\
-  //--------MISC--------\\
-    \* ************** */
-
-    //ITEM ACTIVATION ANIMATION
-    // PORT-1.21.11: the animation is no longer GameRenderer's. It lives on
-    // ScreenEffectRenderer#renderItemActivationAnimation(PoseStack,float,SubmitNodeCollector),
-    // together with itemActivationTicks/Item/OffX/OffY, and nothing in vanilla calls it any more
-    // - the method is dead code in the jar. So all three hooks that used to sit here are gone:
-    //   * visor$noItemActivationAnimInGUI suppressed vanilla's GUI-space call from render(); that
-    //     call site no longer exists, so there is nothing left to suppress.
-    //   * visor$noScaleItem / visor$noItemTranslate re-anchored the animation onto the VR camera
-    //     by rewriting the PoseStack.translate/scale calls inside the method body. The body still
-    //     performs that GUI-space translate/scale, but it belongs to another class now, so those
-    //     redirects have to be re-declared in a ScreenEffectRenderer mixin - see the report.
-    // Visor drives the animation itself from GameEffectVanilla, through the two widened members
-    // in visor.accesswidener.
-    //--
-
-    /**
-     * Only process this when rendering vanilla
-     * or VR camera that is a worldUpdater
-     */
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;pauseGame(Z)V"), method = "render")
-    public void visor$pauseOncePerFrame(Minecraft instance, boolean bl) {
-        if (VisorState.get().isNotActive() || VRRenderState.getRenderPass() == VRRenderPass.worldUpdater()) {
-            instance.pauseGame(bl);
-        }
-    }
-
-    /**
-     * Only process this when rendering vanilla
-     * or VR camera that is a worldUpdater
-     */
-    // 1.21.11: Util moved to net.minecraft.util, so the redirect descriptor moved with it
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Util;getMillis()J"), method = "render")
-    public long visor$useActiveTimeOncePerFrame() {
-        if (VisorState.get().isNotActive() || VRRenderState.getRenderPass() == VRRenderPass.worldUpdater()) {
-            return Util.getMillis();
-        } else {
-            return this.lastActiveTime;
-        }
-    }
-
-
-
-
-
-    /* ************************ *\
-  //--------PUBLIC METHODS--------\\
-    \* ************************ */
     @Override
     @Unique
     public void visor$setupCameraEntity(VRPose vrPose) {
         if (this.visor$cameraEntityCached) {
-
             var position = vrPose.getPosition();
             LivingEntity cameraEntity = (LivingEntity) this.minecraft.getCameraEntity();
             cameraEntity.setPosRaw(position.x(), position.y(), position.z());
@@ -719,10 +662,6 @@ public abstract class GameRendererMixin
             cameraEntity.setXRot(-vrPose.getPitchDegrees());
             cameraEntity.xRotO = cameraEntity.getXRot();
             cameraEntity.setYRot(vrPose.getYawDegrees());
-            // PORT-1.21.11: yRotO has to follow too. Entity#getViewVector lerps yRotO -> yRot,
-            // and the hand ray trace reads that view vector directly now that Visor no longer
-            // overrides the direction local inside the (moved) pick overload - leaving the stale
-            // body yaw here would swing the ray by the partial tick.
             cameraEntity.yRotO = cameraEntity.getYRot();
             cameraEntity.yHeadRot = cameraEntity.getYRot();
             cameraEntity.yHeadRotO = cameraEntity.getYRot();
@@ -740,19 +679,14 @@ public abstract class GameRendererMixin
                 visor$cameraEntityCache = new VRCameraEntityCache(
                         cameraEntity.getX(), cameraEntity.getY(),
                         cameraEntity.getZ(),
-
                         cameraEntity.xOld, cameraEntity.yOld,
                         cameraEntity.zOld,
-
                         cameraEntity.xo, cameraEntity.yo,
                         cameraEntity.zo,
-
                         livingEntity != null ? livingEntity.yHeadRot : cameraEntity.getYRot(),
                         cameraEntity.getXRot(),
-
                         livingEntity != null ? livingEntity.yHeadRotO : cameraEntity.yRotO,
                         cameraEntity.xRotO,
-
                         cameraEntity.getEyeHeight()
                 );
                 this.visor$cameraEntityCached = true;
@@ -782,42 +716,16 @@ public abstract class GameRendererMixin
         }
     }
 
-
-
     @Override
-    @Unique
-    public void visor$setupClipPlanes() {
-        this.renderDistance = (float) (this.minecraft.options.getEffectiveRenderDistance() * 16);
-        // honor vanilla's depthFar (and far-distance mods extending it)
-        this.visor$farClipPlane = Math.max(
-                this.renderDistance + 1024.0F,
-                this.getDepthFar()
-        );
+    public VRCameraEntityCache visor$getCameraEntityCache() {
+        return visor$cameraEntityCache;
     }
-
-    @Override
-    @Unique
-    public float visor$getNearClipPlane() {
-        return this.visor$nearClipPlane;
-    }
-
-    @Override
-    @Unique
-    public float visor$getFarClipPlane() {
-        return this.visor$farClipPlane;
-    }
-
-
-
-
-
 
     @Override
     @Unique
     public boolean visor$isOnFire() {
         return visor$onfire;
     }
-
 
     @Override
     @Unique
@@ -831,140 +739,17 @@ public abstract class GameRendererMixin
         return visor$blockProximity;
     }
 
-
-    @Override
-    @Unique
-    public void visor$resetProjectionMatrix(float partialTicks) {
-        RenderSystem.setProjectionMatrix(
-                visor$uploadProjection(
-                        this.getProjectionMatrix(this.getFov(this.mainCamera, partialTicks, true))
-                ),
-                ProjectionType.PERSPECTIVE
-        );
-    }
-
-    /**
-     * Writes {@code projection} into a fresh slot of the VR projection ring and hands back its
-     * slice.
-     * <p>
-     * PORT-1.21.11: a projection is a pointer now, not a value, and this cannot be one buffer.
-     * {@code RenderSystem.setProjectionMatrix} took a {@code Matrix4f} in 1.21.4 and copied it
-     * into a CPU field, so overwriting the projection as often as VR likes cost nothing. It
-     * takes a {@code GpuBufferSlice} in 1.21.11, and a {@code ProjectionMatrixBuffer}
-     * owns exactly ONE slot: {@code getBuffer} rewrites that slot in place and returns the same
-     * final slice every call. So one instance can only ever hold one projection at a time, and
-     * every write invalidates the value that previously-handed-out slices resolve to -
-     * {@code RenderSystem.backupProjectionMatrix}/{@code restoreProjectionMatrix} included, since
-     * those now save the pointer rather than the matrix.
-     * <p>
-     * That collides head-on with 1.21.11 drawing being deferred. Visor writes a projection from
-     * four call sites (both overlay passes, both hand passes) several times per eye pass, while
-     * the geometry that reads it is sitting in the SubmitNodeStorage waiting for
-     * {@code renderAllFeatures()}. With a single slot, whichever projection was written last wins
-     * for every pending draw - so geometry rendered correctly when its flush happened to follow
-     * its own write, and was drawn through another pass's projection otherwise.
-     * <p>
-     * A ring gives every write its own slot, so a slice stays valid until the GPU has consumed
-     * the draws that reference it. 64 bytes each; the ring is sized well past the number of
-     * writes that can be in flight across the eye, mirror and GUI passes of one frame.
-     */
-    @Unique
-    private GpuBufferSlice visor$uploadProjection(Matrix4f projection) {
-        if (this.visor$projectionRing == null) {
-            this.visor$projectionRing =
-                    new ProjectionMatrixBuffer[VISOR_PROJECTION_RING_SIZE];
-        }
-        int slot = this.visor$projectionRingIndex;
-        this.visor$projectionRingIndex = (slot + 1) % VISOR_PROJECTION_RING_SIZE;
-        ProjectionMatrixBuffer buffer = this.visor$projectionRing[slot];
-        if (buffer == null) {
-            buffer = new ProjectionMatrixBuffer("visor vr projection " + slot);
-            this.visor$projectionRing[slot] = buffer;
-        }
-        return buffer.getBuffer(projection);
-    }
-
-    /**
-     * Releases the VR projection UBO alongside vanilla's own {@code levelProjectionMatrixBuffer},
-     * which {@code GameRenderer#close} disposes of on the same line.
-     */
-    @Inject(method = "close", at = @At("HEAD"))
-    private void visor$closeProjectionBuffer(CallbackInfo ci) {
-        if (this.visor$projectionRing == null) {
-            return;
-        }
-        for (int i = 0; i < this.visor$projectionRing.length; i++) {
-            if (this.visor$projectionRing[i] != null) {
-                this.visor$projectionRing[i].close();
-                this.visor$projectionRing[i] = null;
-            }
-        }
-        this.visor$projectionRing = null;
-        this.visor$projectionRingIndex = 0;
-    }
-
-
-    @Override
-    @Unique
-    public Vec3 visor$getCrossVec() {
-        return visor$crossVec;
-    }
-
-    @Override
-    @Unique
-    public Vec3 visor$getCrossVec(HandType hand) {
-        return visor$handCrossVec[hand.ordinal()];
-    }
-
-    @Override
-    @Unique
-    public HitResult visor$getHandHitResult(HandType hand) {
-        return visor$handHitResult[hand.ordinal()];
-    }
-
-    @Override
-    @Unique
-    public void visor$applyHandPick(HandType hand) {
-        HitResult hitResult = visor$handHitResult[hand.ordinal()];
-        Vec3 crossVec = visor$handCrossVec[hand.ordinal()];
-        if (hitResult == null || crossVec == null) {
-            this.pick(1.0f);
-            return;
-        }
-        this.minecraft.hitResult = hitResult;
-        this.minecraft.crosshairPickEntity = visor$handPickEntity[hand.ordinal()];
-        this.visor$crossVec = crossVec;
-    }
-
-    @Override
-    public VRCameraEntityCache visor$getCameraEntityCache() {
-        return visor$cameraEntityCache;
-    }
-
-    @Override
-    @Unique
-    public Matrix4f visor$getThirdPersonProjection() {
-        return visor$thirdPersonProjection;
-    }
-
-
-    /* ************************* *\
-      //--------UTILITY METHODS--------\\
-        \* ************************* */
     @Unique
     private void visor$setupOverlayStatus(float partialTicks) {
-        //@TODO add post process for these effects
         this.visor$inBlock = false;
         this.visor$blockProximity = 0.0f;
-
         this.visor$onfire = false;
-
-        if(minecraft.player.isSpectator()
+        if (minecraft.player == null
+                || minecraft.player.isSpectator()
                 || !minecraft.player.isAlive()
-                || VRRenderState.getSceneType().isMainMenu()){
+                || VRRenderState.getSceneType().isMainMenu()) {
             return;
         }
-        // fix for immersive portals issue
         if (this.minecraft.level != this.minecraft.player.level()) {
             return;
         }
@@ -976,47 +761,20 @@ public abstract class GameRendererMixin
                 renderPass,
                 ClientContext.localPlayer.getPoseData(PlayerPoseType.RENDER)
         );
-
         float inBlockEffectStart = 0.3f;
         float distance = RenderHelper.distanceToNearestSolidBlockSurface(
                 new Vec3((Vector3f) cameraPos),
                 inBlockEffectStart
         );
-
         this.visor$blockProximity = Math.max(
                 0.0f,
                 1.0f - distance / inBlockEffectStart
         );
         this.visor$inBlock = distance < visor$nearClipPlane * 2.0f;
-
-
         this.visor$onfire = VRRenderState.getRenderPass() != VRRenderPass.THIRD_PERSON
                 && this.minecraft.player.isOnFire()
                 && !ModLoader.get().renderFireOverlay(
                 this.minecraft.player, new PoseStack()
         );
     }
-
-    @Unique
-    public Vec3 visor$aimedPointAtDistance(VRPose vrPose,
-                                           double distance) {
-        var dir = vrPose.getDirection();
-        return new Vec3(vrPose
-                .getPosition().add(
-                        dir.x() * (float) distance,
-                        dir.y() * (float) distance,
-                        dir.z() * (float) distance,
-                        new Vector3f()
-                )
-        );
-    }
-
-    @Unique
-    public HitResult visor$pickBlock(VRPose vrPose,
-                                     double blockReachDistance,
-                                     boolean fluid
-    ) {
-        return ImmPortalsCompatHelper.pickBlock(MC.level, vrPose, blockReachDistance, fluid, MC.player);
-    }
-
 }

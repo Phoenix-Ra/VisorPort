@@ -22,8 +22,11 @@ public interface GameRendererAccessor {
      * by the {@link GuiRenderer}. Visor renders GUIs off the vanilla schedule - once per overlay
      * texture, plus the desktop mirror - so it needs both halves.
      */
-    @Accessor("guiRenderState")
-    GuiRenderState visor$getGuiRenderState();
+    // PORT-26.1: the GuiRenderState moved into GameRenderer.gameRenderState and is public via
+    // getGameRenderState().guiRenderState, so no accessor is needed any more. It must not be a
+    // default method here either: an interface mixin is only an accessor mixin while every
+    // method is @Accessor/@Invoker - one plain method turns it into an interface mixin, which
+    // Mixin refuses to apply to a class ("@Mixin target type mismatch ... is not an interface").
 
     @Accessor("guiRenderer")
     GuiRenderer visor$getGuiRenderer();

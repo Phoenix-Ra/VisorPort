@@ -29,12 +29,10 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.ForgeHooksClient;
 import net.minecraftforge.common.ForgeMod;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLEnvironment;
-import net.minecraftforge.fml.loading.FMLLoader;
+import net.minecraftforge.fml.loading.LoadingModList;
 import net.minecraftforge.fml.loading.FMLPaths;
 import net.minecraftforge.fml.loading.moddiscovery.ModFileInfo;
-import net.minecraftforge.forgespi.language.IModFileInfo;
 import net.minecraftforge.forgespi.language.ModFileScanData;
 import org.jetbrains.annotations.NotNull;
 
@@ -58,14 +56,14 @@ public class ForgeModLoader implements ModLoader {
 
     @Override
     public boolean isModLoaded(@NotNull String id) {
-        return FMLLoader.getLoadingModList().getModFileById(id) != null;
+        // PORT-26.1 (Forge 64): FMLLoader.getLoadingModList() is gone; LoadingModList is a static API
+        return LoadingModList.getModFileById(id) != null;
     }
 
     @Override
     public @NotNull String getModVersion(@NotNull String id) {
         if (isModLoaded(VisorAPI.MOD_ID)) {
-            return FMLLoader.getLoadingModList()
-                    .getModFileById(id).versionString();
+            return LoadingModList.getModFileById(id).versionString();
         }
         return "no version";
     }
@@ -147,8 +145,11 @@ public class ForgeModLoader implements ModLoader {
                                                        @NotNull String modId,
                                                        @NotNull String packagePath) {
         List<Class<?>> result = new ArrayList<>();
-        IModFileInfo info = ModList.get().getModFileById(modId);
-        if (!(info instanceof ModFileInfo modFileInfo)) {
+        // PORT-26.1: ModList.get() is gone on Forge 64. Resolve the file through LoadingModList
+        // instead - the same static call isModLoaded() uses, and the one Vivecraft's 26.1 Forge
+        // module (built on Forge 63) relies on, so it holds across the whole 26.1.x line.
+        ModFileInfo modFileInfo = LoadingModList.getModFileById(modId);
+        if (modFileInfo == null) {
             return result;
         }
 

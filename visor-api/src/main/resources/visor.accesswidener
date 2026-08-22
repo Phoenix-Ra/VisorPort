@@ -95,6 +95,27 @@ accessible field net/minecraft/client/Camera yRot F
 # to set reset camera before tick
 accessible method net/minecraft/client/Camera setPosition (Lnet/minecraft/world/phys/Vec3;)V
 
+# PORT-26.1: Camera.setup() is gone; Camera.update(DeltaTracker) now owns pose, fov, far plane,
+# the cull frustum and the projection. VRGameCamera rebuilds all of them per VR pass, so the
+# private pieces it has to write/call are widened here.
+accessible field net/minecraft/client/Camera fov F
+accessible field net/minecraft/client/Camera hudFov F
+accessible field net/minecraft/client/Camera depthFar F
+accessible field net/minecraft/client/Camera cullFrustum Lnet/minecraft/client/renderer/culling/Frustum;
+accessible field net/minecraft/client/Camera matrixPropertiesDirty I
+accessible method net/minecraft/client/Camera prepareCullFrustum (Lorg/joml/Matrix4fc;Lorg/joml/Matrix4f;Lnet/minecraft/world/phys/Vec3;)V
+accessible method net/minecraft/client/Camera createProjectionMatrixForCulling ()Lorg/joml/Matrix4f;
+accessible method net/minecraft/client/Camera setupPerspective (FFFFF)V
+
+# PORT-26.1: 26.1 lights GUI items/entities with a flat 1x1 "UI lightmap" that GameRenderer only
+# switches on around its own GUI draw. Visor draws GUI content outside that window (overlay
+# textures, mirror text), so RenderGuiHelper flips the same switch around its flushes.
+accessible field net/minecraft/client/renderer/GameRenderer useUiLightmap Z
+
+# PORT-26.1: GameRenderer.pick(F) moved to Minecraft and became private; the hand-aware VR pick
+# still needs to call the vanilla raycast.
+accessible method net/minecraft/client/Minecraft pick (F)V
+
 # for pausemenu buttons
 accessible method net/minecraft/client/Minecraft isMultiplayerServer ()Z
 

@@ -14,7 +14,7 @@ import org.vmstudio.visor.api.common.network.VisorPayloadToClient;
 import org.vmstudio.visor.api.common.network.VisorPayloadToServer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import org.vmstudio.visor.loader.fabric.network.VisorChannelPayload;
@@ -87,29 +87,28 @@ public class FabricModLoader implements ModLoader {
 
         if (!worldEventsRegistered) {
             /*
-             * PORT-1.21.11: WorldRenderEvents moved to ...rendering.v1.world and the event set was
-             * reshuffled for the extract/submit split. Two of the three Visor used survived in
-             * spirit:
-             *   BEFORE_ENTITIES  - unchanged, still "after the SOLID, CUTOUT and CUTOUT_MIPPED
-             *                      terrain layers are drawn, before entities", which is what Visor
-             *                      already used as its closest equivalent of AFTER_SOLID.
-             *   AFTER_TRANSLUCENT -> END_MAIN. Both fire once translucent terrain is on the
-             *                      framebuffer and before particles, clouds and weather.
-             * The context lost tickCounter() (it only exists on the extraction context now) and
-             * matrixStack() is matrices().
+             * PORT-26.1: WorldRenderEvents (rendering.v1.world) became LevelRenderEvents
+             * (rendering.v1.level), split into extraction and drawing events. The two drawing
+             * points Visor needs map as:
+             *   BEFORE_ENTITIES -> AFTER_OPAQUE_TERRAIN: "after opaque terrain is drawn, before any
+             *                      submit nodes are added" - the same spot, i.e. AFTER_SOLID.
+             *   END_MAIN        -> END_MAIN: unchanged - terrain, entities, block entities and
+             *                      particles are on the framebuffer, clouds/weather are not.
+             * The context exposes poseStack() instead of matrices().
              */
-            WorldRenderEvents.BEFORE_ENTITIES.register(context ->
+            // AFTER_OPAQUE_TERRAIN only carries a LevelTerrainRenderContext (no PoseStack); the
+            // decoration renderers build their own camera transform, exactly as on Forge, which
+            // hands them a fresh stack too.
+            LevelRenderEvents.AFTER_OPAQUE_TERRAIN.register(context ->
                     fireCallbacks(RenderPipelineStage.AFTER_SOLID,
-                            context.matrices(), visor$partialTicks()));
+                            new PoseStack(), visor$partialTicks()));
 
-            WorldRenderEvents.END_MAIN.register(context ->
+            LevelRenderEvents.END_MAIN.register(context ->
                     fireCallbacks(RenderPipelineStage.AFTER_TRANSLUCENT,
-                            context.matrices(), visor$partialTicks()));
+                            context.poseStack(), visor$partialTicks()));
 
-            // AFTER_WORLD has no event any more - WorldRenderEvents.END is gone and END_MAIN
-            // stops short of particles, clouds and weather, so it would collide with
-            // AFTER_TRANSLUCENT rather than replace END. FabricLevelRendererVRMixin fires it from
-            // the tail of renderLevel instead, which is where END used to sit.
+            // AFTER_WORLD still has no event; FabricLevelRendererVRMixin fires it from the tail
+            // of renderLevel.
             worldEventsRegistered = true;
         }
     }
@@ -235,7 +234,8 @@ public class FabricModLoader implements ModLoader {
         var codec = VisorChannelPayload.codecOf(type);
 
         if (channel.hasPacketsToServer()) {
-            PayloadTypeRegistry.playC2S().register(type, codec);
+            // PORT-26.1: Fabric networking renamed playC2S/playS2C -> serverboundPlay/clientboundPlay
+            PayloadTypeRegistry.serverboundPlay().register(type, codec);
             ServerPlayNetworking.registerGlobalReceiver(type, (payload, context) ->
                     context.server().execute(() -> {
                         FriendlyByteBuf buffer = payload.toBuffer();
@@ -250,7 +250,7 @@ public class FabricModLoader implements ModLoader {
                     }));
         }
         if (channel.hasPacketsToClient()) {
-            PayloadTypeRegistry.playS2C().register(type, codec);
+            PayloadTypeRegistry.clientboundPlay().register(type, codec);
             if (FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT) {
                 ClientPlayNetworking.registerGlobalReceiver(type, (payload, context) ->
                         context.client().execute(() -> {
@@ -270,7 +270,8 @@ public class FabricModLoader implements ModLoader {
                                                    @NotNull VisorPayloadToClient payload) {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         payload.write(buffer);
-        return ServerPlayNetworking.createS2CPacket(VisorChannelPayload.of(channelId, buffer));
+        // PORT-26.1: createS2CPacket -> createClientboundPacket
+        return ServerPlayNetworking.createClientboundPacket(VisorChannelPayload.of(channelId, buffer));
     }
 
     @Override
@@ -278,7 +279,8 @@ public class FabricModLoader implements ModLoader {
                                                    @NotNull VisorPayloadToServer payload) {
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         payload.write(buffer);
-        return ClientPlayNetworking.createC2SPacket(VisorChannelPayload.of(channelId, buffer));
+        // PORT-26.1: createC2SPacket -> createServerboundPacket
+        return ClientPlayNetworking.createServerboundPacket(VisorChannelPayload.of(channelId, buffer));
     }
 
 

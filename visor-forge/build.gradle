@@ -24,6 +24,10 @@ loom {
         mixinConfig "visor.blur.mixins.json"
         mixinConfig "visor.mixins.forge.json"
     }
+
+    // PORT-26.1: same as visor-fabric - loom-no-remap nests `include` (mixinextras-forge) into the
+    // -dev `jar` only, so the shipped shadowJar had no META-INF/jarjar. Nest into shadowJar instead.
+    nestJars(tasks.named('shadowJar'), configurations.named('include'))
 }
 
 configurations {

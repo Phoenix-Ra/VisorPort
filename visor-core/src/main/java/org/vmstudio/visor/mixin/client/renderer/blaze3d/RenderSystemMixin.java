@@ -1,6 +1,6 @@
 package org.vmstudio.visor.mixin.client.renderer.blaze3d;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.FramerateLimiter;
 import org.vmstudio.visor.core.client.VisorState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,11 +14,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * which pipelines still route through), and {@code setShaderTexture} went with the global texture
  * slots, taking the stale-id guard with it.
  */
-@Mixin(RenderSystem.class)
+@Mixin(FramerateLimiter.class)
+/**
+ * PORT-26.1: RenderSystem.limitDisplayFPS(int) moved to net.minecraft.client.FramerateLimiter.
+ */
 public class RenderSystemMixin {
 
     @Inject(at = @At("HEAD"), method = "limitDisplayFPS",
-            cancellable = true, remap = false)
+            cancellable = true)
     private static void visor$noFPSlimit(CallbackInfo ci) {
         if (VisorState.get().isActive()) {
             ci.cancel();

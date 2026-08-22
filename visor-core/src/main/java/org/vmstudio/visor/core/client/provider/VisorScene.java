@@ -16,6 +16,7 @@ import org.vmstudio.visor.core.client.render.context.RenderContext;
 import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.render.VRShaders;
 import org.vmstudio.visor.core.client.render.VRRenderState;
+import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import org.vmstudio.visor.core.client.render.helpers.MirrorHelper;
@@ -50,9 +51,8 @@ public class VisorScene implements AtumVRScene {
         var renderContext = (RenderContext) context;
         var profiler =  renderContext.profiler();
 
-        // pop pose pushed in onGameRenderStart method
-        RenderSystem.getModelViewStack().popMatrix();
-
+        // The model-view entry pushed in onGameRenderStart is already popped by
+        // VRRendererBase.onGameRenderEnd (from VisorClientImpl.renderVR) before this runs.
 
         GlStateManager._depthMask(true);
 
@@ -122,7 +122,8 @@ public class VisorScene implements AtumVRScene {
             RenderTarget rendertarget = MC.mainRenderTarget;
 
             ClientUtils.takeScreenshot(rendertarget);
-            MC.getWindow().updateDisplay(null);
+            // PORT-26.1: Window.updateDisplay() is gone; the swap is RenderSystem.flipFrame() now
+            RenderSystem.flipFrame(null);
             ClientContext.renderer.setAskedForScreenShot(false);
         }
     }
@@ -151,10 +152,20 @@ public class VisorScene implements AtumVRScene {
 
         ShadersHelper.bridge().beginEye(renderPass.getEyeOrLeft());
 
-        MC.gameRenderer.render(
-                MC.getDeltaTracker(),
-                context.renderLevel()
-        );
+        // PORT-26.1: GameRenderer.render(deltaTracker, renderLevel) became the update / extract /
+        // render triple. The camera (VRGameCamera) answers update() with this pass's pose and
+        // projection, extract() records the level from it, and render() draws it - the GUI half
+        // of render() is cut off by GameRendererMixin#visor$onRenderGUI. The camera entity is
+        // parked on the VR camera for the whole sequence, as it was for renderLevel() before.
+        var gameRenderer = (GameRendererExtension) MC.gameRenderer;
+        gameRenderer.visor$beginWorldPass(context.partialTicks());
+        try {
+            MC.gameRenderer.update(MC.getDeltaTracker(), context.renderLevel());
+            MC.gameRenderer.extract(MC.getDeltaTracker(), context.renderLevel());
+            MC.gameRenderer.render(MC.getDeltaTracker(), context.renderLevel());
+        } finally {
+            gameRenderer.visor$endWorldPass();
+        }
 
         if (ShadersHelper.isShaderActive()) {
             Matrix4fStack modelView = RenderSystem.getModelViewStack();

@@ -56,7 +56,7 @@ public class RenderGuiHelper {
     }
 
     public static GuiGraphicsExtractor beginGui(int mouseX, int mouseY) {
-        GuiRenderState state = ((GameRendererAccessor) MC.gameRenderer).visor$getGuiRenderState();
+        GuiRenderState state = MC.gameRenderer.getGameRenderState().guiRenderState;
         state.reset();
         return new GuiGraphicsExtractor(MC, state, mouseX, mouseY);
     }
@@ -64,9 +64,19 @@ public class RenderGuiHelper {
     /** Replays everything recorded since {@link #beginGui} onto the current main render target. */
     public static void flushGui() {
         GameRendererAccessor gameRenderer = (GameRendererAccessor) MC.gameRenderer;
-        gameRenderer.visor$getGuiRenderer().render(
-                gameRenderer.visor$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE));
-        gameRenderer.visor$getGuiRenderer().endFrame();
+        // PORT-26.1: GUI item/entity draws sample GameRenderer.lightmap(), which is the flat UI
+        // lightmap only while useUiLightmap is set - vanilla sets it around its own GUI draw in
+        // GameRenderer.render(). Visor flushes outside that window, so mirror it here or the
+        // overlay textures get lit by the world lightmap (dark at night, tinted in the Nether).
+        boolean uiLightmap = MC.gameRenderer.useUiLightmap;
+        MC.gameRenderer.useUiLightmap = true;
+        try {
+            gameRenderer.visor$getGuiRenderer().render(
+                    gameRenderer.visor$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE));
+            gameRenderer.visor$getGuiRenderer().endFrame();
+        } finally {
+            MC.gameRenderer.useUiLightmap = uiLightmap;
+        }
     }
 
 
