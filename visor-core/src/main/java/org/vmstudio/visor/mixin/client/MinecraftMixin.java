@@ -696,7 +696,7 @@ public abstract class MinecraftMixin implements MinecraftExtension {
                 partialTick,
                 tick -> original.call(tick)
         );
-        if (this.screen == null) {
+        if (this.screen == null && this.player != null) {
             TaskTeleport.updateTeleportDestination(this.player);
         }
     }

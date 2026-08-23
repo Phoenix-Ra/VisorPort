@@ -1,5 +1,6 @@
 package org.vmstudio.visor.mixin.client.multiplayer;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.prediction.PredictiveAction;
 import net.minecraft.network.protocol.Packet;
@@ -87,6 +88,27 @@ public abstract class MultiPlayerGameModeMixin {
             target = "Lnet/minecraft/client/player/LocalPlayer;getMainHandItem()Lnet/minecraft/world/item/ItemStack;"))
     public ItemStack visor$destroyBlock(LocalPlayer player) {
         return visor$getUsedItem(player);
+    }
+
+    /**
+     * Vanilla only falls back to BlockState#useWithoutItem (doors, levers, chests, buttons...)
+     * on the MAIN_HAND pass of performUseItemOn - the OFF_HAND pass may only use its item, which
+     * is why interacting with the VR offhand either did nothing or placed the held block.
+     * In two-handed VR the loop is already restricted to the single active hand
+     * (visor$useItemOnlyActive), so the "acting hand" takes over MAIN_HAND's role in that rule:
+     * compare against the active hand instead. With MAIN active this returns MAIN_HAND and
+     * vanilla behavior is untouched.
+     * <p>
+     * performUseItemOn references InteractionHand.MAIN_HAND exactly once (the fallback gate),
+     * verified against the 26.1.2 bytecode.
+     */
+    @ModifyExpressionValue(method = "performUseItemOn", at = @At(value = "FIELD",
+            target = "Lnet/minecraft/world/InteractionHand;MAIN_HAND:Lnet/minecraft/world/InteractionHand;"))
+    private InteractionHand visor$blockInteractionWithActiveHand(InteractionHand original) {
+        if (VisorState.get().isNotActive() || !VRServerSettings.isTwoHandedVR()) {
+            return original;
+        }
+        return ClientContext.localPlayer.getActiveHand().asInteractionHand();
     }
 
 
