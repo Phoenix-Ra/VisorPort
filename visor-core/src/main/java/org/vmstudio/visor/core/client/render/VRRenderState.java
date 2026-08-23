@@ -217,6 +217,23 @@ public class VRRenderState {
                 && renderPass.isFirstPerson();
     }
 
+    /**
+     * True while Visor is inside a VR world pass other than {@link VRRenderPass#worldUpdater()}.
+     * Once-per-frame world work that some mod still drives from the render path (light-engine
+     * polling, chunk graph rebuilds, ...) can be skipped in these passes; vanilla 26.1 itself
+     * runs that work once per frame from Minecraft#renderFrame, outside any VR pass, and this
+     * returns false there.
+     */
+    public static boolean isSecondaryWorldPass() {
+        if (VisorState.get().isNotActive()) {
+            return false;
+        }
+        if (!phase.isVRWorld()) {
+            return false;
+        }
+        return renderPass != VRRenderPass.worldUpdater();
+    }
+
     public static boolean isInMainMenu(){
         if(MC == null){
             return false;

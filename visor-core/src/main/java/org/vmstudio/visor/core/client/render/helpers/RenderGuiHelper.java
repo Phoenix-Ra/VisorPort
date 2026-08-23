@@ -13,6 +13,8 @@ import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.render.GuiRenderer;
 import net.minecraft.client.renderer.state.gui.GuiRenderState;
+import net.minecraft.client.renderer.state.WindowRenderState;
+import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.renderer.fog.FogRenderer;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.render.VisorPipelines;
@@ -70,12 +72,31 @@ public class RenderGuiHelper {
         // overlay textures get lit by the world lightmap (dark at night, tinted in the Nether).
         boolean uiLightmap = MC.gameRenderer.useUiLightmap;
         MC.gameRenderer.useUiLightmap = true;
+        // PORT-26.1: GuiRenderer no longer asks the Window for its size. The ortho projection,
+        // scissor rects, picture-in-picture scale and the item atlas slot size all come from the
+        // windowRenderState snapshot that GameRenderer.extractWindow() took once for the frame,
+        // while the GUI *extraction* (layout) still uses the live Window getters that WindowMixin
+        // redirects to the overlay being textured (or to the mirror / pass target). Mirror those
+        // live values into the snapshot for the duration of the flush, or every overlay whose
+        // target is not exactly the GUI target's size and gui scale is drawn with the GUI
+        // target's projection: its content ends up shrunk into a corner and scissored wrongly.
+        WindowRenderState windowState = MC.gameRenderer.getGameRenderState().windowRenderState;
+        int savedWidth = windowState.width;
+        int savedHeight = windowState.height;
+        int savedGuiScale = windowState.guiScale;
+        Window window = MC.getWindow();
+        windowState.width = window.getWidth();
+        windowState.height = window.getHeight();
+        windowState.guiScale = window.getGuiScale();
         try {
             gameRenderer.visor$getGuiRenderer().render(
                     gameRenderer.visor$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE));
             gameRenderer.visor$getGuiRenderer().endFrame();
         } finally {
             MC.gameRenderer.useUiLightmap = uiLightmap;
+            windowState.width = savedWidth;
+            windowState.height = savedHeight;
+            windowState.guiScale = savedGuiScale;
         }
     }
 

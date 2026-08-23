@@ -239,16 +239,17 @@ public abstract class MinecraftMixin implements MinecraftExtension {
      * GUI phase starts right before the first of them and turns the flag off for all three, so
      * the vanilla frame only produces the GUI (into Visor's GUI target); the eye/mirror passes
      * render the level themselves from visor$renderVR.
+     *
+     * Starting the phase and suppressing the flag happen in the same ModifyArg (as the 1.21.11
+     * port did on render()) rather than in an @Inject plus a @ModifyArg on the same call: both
+     * injector kinds share the same priority, so their relative order would otherwise depend on
+     * declaration order, and the flag must be read only after the phase has switched.
      */
-    @Inject(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame")
-    private void visor$startVRGuiPhase(boolean advanceGameTime, CallbackInfo ci) {
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame", index = 1)
+    private boolean visor$guiPhaseUpdate(boolean advanceGameTime) {
         if (VisorState.get().isActive()) {
             ClientContext.renderer.onGameRenderStart(advanceGameTime);
         }
-    }
-
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame", index = 1)
-    private boolean visor$guiPhaseUpdate(boolean advanceGameTime) {
         return visor$vanillaFrameRendersLevel(advanceGameTime);
     }
 

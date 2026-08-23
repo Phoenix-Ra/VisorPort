@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.entity.*;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.PlayerModelType;
@@ -22,6 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.vmstudio.visor.api.client.player.VRClientPlayer;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
 import org.vmstudio.visor.api.client.render.decoration.VRBodyRenderer;
 import org.vmstudio.visor.core.client.ClientContext;
@@ -29,6 +31,7 @@ import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.player.VRClientPlayers;
 import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.extensions.client.entity.EntityRenderDispatcherExtension;
+import org.vmstudio.visor.extensions.client.entity.EntityRenderStateExtension;
 import org.vmstudio.visor.extensions.client.entity.PlayerRendererExtension;
 
 public class PlayerRenderMixins {
@@ -89,6 +92,42 @@ public class PlayerRenderMixins {
                 if(model != null) {
                     cir.setReturnValue(model);
                 }
+            }
+        }
+
+        // PORT-26.1: carried over from 1.21.11, where drawing an entity stopped being one call.
+        // extractEntity() still resolves through getRenderer(Entity) above, but
+        // EntityRenderDispatcher#submit resolves through this overload, which reads
+        // playerRenderers.get(state.skin.model()) directly and never consults the entity one.
+        // Without the same substitution here the VR renderer only ever extracts, and vanilla
+        // AvatarRenderer/PlayerModel draw the body in its vanilla pose. The VR player is already
+        // on the state - extractRenderState parks it, and createRenderState allocates a fresh
+        // state per extract, so it is never stale.
+        @Inject(method = "getRenderer(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;)Lnet/minecraft/client/renderer/entity/EntityRenderer;",
+                at = @At("HEAD"), cancellable = true)
+        private void visor$getVRPlayerRendererForState(
+                EntityRenderState renderState, CallbackInfoReturnable cir)
+        {
+            if(ClientContext.visor == null) {
+                return;
+            }
+            if (!(renderState instanceof AvatarRenderState avatarState)) {
+                return;
+            }
+            VRClientPlayer vrPlayer =
+                    ((EntityRenderStateExtension) renderState).visor$getVRPlayer();
+            if(vrPlayer == null){
+                return;
+            }
+            // same slim/wide mapping as the entity overload above
+            String modelName = avatarState.skin.model() == PlayerModelType.SLIM
+                    ? VRBodyRenderer.MODEL_NAME_SLIM
+                    : VRBodyRenderer.MODEL_NAME_DEFAULT;
+            var model = vrPlayer.getBodyType().getRenderer().getModelRenderer(
+                    vrPlayer, modelName
+            );
+            if(model != null) {
+                cir.setReturnValue(model);
             }
         }
 

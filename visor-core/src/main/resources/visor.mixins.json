@@ -33,7 +33,6 @@
     "client.renderer.LevelRendererMixin",
     "client.renderer.NoSodiumLevelRendererMixin",
     "client.renderer.VRLightsMixins$ClientLevelMixin",
-    "client.renderer.VRLightsMixins$LevelLightEngineMixin",
     "client.renderer.WeatherEffectRendererMixin",
     "client.renderer.blaze3d.GlStateManagerMixin",
     "client.renderer.blaze3d.RenderSystemMixin",
