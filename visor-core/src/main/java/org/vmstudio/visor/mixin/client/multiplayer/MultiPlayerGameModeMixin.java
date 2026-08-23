@@ -1,5 +1,6 @@
 package org.vmstudio.visor.mixin.client.multiplayer;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.prediction.PredictiveAction;
 import net.minecraft.network.protocol.Packet;
@@ -87,6 +88,16 @@ public abstract class MultiPlayerGameModeMixin {
             target = "Lnet/minecraft/client/player/LocalPlayer;getMainHandItem()Lnet/minecraft/world/item/ItemStack;"))
     public ItemStack visor$destroyBlock(LocalPlayer player) {
         return visor$getUsedItem(player);
+    }
+
+
+    @ModifyExpressionValue(method = "performUseItemOn", at = @At(value = "FIELD",
+            target = "Lnet/minecraft/world/InteractionHand;MAIN_HAND:Lnet/minecraft/world/InteractionHand;"))
+    private InteractionHand visor$blockInteractionWithActiveHand(InteractionHand original) {
+        if (VisorState.get().isNotActive() || !VRServerSettings.isTwoHandedVR()) {
+            return original;
+        }
+        return ClientContext.localPlayer.getActiveHand().asInteractionHand();
     }
 
 

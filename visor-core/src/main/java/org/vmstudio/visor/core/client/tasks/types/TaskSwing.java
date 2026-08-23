@@ -565,12 +565,13 @@ public class TaskSwing extends VisorTask {
     }
 
     private void startPrediction(final ClientLevel clientLevel, final PredictiveVrAction predictiveAction) {
+        if (MC.getConnection() == null || !ClientNetworking.isServerSupportsVisor()) {
+            return;
+        }
         try (BlockStatePredictionHandler handler = clientLevel.getBlockStatePredictionHandler().startPredicting()) {
             final int sequence = handler.currentSequence();
             final SwingBlockPayloadToServer packet = predictiveAction.predict(sequence);
             ClientNetworking.sendVRPacket(packet);
-        } catch (Exception e) {
-            throw e;
         }
     }
 

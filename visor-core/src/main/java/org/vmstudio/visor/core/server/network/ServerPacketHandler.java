@@ -47,6 +47,9 @@ public class ServerPacketHandler {
 
         if (vrPlayer == null) {
             if(payloadToServer.payloadId() != VisorCorePayloadID.HANDSHAKE.byteOrdinal()) {
+               if (payloadToServer instanceof SwingBlockPayloadToServer swingBlock) {
+                    serverPlayer.connection.ackBlockChangesUpTo(swingBlock.sequence());
+                }
                 return;
             } else{
                 if(packetReceiver == null){
@@ -198,14 +201,20 @@ public class ServerPacketHandler {
                 }
             }
             case SWING_BLOCK -> {
+                var payload = (SwingBlockPayloadToServer) payloadToServer;
+                // Vanilla acknowledges every sequenced packet before (or regardless of how) it
+                // processes it - see handleUseItemOn/handlePlayerAction. A sequence that is never
+                // acked leaves the client's BlockStatePredictionHandler holding that position
+                // forever: later server block updates for it get parked instead of applied, and
+                // the block visually refuses to break until some other acked action (e.g. placing
+                // a block) flushes the map. So ack first, no matter which branch below runs.
+                serverPlayer.connection.ackBlockChangesUpTo(payload.sequence());
                 if(!VRServerSettings.isBetterSwinging()){
                     return;
                 }
                 if (serverPlayer.gameMode.getGameModeForPlayer() == GameType.SPECTATOR) {
                     return;
                 }
-
-                var payload = (SwingBlockPayloadToServer) payloadToServer;
 
                 HandType handType = payload.mainHand() ? HandType.MAIN : HandType.OFFHAND;
 
@@ -221,7 +230,6 @@ public class ServerPacketHandler {
                                 payload.sequence(),
                                 itemStack
                         );
-                serverPlayer.connection.ackBlockChangesUpTo(payload.sequence());
             }
         }
     }

@@ -1,5 +1,6 @@
 package org.vmstudio.visor.mixin.common.player;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import me.phoenixra.atumconfig.api.tuples.PairRecord;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -12,6 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerPlayerGameMode;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectUtil;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.player.Player;
@@ -145,6 +147,20 @@ public abstract class ServerPlayerGameModeMixin implements ServerPlayerGameModeE
         return visor$vrHandItem(player);
     }
 
+
+    @ModifyExpressionValue(method = "useItemOn", at = @At(value = "FIELD",
+            target = "Lnet/minecraft/world/InteractionHand;MAIN_HAND:Lnet/minecraft/world/InteractionHand;"))
+    private InteractionHand visor$blockInteractionWithActiveHand(InteractionHand original) {
+        if (!VRServerSettings.isTwoHandedVR()) {
+            return original;
+        }
+        VRPlayer vrPlayer = VisorAPI.getVRPlayer(this.player);
+        if (vrPlayer == null) {
+            return original;
+        }
+        return vrPlayer.getActiveHand().asInteractionHand();
+    }
+
     /* ************************* *\
   //--------BETTER SWINGING--------\\
     \* ************************* */
@@ -221,8 +237,12 @@ public abstract class ServerPlayerGameModeMixin implements ServerPlayerGameModeE
             return;
         }
 
-        this.hasDelayedDestroy = false;
-        this.isDestroyingBlock = false;
+        if (this.hasDelayedDestroy && blockPos.equals(this.delayedDestroyPos)) {
+            this.hasDelayedDestroy = false;
+        }
+        if (this.isDestroyingBlock && blockPos.equals(this.destroyPos)) {
+            this.isDestroyingBlock = false;
+        }
         if (this.isCreative()) {
             this.visor$destroyAndAck(
                     blockPos, j, "creative destroy",
