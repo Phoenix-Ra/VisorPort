@@ -14,6 +14,7 @@ import net.minecraft.client.renderer.state.CameraRenderState;
 import net.minecraft.client.renderer.entity.*;
 import net.minecraft.client.renderer.entity.player.AvatarRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.entity.Entity;
@@ -96,6 +97,35 @@ public class PlayerRenderMixins {
                 if(model != null) {
                     cir.setReturnValue(model);
                 }
+            }
+        }
+
+
+        @Inject(method = "getRenderer(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;)Lnet/minecraft/client/renderer/entity/EntityRenderer;",
+                at = @At("HEAD"), cancellable = true)
+        private void visor$getVRPlayerRendererForState(
+                EntityRenderState renderState, CallbackInfoReturnable cir)
+        {
+            if(ClientContext.visor == null) {
+                return;
+            }
+            if (!(renderState instanceof AvatarRenderState avatarState)) {
+                return;
+            }
+            VRClientPlayer vrPlayer =
+                    ((EntityRenderStateExtension) renderState).visor$getVRPlayer();
+            if(vrPlayer == null){
+                return;
+            }
+            // same slim/wide mapping as the entity overload above
+            String modelName = avatarState.skin.model() == PlayerModelType.SLIM
+                    ? VRBodyRenderer.MODEL_NAME_SLIM
+                    : VRBodyRenderer.MODEL_NAME_DEFAULT;
+            var model = vrPlayer.getBodyType().getRenderer().getModelRenderer(
+                    vrPlayer, modelName
+            );
+            if(model != null) {
+                cir.setReturnValue(model);
             }
         }
 
