@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.gui.overlays.templates;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.textures.FilterMode;
 import net.minecraft.network.chat.Component;
@@ -78,7 +79,7 @@ public class VROverlayHUD extends VROverlayTemplateFrameBuffer implements VREven
 
     @Override
     public boolean updateVisibility() {
-        return MC.screen == null
+        return MC.gui.screen() == null
                 && MC.player != null;
     }
 
@@ -227,7 +228,7 @@ public class VROverlayHUD extends VROverlayTemplateFrameBuffer implements VREven
     private static final class RegionRenderTarget extends RenderTarget {
         public RegionRenderTarget(boolean useDepth) {
             // PORT-1.21.11: RenderTarget now labels its GPU textures, so it wants a name.
-            super("visor hud region", useDepth);
+            super("visor hud region", useDepth, GpuFormat.RGBA8_UNORM);
         }
     }
 }

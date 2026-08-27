@@ -1,18 +1,19 @@
 package org.vmstudio.visor.core.client.render;
 
+import com.mojang.blaze3d.GpuFormat;
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
+import com.mojang.blaze3d.platform.BlendFactor;
 import java.util.Optional;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.DepthStencilState;
 import com.mojang.blaze3d.platform.CompareOp;
-import com.mojang.blaze3d.platform.DestFactor;
-import com.mojang.blaze3d.platform.SourceFactor;
-import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.rendertype.RenderSetup;
 import net.minecraft.client.renderer.rendertype.RenderType;
@@ -62,8 +63,8 @@ public final class VisorPipelines {
      * function and is not a substitute.
      */
     private static final BlendFunction CROSSHAIR_INVERT = new BlendFunction(
-            SourceFactor.ONE_MINUS_DST_COLOR, DestFactor.ONE_MINUS_SRC_COLOR,
-            SourceFactor.ONE, DestFactor.ZERO);
+            BlendFactor.ONE_MINUS_DST_COLOR, BlendFactor.ONE_MINUS_SRC_COLOR,
+            BlendFactor.ONE, BlendFactor.ZERO);
 
 
     /*
@@ -90,8 +91,12 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_triangles"))
             .withVertexShader("core/position")
             .withFragmentShader("core/position")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.TRIANGLES)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            // core/position is the one core shader here that also imports fog.glsl.
+            .withBindGroupLayout(BindGroupLayouts.FOG)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION)
+            .withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
             .withColorTargetState(ColorTargetState.DEFAULT)
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -105,10 +110,12 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_color"))
             .withVertexShader("core/position_color")
             .withFragmentShader("core/position_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
-            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
+            .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true))
             .withCull(true)
             .build();
 
@@ -117,8 +124,10 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_color_no_depth"))
             .withVertexShader("core/position_color")
             .withFragmentShader("core/position_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -129,8 +138,10 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_color_additive_no_depth"))
             .withVertexShader("core/position_color")
             .withFragmentShader("core/position_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(ADDITIVE_GLOW))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -147,10 +158,12 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_color_normal"))
             .withVertexShader("core/position_color")
             .withFragmentShader("core/position_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR_NORMAL)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
-            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, false))
+            .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, false))
             .withCull(true)
             .build();
 
@@ -159,8 +172,10 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_color_normal_no_depth"))
             .withVertexShader("core/position_color")
             .withFragmentShader("core/position_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR_NORMAL)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -173,11 +188,13 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_tex_color"))
             .withVertexShader("core/position_tex_color")
             .withFragmentShader("core/position_tex_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
-            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
+            .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true))
             .withCull(true)
             .build();
 
@@ -190,11 +207,13 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_tex_color_no_cull"))
             .withVertexShader("core/position_tex_color")
             .withFragmentShader("core/position_tex_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
-            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
+            .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true))
             .withCull(false)
             .build();
 
@@ -202,9 +221,11 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_tex_color_no_depth"))
             .withVertexShader("core/position_tex_color")
             .withFragmentShader("core/position_tex_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -214,9 +235,11 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_tex_color_additive_no_depth"))
             .withVertexShader("core/position_tex_color")
             .withFragmentShader("core/position_tex_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(ADDITIVE_GLOW))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -227,9 +250,11 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_tex_color_invert"))
             .withVertexShader("core/position_tex_color")
             .withFragmentShader("core/position_tex_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(CROSSHAIR_INVERT))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -244,20 +269,28 @@ public final class VisorPipelines {
      * closer. {@code NO_DEPTH_TEST} maps to {@code glDisable(GL_DEPTH_TEST)}, under which GL
      * never writes depth, so one pipeline cannot do both halves any more. The colour half stays
      * on {@link #POSITION_TEX_COLOR_INVERT}; this colour-masked pass restores the write half.
-     * LEQUAL rather than the old unconditional write: where the crosshair shows through a wall,
-     * it no longer pushes the wall's depth back, it just declines to carve there.
+     * Depth-tested rather than the old unconditional write: where the crosshair shows through a
+     * wall, it no longer pushes the wall's depth back, it just declines to carve there.
+     * <p>
+     * PORT-26.2: every depth test in this class is GREATER_THAN_OR_EQUAL now - 26.2 renders with
+     * a reversed depth buffer (cleared to 0.0, near mapping to 1). See {@code ProjectionHelper}.
      */
     public static final RenderPipeline CROSSHAIR_DEPTH_CARVE = RenderPipeline.builder()
             .withLocation(visor("pipeline/crosshair_depth_carve"))
             .withVertexShader("core/position_tex_color")
             .withFragmentShader("core/position_tex_color")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX_COLOR)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             // PORT-26.1: depth-only carve - the old withoutBlend() + withColorWrite(false,false)
             // pair is now one ColorTargetState with an explicit write mask.
-            .withColorTargetState(new ColorTargetState(Optional.empty(), ColorTargetState.WRITE_NONE))
-            .withDepthStencilState(new DepthStencilState(CompareOp.LESS_THAN_OR_EQUAL, true))
+            // PORT-26.2: ColorTargetState carries the target's GpuFormat now. RGBA8_UNORM is what
+            // ColorTargetState.DEFAULT itself is built with.
+            .withColorTargetState(new ColorTargetState(Optional.empty(), GpuFormat.RGBA8_UNORM,
+                    ColorTargetState.WRITE_NONE))
+            .withDepthStencilState(new DepthStencilState(CompareOp.GREATER_THAN_OR_EQUAL, true))
             .withCull(false)
             .build();
 
@@ -268,9 +301,11 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/position_tex_no_depth"))
             .withVertexShader("core/position_tex")
             .withFragmentShader("core/position_tex")
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+            .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -289,8 +324,8 @@ public final class VisorPipelines {
      * load-bearing: the mixed-reality compositor reads the eye target's alpha.
      */
     private static final BlendFunction OVERLAY_IN_WORLD = new BlendFunction(
-            SourceFactor.SRC_ALPHA, DestFactor.ONE_MINUS_SRC_ALPHA,
-            SourceFactor.ONE_MINUS_DST_ALPHA, DestFactor.ONE);
+            BlendFactor.SRC_ALPHA, BlendFactor.ONE_MINUS_SRC_ALPHA,
+            BlendFactor.ONE_MINUS_DST_ALPHA, BlendFactor.ONE);
 
     /** Unlit overlay panel, drawn in a world scene. */
     public static final RenderPipeline OVERLAY_QUAD_WORLD = overlayQuad("world", OVERLAY_IN_WORLD, true);
@@ -320,12 +355,14 @@ public final class VisorPipelines {
                 .withLocation(visor("pipeline/overlay_quad_" + suffix))
                 .withVertexShader("core/position_tex")
                 .withFragmentShader("core/position_tex")
-                .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-                .withSampler("Sampler0")
-                .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+                .withBindGroupLayout(BindGroupLayouts.GLOBALS)
+                .withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+                .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+                .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+                .withPrimitiveTopology(PrimitiveTopology.QUADS)
                 .withColorTargetState(new ColorTargetState(blend))
                 .withDepthStencilState(new DepthStencilState(depthTest
-                        ? CompareOp.LESS_THAN_OR_EQUAL
+                        ? CompareOp.GREATER_THAN_OR_EQUAL
                         : CompareOp.ALWAYS_PASS, depthTest))
                 .withCull(false)
                 .build();
@@ -347,10 +384,10 @@ public final class VisorPipelines {
                 .withLocation(visor("pipeline/overlay_quad_lit_" + suffix))
                 .withShaderDefine("ALPHA_CUTOUT", 0.1f)
                 .withShaderDefine("NO_CARDINAL_LIGHTING")
-                .withSampler("Sampler1")
+                .withBindGroupLayout(BindGroupLayouts.SAMPLER1)
                 .withColorTargetState(new ColorTargetState(blend))
                 .withDepthStencilState(new DepthStencilState(depthTest
-                        ? CompareOp.LESS_THAN_OR_EQUAL
+                        ? CompareOp.GREATER_THAN_OR_EQUAL
                         : CompareOp.ALWAYS_PASS, depthTest))
                 .withCull(false)
                 .build();
@@ -376,8 +413,9 @@ public final class VisorPipelines {
             .withLocation(visor("pipeline/blit"))
             .withVertexShader(visor("core/vr_blit"))
             .withFragmentShader(visor("core/vr_blit"))
-            .withSampler("Sampler0")
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(ColorTargetState.DEFAULT)
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)

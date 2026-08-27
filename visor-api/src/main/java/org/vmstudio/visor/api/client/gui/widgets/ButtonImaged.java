@@ -200,7 +200,7 @@ public class ButtonImaged extends AbstractButton {
         if (overlay != null) {
             return overlay;
         }
-        return Minecraft.getInstance().screen;
+        return Minecraft.getInstance().gui.screen();
     }
 
 

@@ -34,7 +34,7 @@ public class DecoratorWinScreen extends VRDecorator {
     @Override
     public boolean canActivate() {
         return MC.level != null
-                && MC.screen instanceof WinScreen;
+                && MC.gui.screen() instanceof WinScreen;
     }
 
     @Override

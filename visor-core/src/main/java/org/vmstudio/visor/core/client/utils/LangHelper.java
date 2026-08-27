@@ -1,6 +1,7 @@
 package org.vmstudio.visor.core.client.utils;
 
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.locale.Language;
 
 public class LangHelper {
 
@@ -14,7 +15,7 @@ public class LangHelper {
         return I18n.get(langKey, params);
     }
     public static boolean existsLangKey(String langKey){
-        return I18n.exists(langKey);
+        return Language.getInstance().has(langKey);
     }
 
 

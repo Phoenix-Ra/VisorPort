@@ -63,11 +63,15 @@ public class EntityRendererMixin {
      */
     @WrapOperation(method = "submitNameDisplay(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;I)V",
             at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitNameTag(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZIDLnet/minecraft/client/renderer/state/level/CameraRenderState;)V"))
+                    target = "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitNameTag(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/phys/Vec3;ILnet/minecraft/network/chat/Component;ZILnet/minecraft/client/renderer/state/level/CameraRenderState;)V"))
+    // PORT-26.2: submitNameTag dropped its distanceToCameraSq (double) parameter. A WrapOperation
+    // handler's arguments have to mirror the wrapped call exactly, so it goes from the handler and
+    // from the original.call below - fixing only the @At descriptor leaves an apply-time crash
+    // ("Found unexpected argument type double at index 7") that compiles perfectly well.
     private void visor$vrNameTagCameraOrient(SubmitNodeCollector collector, PoseStack poseStack,
                                              Vec3 nameTagAttachment, int yOffset, Component text,
                                              boolean seeThrough, int lightCoords,
-                                             double distanceToCameraSq, CameraRenderState cameraState,
+                                             CameraRenderState cameraState,
                                              Operation<Void> original,
                                              @Local(argsOnly = true) EntityRenderState renderState) {
         float heightScale = 1.0f;
@@ -88,7 +92,7 @@ public class EntityRendererMixin {
                 );
         try {
             original.call(collector, poseStack, nameTagAttachment, yOffset, text, seeThrough,
-                    lightCoords, distanceToCameraSq, cameraState);
+                    lightCoords, cameraState);
         } finally {
             cameraState.orientation = vanillaOrientation;
         }

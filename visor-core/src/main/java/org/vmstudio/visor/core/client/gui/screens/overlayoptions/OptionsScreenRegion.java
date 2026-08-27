@@ -411,7 +411,7 @@ public class OptionsScreenRegion extends OptionsScreen<OverlayOptionsScreenRegio
         // renderer owns the only GuiRenderState there is.
         // v runs 1 -> 0 top to bottom: a RenderTarget's colour texture is bottom-up, GUI space
         // is top-down. Nothing is scissored here, hence the null scissor rectangle.
-        MC.gameRenderer.getGameRenderState().guiRenderState.addGuiElement(
+        MC.gameRenderer.gameRenderState().guiRenderState.addGuiElement(
                 new BlitRenderState(
                         RenderPipelines.GUI_TEXTURED,
                         TextureSetup.singleTexture(preview,

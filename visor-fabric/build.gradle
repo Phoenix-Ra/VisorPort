@@ -11,7 +11,7 @@ loom {
     accessWidenerPath = project(":visor-api").file("src/main/resources/visor.accesswidener")
     // PORT-26.1: replaces `remapJar { injectAccessWidener = true }`
     injectAccessWidener(tasks.named('shadowJar'))
-    // PORT-26.1: remapJar also nested the `include` jars (lwjgl-openxr + its natives, lwjgl-vulkan,
+    // PORT-26.1: remapJar also nested the `include` jars (lwjgl-openxr + its natives, and
     // the fabric-api modules) into the jar it produced. loom-no-remap only wires that nesting onto
     // the plain `jar` task - now the unshipped -dev artifact - so shadowJar went out with no
     // META-INF/jars and the game failed with NoClassDefFoundError: org/lwjgl/openxr/XrEventDataBuffer.
@@ -58,8 +58,10 @@ dependencies {
     include(implementation("org.lwjgl:lwjgl-openxr:$lwjglVersion:natives-linux"))
     include(implementation("org.lwjgl:lwjgl-openxr:$lwjglVersion:natives-windows"))
 
-    //vulkan bridge rail; no natives jar - lwjgl-vulkan loads the system loader
-    include(implementation(libs.lwjgl.vulkan.get()))
+    // PORT-26.2: the lwjgl-vulkan JiJ is gone. 26.2 lists org.lwjgl:lwjgl-vulkan:3.4.1 in its own
+    // libraries (unconditionally - the macOS-only natives jars are just MoltenVK), so nesting a
+    // second copy would put duplicate org/lwjgl/vulkan classes on the loader classpath. openxr
+    // above still ships: it is not a game library on any version.
 
 
 

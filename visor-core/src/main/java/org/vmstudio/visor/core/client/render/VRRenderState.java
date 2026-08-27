@@ -62,7 +62,7 @@ public class VRRenderState {
         RenderPhase previous = phase;
         phase = RenderPhase.VANILLA;
         renderPass = VRRenderPass.NULL;
-        MC.mainRenderTarget = vanillaTarget;
+        MC.gameRenderer.mainRenderTarget = vanillaTarget;
         if (previous != phase) {
             VisorAPI.eventBus().callEvent(
                     new RenderPhaseStartedVREvent(
@@ -76,7 +76,7 @@ public class VRRenderState {
         RenderPhase previous = phase;
         phase = RenderPhase.VR_GUI;
         renderPass = VRRenderPass.GUI;
-        MC.mainRenderTarget = getTargetForPass(VRRenderPass.GUI);
+        MC.gameRenderer.mainRenderTarget = getTargetForPass(VRRenderPass.GUI);
         if (previous != phase) {
             VisorAPI.eventBus().callEvent(
                     new RenderPhaseStartedVREvent(
@@ -96,7 +96,7 @@ public class VRRenderState {
         RenderPhase previous = phase;
         phase = RenderPhase.VR_WORLD;
         VRRenderState.renderPass = renderPass;
-        MC.mainRenderTarget = getTargetForPass(renderPass);
+        MC.gameRenderer.mainRenderTarget = getTargetForPass(renderPass);
         if (previous != phase) {
             VisorAPI.eventBus().callEvent(
                     new RenderPhaseStartedVREvent(
@@ -110,7 +110,7 @@ public class VRRenderState {
         RenderPhase previous = phase;
         phase = RenderPhase.VR_MIRROR;
         renderPass = VRRenderPass.NULL;
-        MC.mainRenderTarget = ClientContext.renderer.mainTarget.getMirrorTarget();
+        MC.gameRenderer.mainRenderTarget = ClientContext.renderer.mainTarget.getMirrorTarget();
         if (previous != phase) {
             VisorAPI.eventBus().callEvent(new RenderPhaseStartedVREvent(previous, phase, renderPass));
         }
@@ -240,8 +240,8 @@ public class VRRenderState {
         }
         return MC.level == null
                 || MC.gameRenderer == null
-                || McVersionUtilsClient.isLevelTransitionScreen(MC.screen)
-                || MC.getOverlay() != null;
+                || McVersionUtilsClient.isLevelTransitionScreen(MC.gui.screen())
+                || MC.gui.overlay() != null;
     }
 
 

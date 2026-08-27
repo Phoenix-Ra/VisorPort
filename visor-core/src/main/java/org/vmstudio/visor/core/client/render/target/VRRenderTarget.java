@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.render.target;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import lombok.Getter;
@@ -25,7 +26,8 @@ public class VRRenderTarget extends RenderTarget {
                           Supplier<Integer> textureSupplier,
                           boolean linearFilter,
                           boolean useStencil) {
-        super(name, usedepth);
+        // PORT-26.2: RenderTarget now takes the colour format explicitly.
+        super(name, usedepth, GpuFormat.RGBA8_UNORM);
         RenderSystem.assertOnRenderThread();
 
         this.textureSupplier = textureSupplier;

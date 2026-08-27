@@ -112,10 +112,10 @@ public class PipelineManagerMixin implements IrisPipelineManagerExtension {
     @Unique
     private WorldRenderingPipeline visor$buildPassPipeline(Object dimension, VRRenderPass pass) {
         Minecraft mc = Minecraft.getInstance();
-        RenderTarget previousMain = mc.mainRenderTarget;
+        RenderTarget previousMain = mc.gameRenderer.mainRenderTarget;
         RenderTarget passTarget = VRRenderState.getTargetForPass(pass);
         if (passTarget != null) {
-            mc.mainRenderTarget = passTarget;
+            mc.gameRenderer.mainRenderTarget = passTarget;
         }
         IrisCompatHelper.buildingPass = pass;
         try {
@@ -130,7 +130,7 @@ public class PipelineManagerMixin implements IrisPipelineManagerExtension {
             return built;
         } finally {
             IrisCompatHelper.buildingPass = null;
-            mc.mainRenderTarget = previousMain;
+            mc.gameRenderer.mainRenderTarget = previousMain;
         }
     }
 

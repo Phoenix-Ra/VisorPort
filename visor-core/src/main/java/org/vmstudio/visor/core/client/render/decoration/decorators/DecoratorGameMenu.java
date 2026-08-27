@@ -27,7 +27,7 @@ public class DecoratorGameMenu extends VRDecorator {
 
     @Override
     public boolean canActivate() {
-        return MC.player != null && MC.level != null && MC.screen != null;
+        return MC.player != null && MC.level != null && MC.gui.screen() != null;
     }
 
     @Override

@@ -161,7 +161,7 @@ public class VROverlayMovementState extends VROverlayScreen {
 
     @Override
     protected boolean updateVisibility() {
-        if(MC.screen != null){
+        if(MC.gui.screen() != null){
             return false;
         }
         if(MC.player == null) return false;

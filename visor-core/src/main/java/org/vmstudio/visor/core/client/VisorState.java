@@ -65,8 +65,8 @@ public class VisorState implements VisorClientState {
         //HANDLE DELAYED ERROR IN WORLD
         if(MC != null){
             if(delayedErrorHandling != null
-                    && (MC.screen instanceof DisconnectedScreen
-                    || MC.screen instanceof TitleScreen)){
+                    && (MC.gui.screen() instanceof DisconnectedScreen
+                    || MC.gui.screen() instanceof TitleScreen)){
                 delayedErrorHandling.run();
                 delayedErrorHandling = null;
             }
@@ -114,7 +114,7 @@ public class VisorState implements VisorClientState {
             } else {
                 if (state != VRStateMode.ACTIVE) {
                     if (MC.level != null) {
-                        MC.setScreen(new VRPauseMenuScreen());
+                        MC.gui.setScreen(new VRPauseMenuScreen());
                     }
                 }
                 setState(VRStateMode.ACTIVE);
@@ -201,7 +201,9 @@ public class VisorState implements VisorClientState {
         }
 
         MC.resizeGui();
-        MC.getWindow().updateVsync(MC.options.enableVsync().get());
+        // PORT-26.2: Window.updateVsync is gone. Vsync is a present mode on the swapchain now,
+        // and renderFrame reconfigures the surface from options.enableVsync() every frame, so
+        // there is nothing left to poke here.
         ClientContext.renderer.prepareReinit("Switched state");
         return true;
     }
@@ -236,7 +238,7 @@ public class VisorState implements VisorClientState {
             );
         }
         // grab/release mouse
-        if (MC.screen != null || MC.level == null) {
+        if (MC.gui.screen() != null || MC.level == null) {
             MC.mouseHandler.releaseMouse();
             InputConstants.grabOrReleaseMouse(
                     MC.getWindow(),

@@ -364,7 +364,7 @@ public class VRKeyboardScreen extends Screen {
 
     private boolean canTypeText() {
         return overlayKeyboard.getAttachedTo() != null
-                || Minecraft.getInstance().screen != null;
+                || Minecraft.getInstance().gui.screen() != null;
     }
 
     private void pressModifiers(int modifiers) {

@@ -66,7 +66,7 @@ public class VROverlayGameScreen extends VROverlayFrameBuffer {
 
     @Override
     protected boolean updateVisibility() {
-        return MC.screen != null;
+        return MC.gui.screen() != null;
     }
 
 
@@ -191,7 +191,7 @@ public class VROverlayGameScreen extends VROverlayFrameBuffer {
         if (relativePosition == null || relativeRotation == null) {
             orient(
                     null,
-                    MC.screen
+                    MC.gui.screen()
             );
         }
 
@@ -267,7 +267,7 @@ public class VROverlayGameScreen extends VROverlayFrameBuffer {
         return MC.level == null
                 || newScreen instanceof WinScreen
                 || McVersionUtilsClient.isLevelTransitionScreen(newScreen)
-                || MC.getOverlay() != null;
+                || MC.gui.overlay() != null;
     }
 
     @Override
@@ -325,7 +325,7 @@ public class VROverlayGameScreen extends VROverlayFrameBuffer {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollDelta) {
-        if(MC.screen == null){
+        if(MC.gui.screen() == null){
             return false;
         }
         //scroll delta is already calculated...

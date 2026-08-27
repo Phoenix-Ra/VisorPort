@@ -1,9 +1,9 @@
 package org.vmstudio.visor.core.client.render.decoration.effects;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import org.vmstudio.visor.core.client.render.VisorPipelines;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.world.phys.Vec3;
@@ -29,6 +29,8 @@ import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import java.util.EnumMap;
 import java.util.List;
 
+import org.vmstudio.visor.core.client.render.helpers.VRMeshDrawer;
+import org.vmstudio.visor.core.client.render.helpers.VRTesselator;
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 
 
@@ -115,7 +117,7 @@ public class GameEffectTrackerDebug extends VRGameEffect {
         RenderPoseHelper.applyCameraOrientation(renderPass, poseStack);
         Matrix4f pose = poseStack.last().pose();
 
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR_NORMAL);
+        BufferBuilder builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR_NORMAL);
 
         for (var entry : active.entrySet()) {
             VRPose ancestor = findActiveAncestor(entry.getKey(), active);
@@ -132,7 +134,7 @@ public class GameEffectTrackerDebug extends VRGameEffect {
             addAxis(builder, pose, center, projectDir(tracker.getCustomVector(AXIS_Y), cos, sin), 64, 235, 90);  // Y green
             addAxis(builder, pose, center, projectDir(tracker.getCustomVector(AXIS_Z), cos, sin), 66, 135, 245); // Z blue
         }
-        VisorPipelines.POSITION_COLOR_NORMAL_NO_DEPTH_TYPE.draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_NORMAL_NO_DEPTH_TYPE, builder.buildOrThrow());
 
         poseStack.popPose();
 

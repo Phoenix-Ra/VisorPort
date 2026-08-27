@@ -1,11 +1,14 @@
 package org.vmstudio.visor.core.client.render.decoration.decorators.mainmenu;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.vertex.*;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
+import org.vmstudio.visor.core.client.render.helpers.VRMeshDrawer;
+import org.vmstudio.visor.core.client.render.helpers.VRTesselator;
 import org.vmstudio.visor.core.client.utils.ClientUtils;
 import org.vmstudio.visor.core.client.render.VisorPipelines;
 
@@ -32,7 +35,7 @@ public final class VRMenuFloor {
             int r = 128, g = 128, b = 128;
 
             Matrix4f matrix4f = poseStack.last().pose();
-            bufferbuilder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            bufferbuilder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
             poseStack.translate(-width / 2.0F, 0.0F, -length / 2.0F);
 
             final int repeat = 4;
@@ -60,7 +63,7 @@ public final class VRMenuFloor {
 
             // The floor tiles by drawing UVs past 1.0, so it needs the repeating sampler;
             // the default clamp would stretch one copy of the texture over the whole area.
-            VisorPipelines.positionTexColorRepeat(floorTexture).draw(bufferbuilder.buildOrThrow());
+            VRMeshDrawer.draw(VisorPipelines.positionTexColorRepeat(floorTexture), bufferbuilder.buildOrThrow());
 
             poseStack.popPose();
         }

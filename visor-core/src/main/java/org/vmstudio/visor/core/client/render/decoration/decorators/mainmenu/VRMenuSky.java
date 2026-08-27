@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.render.decoration.decorators.mainmenu;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.*;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
@@ -25,6 +26,8 @@ import java.util.Arrays;
 import java.util.List;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 import org.vmstudio.visor.api.VisorAPI;
+import org.vmstudio.visor.core.client.render.helpers.VRMeshDrawer;
+import org.vmstudio.visor.core.client.render.helpers.VRTesselator;
 
 /**
  * Procedural sky for the VR main menu
@@ -424,7 +427,8 @@ public final class VRMenuSky {
         // --- Setup ---
         // Every draw below now carries its own no-depth, no-cull, blended pipeline, so the state
         // that used to be set once here rides on the render types instead.
-        RenderShaderHelper.clearColorAndDepth(Minecraft.getInstance().getMainRenderTarget(), 0, 1.0);
+        RenderShaderHelper.clearColorAndDepth(Minecraft.getInstance().gameRenderer.mainRenderTarget(), 0,
+                RenderShaderHelper.CLEAR_DEPTH_FAR);
 
         // --- Render ---
         renderSkyBox(builder, pose);
@@ -564,7 +568,7 @@ public final class VRMenuSky {
 
     private static void renderSkyBox(BufferBuilder builder,
                                      Matrix4f pose){
-        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
         // -Z wall
         horizon(builder, pose, -SKY_BOX, -SKY_BOX, -SKY_BOX);
@@ -597,7 +601,7 @@ public final class VRMenuSky {
         horizon(builder, pose, SKY_BOX, -SKY_BOX, -SKY_BOX);
         horizon(builder, pose, -SKY_BOX, -SKY_BOX, -SKY_BOX);
 
-        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE, builder.buildOrThrow());
     }
 
     // ====== CELESTIAL BODIES ======
@@ -684,12 +688,12 @@ public final class VRMenuSky {
         // per-draw colour left on this route, so both are baked into the vertices - which is why
         // the geometry is POSITION_TEX_COLOR now rather than POSITION_TEX. Skip that and the sun
         // and moon quietly lose their warmth and stop fading out at the horizon.
-        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp, -size, -size, u0, v0, color, visible);
         billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp,  size, -size, u1, v0, color, visible);
         billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp,  size,  size, u1, v1, color, visible);
         billboardVertex(builder, pose, scratchCenter, scratchRight, scratchUp, -size,  size, u0, v1, color, visible);
-        VisorPipelines.positionTexColorAdditiveNoDepth(texture).draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.positionTexColorAdditiveNoDepth(texture), builder.buildOrThrow());
     }
 
     // ====== STARS ======
@@ -700,7 +704,7 @@ public final class VRMenuSky {
             return;
         }
 
-        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
         for (int star = 0; star < STAR_QUAD.length; star++) {
             float twinkle = 0.65f + 0.35f * (float) Math.sin(currentTimeSec * 1.6f + STAR_PHASE[star]);
             int alpha = (int) (255f * night * twinkle * STAR_BRIGHT);
@@ -713,7 +717,7 @@ public final class VRMenuSky {
 
         emitShootingStar(builder, pose, night);
 
-        VisorPipelines.POSITION_COLOR_ADDITIVE_NO_DEPTH_TYPE.draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_ADDITIVE_NO_DEPTH_TYPE, builder.buildOrThrow());
     }
 
     private static void emitShootingStar(BufferBuilder builder, Matrix4f pose,
@@ -860,7 +864,7 @@ public final class VRMenuSky {
         float fade = clamp01(Math.min(ageSec, UFO_LIFETIME - ageSec) / UFO_FADE_SEC);
         int chaseStep = (int) (ageSec * UFO_LIGHT_STEP_HZ) % UFO_LIGHT_GROUPS;
 
-        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < UFO_DOTS_AMOUNT; i++) {
             float dotX = ufoX + scratchRight.x * UFO_LX[i] + scratchUp.x * UFO_LY[i];
             float dotY = ufoY + scratchRight.y * UFO_LX[i] + scratchUp.y * UFO_LY[i];
@@ -882,7 +886,7 @@ public final class VRMenuSky {
                         UFO_DOT_CORE, UFO_BODY_CORE, (int) (235 * fade));
             }
         }
-        VisorPipelines.positionTexColorAdditiveNoDepth(GLOW_SPRITE).draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.positionTexColorAdditiveNoDepth(GLOW_SPRITE), builder.buildOrThrow());
     }
 
     private static void ufoParkingDir(int cycle, Vector3f out) {
@@ -911,7 +915,7 @@ public final class VRMenuSky {
         boolean asCloudDots = currentDay >= VISOR_DAY_THRESHOLD;
 
         int[] cloudTint = {0, 0, 0};
-        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < VISOR_SIGN.n; i++) {
             float gleam = 1f + VISOR_GLEAM_AMT * Math.max(0f, 1f - Math.abs(VISOR_SIGN.col[i] - gleamPos) / VISOR_GLEAM_W);
             float cx = VISOR_SIGN.px[i], cy = VISOR_SIGN.py[i], cz = VISOR_SIGN.pz[i]; // anchored
@@ -934,7 +938,7 @@ public final class VRMenuSky {
         }
         // The cloud skin blends and the star skin adds; that runtime blend switch is a choice
         // between two render types now.
-        VisorPipelines.positionTexColorGlow(GLOW_SPRITE, !asCloudDots).draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.positionTexColorGlow(GLOW_SPRITE, !asCloudDots), builder.buildOrThrow());
     }
 
     // ====== CLOUDS ======
@@ -952,7 +956,7 @@ public final class VRMenuSky {
 
         float cullDistance = CLOUD_RANGE + 24f;
 
-        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
         for (int cellX = minCellX; cellX <= maxCellX; cellX++) {
             for (int cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
                 if (hash01(cellX, cellZ, 0) > CLOUD_FILL) {
@@ -974,7 +978,7 @@ public final class VRMenuSky {
                 emitCloud(builder, pose, cloudCenterX, cloudCenterZ, cellX, cellZ);
             }
         }
-        VisorPipelines.POSITION_COLOR_TYPE.draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_TYPE, builder.buildOrThrow());
     }
 
     private static void emitCloud(BufferBuilder builder, Matrix4f pose,
@@ -1124,7 +1128,7 @@ public final class VRMenuSky {
 
         boolean showClouds = currentDay >= VISOR_DAY_THRESHOLD;
 
-        builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < userDotCount; i++) {
             scratchDir.set(userDotX[i], userDotY[i], userDotZ[i]);
             billboardBasis(scratchDir, scratchRight, scratchUp);
@@ -1144,7 +1148,7 @@ public final class VRMenuSky {
                 dotQuad(builder, pose, scratchRight, scratchUp, cx, cy, cz, VISOR_STAR_CORE, colorCore, 255);
             }
         }
-        VisorPipelines.positionTexColorGlow(GLOW_SPRITE, !showClouds).draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.positionTexColorGlow(GLOW_SPRITE, !showClouds), builder.buildOrThrow());
     }
     static Identifier glowSprite() {
         ensureGlowSprite();

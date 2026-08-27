@@ -7,6 +7,9 @@ import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.pipeline.MainTarget;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 
+import com.mojang.blaze3d.systems.CommandEncoder;
+import com.mojang.blaze3d.systems.GpuSurface;
+import com.mojang.blaze3d.textures.GpuTextureView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
@@ -27,6 +30,7 @@ import org.vmstudio.visor.core.client.render.VRRenderState;
 import org.vmstudio.visor.core.client.settings.VROptionWidgetType;
 import java.util.function.BooleanSupplier;
 import net.minecraft.client.*;
+import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.screens.Overlay;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
@@ -65,8 +69,7 @@ public abstract class MinecraftMixin implements MinecraftExtension {
     public Gui gui;
 
 
-    @Shadow
-    public Screen screen;
+    // PORT-26.2: Minecraft.screen is gone - the field moved to Gui, read via gui.screen().
 
 
 
@@ -81,8 +84,7 @@ public abstract class MinecraftMixin implements MinecraftExtension {
     @Shadow
     public ClientLevel level;
 
-    @Shadow
-    public RenderTarget mainRenderTarget;
+    // PORT-26.2: Minecraft.mainRenderTarget is gone - it lives on GameRenderer now.
 
     @Shadow
     public LocalPlayer player;
@@ -110,9 +112,10 @@ public abstract class MinecraftMixin implements MinecraftExtension {
      * @param overlay s
      * @return s
      */
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;setOverlay(Lnet/minecraft/client/gui/screens/Overlay;)V"), method = "<init>", index = 0)
+    // PORT-26.2: setOverlay moved to Gui; the call site is still Minecraft's constructor.
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;setOverlay(Lnet/minecraft/client/gui/screens/Overlay;)V"), method = "<init>", index = 0)
     public Overlay visor$initRenderStageManager(Overlay overlay) {
-        VRRenderState.initVanillaTarget((MainTarget) this.mainRenderTarget);
+        VRRenderState.initVanillaTarget((MainTarget) this.gameRenderer.mainRenderTarget);
 
         return overlay;
     }
@@ -245,12 +248,19 @@ public abstract class MinecraftMixin implements MinecraftExtension {
      * injector kinds share the same priority, so their relative order would otherwise depend on
      * declaration order, and the flag must be read only after the phase has switched.
      */
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame", index = 1)
-    private boolean visor$guiPhaseUpdate(boolean advanceGameTime) {
+    // PORT-26.2: update() no longer takes advanceGameTime - only extract() and render() still do
+    // - so there is no argument left to modify here. The phase start is what this call site was
+    // really for (it has to happen before the first of the three), so it becomes a plain @Inject
+    // in front of update(); the two ModifyArgs below still suppress the flag on the calls that
+    // kept it. Ordering is by position in renderFrame, not by injector kind, so the warning about
+    // @Inject and @ModifyArg racing on the *same* call does not apply.
+    @Inject(method = "renderFrame", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/renderer/GameRenderer;update(Lnet/minecraft/client/DeltaTracker;)V",
+            shift = Shift.BEFORE))
+    private void visor$guiPhaseUpdate(boolean advanceGameTime, CallbackInfo ci) {
         if (VisorState.get().isActive()) {
             ClientContext.renderer.onGameRenderStart(advanceGameTime);
         }
-        return visor$vanillaFrameRendersLevel(advanceGameTime);
     }
 
     @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;extract(Lnet/minecraft/client/DeltaTracker;Z)V"), method = "renderFrame", index = 1)
@@ -313,18 +323,23 @@ public abstract class MinecraftMixin implements MinecraftExtension {
      * {@code this.mainRenderTarget} at blit time again; the redirect stays for the
      * destroyed-target guard below.
      */
-    @Redirect(method = "renderFrame", at = @At(value = "INVOKE",
-            target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;blitToScreen()V"))
-    private void visor$blitLiveTarget(RenderTarget capturedAtFrameStart) {
-        RenderTarget live = this.mainRenderTarget != null
-                ? this.mainRenderTarget
-                : capturedAtFrameStart;
-        // A target still mid-reinit has no colour attachment; skipping one frame of desktop
-        // mirror beats taking down the game.
-        if (live.getColorTexture() == null) {
-            return;
+    // PORT-26.2: RenderTarget.blitToScreen is gone - the desktop present goes through the
+    // window's swapchain. renderFrame reads mainRenderTarget().getColorTextureView() *live* at
+    // present time (the stale-local problem this redirect was born for no longer exists - the
+    // mirror phase's target is what vanilla sees), but it throws "Can't blit to screen, color
+    // texture doesn't exist yet" when that view is null, which is exactly the state a target
+    // mid-reinit is in. The read itself is wrapped so a destroyed target falls back to the
+    // vanilla window target: one black desktop frame beats taking down the game.
+    @WrapOperation(method = "renderFrame", at = @At(value = "INVOKE",
+            target = "Lcom/mojang/blaze3d/pipeline/RenderTarget;getColorTextureView()Lcom/mojang/blaze3d/textures/GpuTextureView;"))
+    private GpuTextureView visor$presentSurvivesTargetReinit(RenderTarget target,
+                                                             Operation<GpuTextureView> original) {
+        GpuTextureView view = original.call(target);
+        if (view != null || VisorState.get().isNotActive()) {
+            return view;
         }
-        live.blitToScreen();
+        RenderTarget vanillaTarget = VRRenderState.getVanillaTarget();
+        return vanillaTarget != null ? vanillaTarget.getColorTextureView() : null;
     }
 
 
@@ -399,34 +414,35 @@ public abstract class MinecraftMixin implements MinecraftExtension {
    //--------VR OVERLAYS--------\\
      \* ******************* */
 
-    /**
-     * Handles screen changes
-     *
-     * @param pGuiScreen s
-     * @param info       s
-     */
-    @Inject(at = @At(value = "FIELD", opcode = Opcodes.PUTFIELD, target = "Lnet/minecraft/client/Minecraft;screen:Lnet/minecraft/client/gui/screens/Screen;", shift = Shift.BEFORE, ordinal = 0), method = "setScreen(Lnet/minecraft/client/gui/screens/Screen;)V")
-    public void visor$onOpenScreen(Screen pGuiScreen, CallbackInfo info) {
-        if (VisorState.get().isNotActive()) return;
+    // PORT-26.2: both screen-change hooks moved to GuiMixin - setScreen/setOverlay and the
+    // screen/overlay fields they anchor on are all on Gui now.
 
-        ClientContext.overlayManager
-                .getOverlay(VROverlayGameScreen.ID, VROverlayGameScreen.class)
-                .onScreenChanged(this.screen, pGuiScreen, true);
+    /**
+     * PORT-26.2: the screenshot hotkey moved out of {@code KeyboardHandler.keyPress} into
+     * {@code Minecraft.handleGlobalKeyPress}, and the overload it reaches is
+     * {@code Screenshot.grab(Minecraft, boolean)} rather than the File/RenderTarget one. In VR the
+     * grab is deferred to the renderer, which captures the eye target instead of the window.
+     */
+    @Redirect(method = "handleGlobalKeyPress", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/Screenshot;grab(Lnet/minecraft/client/Minecraft;Z)V"))
+    private void visor$screenshot(Minecraft minecraft, boolean showMessage) {
+        if (VisorState.get().isNotActive()) {
+            Screenshot.grab(minecraft, showMessage);
+            return;
+        }
+        ClientContext.renderer.setAskedForScreenShot(true);
     }
 
     /**
-     * Handles overlay changes
-     *
-     * @param overlay s
-     * @param ci      s
+     * PORT-26.2: no vsync in VR. {@code Window.updateVsync} is gone - the swapchain picks a
+     * present mode in {@code renderFrame}, from {@code options.enableVsync()}, so the flag is
+     * suppressed at that call instead of on the window.
      */
-    @Inject(at = @At("TAIL"), method = "setOverlay")
-    public void visor$onOverlaySet(Overlay overlay, CallbackInfo ci) {
-        if (VisorState.get().isNotActive()) return;
-
-        ClientContext.overlayManager
-                .getOverlay(VROverlayGameScreen.ID, VROverlayGameScreen.class)
-                .onScreenChanged(this.screen, this.screen, true);
+    @ModifyArg(method = "renderFrame", at = @At(value = "INVOKE",
+            target = "Lcom/mojang/blaze3d/systems/GpuSurface$PresentMode;getSupportedVsyncMode(Ljava/util/Collection;Z)Lcom/mojang/blaze3d/systems/GpuSurface$PresentMode;"),
+            index = 1)
+    private boolean visor$noVsyncInVR(boolean enableVsync) {
+        return !VisorState.get().isActive() && enableVsync;
     }
 
     /**
@@ -434,7 +450,7 @@ public abstract class MinecraftMixin implements MinecraftExtension {
      *
      * @param ci s
      */
-    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;tick(Z)V"))
+    @Inject(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;tick()V"))
     private void visor$tickVrOverlays(CallbackInfo ci) {
         if (VisorState.get().isNotActive()) return;
 
@@ -696,7 +712,7 @@ public abstract class MinecraftMixin implements MinecraftExtension {
                 partialTick,
                 tick -> original.call(tick)
         );
-        if (this.screen == null && this.player != null) {
+        if (this.gui.screen() == null && this.player != null) {
             TaskTeleport.updateTeleportDestination(this.player);
         }
     }

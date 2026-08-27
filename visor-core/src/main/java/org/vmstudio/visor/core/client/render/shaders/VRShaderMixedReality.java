@@ -1,8 +1,11 @@
 package org.vmstudio.visor.core.client.render.shaders;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import com.mojang.blaze3d.pipeline.BindGroupLayout;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
@@ -18,6 +21,7 @@ import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
 import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.helpers.MirrorHelper;
+import org.vmstudio.visor.core.client.render.helpers.ProjectionHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.joml.Matrix4f;
@@ -28,14 +32,25 @@ import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 
 public class VRShaderMixedReality implements VRShader {
 
+    /** PORT-26.2: Visor's own uniform block and its two named samplers, as bind group layouts. */
+    private static final BindGroupLayout UNIFORM_LAYOUT = BindGroupLayout.builder()
+            .withUniform("VisorMixedReality", UniformType.UNIFORM_BUFFER)
+            .build();
+
+    private static final BindGroupLayout SAMPLER_LAYOUT = BindGroupLayout.builder()
+            .withSampler("SamplerColor")
+            .withSampler("SamplerDepth")
+            .build();
+
     public static final RenderPipeline PIPELINE = RenderPipeline.builder()
             .withLocation(McVersionUtils.newResourceLoc("visor", "pipeline/vr_mixed_reality"))
             .withVertexShader(McVersionUtils.newResourceLoc("visor", "core/vr_mixed_reality"))
             .withFragmentShader(McVersionUtils.newResourceLoc("visor", "core/vr_mixed_reality"))
-            .withSampler("SamplerColor")
-            .withSampler("SamplerDepth")
-            .withUniform("VisorMixedReality", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            // PORT-26.2: uniform group first, then the samplers - vanilla's order everywhere.
+            .withBindGroupLayout(UNIFORM_LAYOUT)
+            .withBindGroupLayout(SAMPLER_LAYOUT)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             // PORT-1.21.11: this used to inherit whatever blend state was already set, which is
             // no longer expressible - blend is baked into the pipeline. It writes an opaque
             // full-screen composite, so no blend is the intended behaviour; verify on screen.
@@ -106,6 +121,12 @@ public class VRShaderMixedReality implements VRShader {
         Matrix4f invProjView = new Matrix4f(proj)
                 .mul(cameraRotation)
                 .invert();
+        // PORT-26.2: the shader unprojects the raw [0,1] depth value as clip-space z. That is
+        // exact on a zero-to-one device; on a -1..1 device the remap (z*2-1) is baked in here
+        // so the shader stays convention-free.
+        if (!ProjectionHelper.isZZeroToOne()) {
+            invProjView.mul(new Matrix4f().translation(0f, 0f, -1f).scale(1f, 1f, 2f));
+        }
 
         float keyR = 0f;
         float keyG = 0f;
@@ -120,8 +141,7 @@ public class VRShaderMixedReality implements VRShader {
 
         // --- Update Uniforms ---
         // Put order here is load-bearing: it has to match the std140 block declaration exactly.
-        try (GpuBuffer.MappedView view = RenderSystem.getDevice().createCommandEncoder()
-                .mapBuffer(ubo.currentBuffer(), false, true)) {
+        try (GpuBufferSlice.MappedView view = ubo.currentBuffer().map(false, true)) {
             Std140Builder.intoBuffer(view.data())
                     .putMat4f(invProjView)
                     .putVec4(cameraPos.x, cameraPos.y, cameraPos.z, 0f)
@@ -144,7 +164,7 @@ public class VRShaderMixedReality implements VRShader {
                     RenderShaderHelper.bindColor(pass, "SamplerColor", thirdPerson);
                     RenderShaderHelper.bindDepth(pass, "SamplerDepth", thirdPerson);
                 },
-                MC.mainRenderTarget.getColorTextureView()
+                MC.gameRenderer.mainRenderTarget.getColorTextureView()
         );
 
         if (asGrid2x2) {
@@ -159,10 +179,10 @@ public class VRShaderMixedReality implements VRShader {
                 }
             }
             MirrorHelper.blit(source,
-                    MC.mainRenderTarget.width / 2,
+                    MC.gameRenderer.mainRenderTarget.width / 2,
                     0,
-                    MC.mainRenderTarget.width,
-                    MC.mainRenderTarget.height / 2
+                    MC.gameRenderer.mainRenderTarget.width,
+                    MC.gameRenderer.mainRenderTarget.height / 2
             );
         }
     }

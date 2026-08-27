@@ -124,7 +124,8 @@ public abstract class VRRendererBase implements VRRenderer {
         // PORT-1.21.11: the depth/colour mask pokes are gone with the rest of the global state,
         // and there is no framebuffer to bind - "where do I draw" is the texture handed to each
         // render pass. All that is left of this block is the clear.
-        RenderShaderHelper.clearColorAndDepth(MC.mainRenderTarget, 0, 1.0);
+        RenderShaderHelper.clearColorAndDepth(MC.gameRenderer.mainRenderTarget, 0,
+                RenderShaderHelper.CLEAR_DEPTH_FAR);
 
         // push pose to pop it in onGameRenderEnd, once the vanilla frame has drawn the GUI
         RenderSystem.getModelViewStack().pushMatrix();
@@ -246,7 +247,7 @@ public abstract class VRRendererBase implements VRRenderer {
         updateProjection();
 
         try {
-            minecraft.mainRenderTarget = mainTarget.getTarget();
+            minecraft.gameRenderer.mainRenderTarget = mainTarget.getTarget();
 
             VRShaders.setup();
         } catch (Exception exception1) {
@@ -254,7 +255,7 @@ public abstract class VRRendererBase implements VRRenderer {
             System.exit(-1);
         }
 
-        if (minecraft.screen != null) {
+        if (minecraft.gui.screen() != null) {
             minecraft.resizeGui();
         }
 
@@ -275,7 +276,8 @@ public abstract class VRRendererBase implements VRRenderer {
                 "\nTotal shaded pixels per frame: " + String.format("%.1f", (float) vrPixels / 1000000.0F) + " MP (eye stencil not accounted for)"
         );
 
-        minecraft.levelRenderer.onResourceManagerReload(minecraft.getResourceManager());
+        // PORT-26.2: the reload/rebuild half of LevelRenderer moved to Minecraft.levelExtractor.
+        minecraft.levelExtractor.onResourceManagerReload(minecraft.getResourceManager());
 
         ShadersHelper.bridge().onVisorTargetsRecreated(eyeRenderWidth, eyeRenderHeight);
 

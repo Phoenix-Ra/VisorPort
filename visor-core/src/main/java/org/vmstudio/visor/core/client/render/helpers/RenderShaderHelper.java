@@ -1,8 +1,10 @@
 package org.vmstudio.visor.core.client.render.helpers;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.opengl.DirectStateAccess;
+import com.mojang.blaze3d.opengl.FrameBufferCache;
 import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
@@ -15,6 +17,10 @@ import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.*;
+import java.util.List;
+import java.util.Optional;
+import net.minecraft.client.renderer.StagedVertexBuffer;
+import net.minecraft.util.ARGB;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
@@ -74,7 +80,7 @@ public class RenderShaderHelper {
 
     private static GpuBuffer buildQuad(VertexFormat format, String label) {
         try (ByteBufferBuilder bytes = ByteBufferBuilder.exactlySized(4 * format.getVertexSize())) {
-            BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, format);
+            BufferBuilder builder = new BufferBuilder(bytes, PrimitiveTopology.QUADS, format);
             boolean textured = format == DefaultVertexFormat.POSITION_TEX;
             putQuadVertex(builder, textured, -1f, -1f, 0f, 0f);
             putQuadVertex(builder, textured, 1f, -1f, 1f, 0f);
@@ -130,18 +136,18 @@ public class RenderShaderHelper {
                                             @NotNull RenderPipeline pipeline,
                                             @NotNull Consumer<RenderPass> bindings,
                                             @NotNull GpuTextureView target) {
-        GpuBuffer vertexBuffer = quadFor(pipeline.getVertexFormat());
+        GpuBuffer vertexBuffer = quadFor(pipeline.getVertexFormatBinding(0));
         RenderSystem.AutoStorageIndexBuffer indices =
-                RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+                RenderSystem.getSequentialBuffer(PrimitiveTopology.QUADS);
         GpuBuffer indexBuffer = indices.getBuffer(6);
 
         try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder()
-                .createRenderPass(label, target, OptionalInt.empty())) {
+                .createRenderPass(label, target, Optional.empty())) {
             pass.setPipeline(pipeline);
-            pass.setVertexBuffer(0, vertexBuffer);
+            pass.setVertexBuffer(0, vertexBuffer.slice());
             bindings.accept(pass);
             pass.setIndexBuffer(indexBuffer, indices.type());
-            pass.drawIndexed(0, 0, 6, 1);
+            pass.drawIndexed(6, 1, 0, 0, 0);
         }
     }
 
@@ -162,28 +168,27 @@ public class RenderShaderHelper {
                                         @NotNull GpuTextureView target,
                                         float x0, float y0, float x1, float y1,
                                         float u0, float v0, float u1, float v1) {
-        VertexFormat format = pipeline.getVertexFormat();
+        VertexFormat format = pipeline.getVertexFormatBinding(0);
         try (ByteBufferBuilder bytes = ByteBufferBuilder.exactlySized(4 * format.getVertexSize())) {
-            BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, format);
+            BufferBuilder builder = new BufferBuilder(bytes, PrimitiveTopology.QUADS, format);
             builder.addVertex(x0, y0, 0f).setUv(u0, v0);
             builder.addVertex(x1, y0, 0f).setUv(u1, v0);
             builder.addVertex(x1, y1, 0f).setUv(u1, v1);
             builder.addVertex(x0, y1, 0f).setUv(u0, v1);
 
             try (MeshData mesh = builder.buildOrThrow()) {
-                GpuBuffer vertexBuffer = format.uploadImmediateVertexBuffer(mesh.vertexBuffer());
-                RenderSystem.AutoStorageIndexBuffer indices =
-                        RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
-                GpuBuffer indexBuffer = indices.getBuffer(6);
+                StagedVertexBuffer.ExecuteInfo geometry = upload(mesh);
 
                 try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder()
-                        .createRenderPass(label, target, OptionalInt.empty())) {
+                        .createRenderPass(label, target, Optional.empty())) {
                     pass.setPipeline(pipeline);
-                    pass.setVertexBuffer(0, vertexBuffer);
+                    pass.setVertexBuffer(0, geometry.vertexBuffer().slice());
                     bindings.accept(pass);
-                    pass.setIndexBuffer(indexBuffer, indices.type());
-                    pass.drawIndexed(0, 0, 6, 1);
+                    pass.setIndexBuffer(geometry.indexBuffer(), geometry.indexType());
+                    pass.drawIndexed(geometry.indexCount(), 1,
+                            geometry.firstIndex(), geometry.baseVertex(), 0);
                 }
+                endUpload();
             }
         }
     }
@@ -230,9 +235,13 @@ public class RenderShaderHelper {
         if (RenderSystem.getDevice().backend instanceof GlDevice device
                 && src instanceof GlTexture glSrc
                 && dst instanceof GlTexture glDst) {
+            // PORT-26.2: GlTexture.getFbo is gone - the per-texture framebuffer objects moved
+            // into a FrameBufferCache on the device, keyed by attachment list. A GlTexture is a
+            // FrameBufferAttachment, so one colour attachment and no depth is the same FBO.
             DirectStateAccess dsa = device.directStateAccess();
-            int readFbo = glSrc.getFbo(dsa, null);
-            int drawFbo = glDst.getFbo(dsa, null);
+            FrameBufferCache fbos = device.frameBufferCache();
+            int readFbo = fbos.getFbo(dsa, List.of(glSrc), null);
+            int drawFbo = fbos.getFbo(dsa, List.of(glDst), null);
             int previousRead = GlStateManager.getFrameBuffer(GL30.GL_READ_FRAMEBUFFER);
             int previousDraw = GlStateManager.getFrameBuffer(GL30.GL_DRAW_FRAMEBUFFER);
 
@@ -295,9 +304,9 @@ public class RenderShaderHelper {
                                        float x0, float y, float z0, float x1, float z1,
                                        @NotNull GpuTextureView color,
                                        @NotNull GpuTextureView depth) {
-        VertexFormat format = pipeline.getVertexFormat();
+        VertexFormat format = pipeline.getVertexFormatBinding(0);
         try (ByteBufferBuilder bytes = ByteBufferBuilder.exactlySized(4 * format.getVertexSize())) {
-            BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, format);
+            BufferBuilder builder = new BufferBuilder(bytes, PrimitiveTopology.QUADS, format);
             boolean textured = format == DefaultVertexFormat.POSITION_TEX;
             putWorldVertex(builder, textured, pose, x0, y, z0, 0f, 0f);
             putWorldVertex(builder, textured, pose, x1, y, z0, 1f, 0f);
@@ -305,20 +314,19 @@ public class RenderShaderHelper {
             putWorldVertex(builder, textured, pose, x0, y, z1, 0f, 1f);
 
             try (MeshData mesh = builder.buildOrThrow()) {
-                GpuBuffer vertexBuffer = format.uploadImmediateVertexBuffer(mesh.vertexBuffer());
-                RenderSystem.AutoStorageIndexBuffer indices =
-                        RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
-                GpuBuffer indexBuffer = indices.getBuffer(6);
+                StagedVertexBuffer.ExecuteInfo geometry = upload(mesh);
 
                 try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder()
-                        .createRenderPass(label, color, OptionalInt.empty(),
+                        .createRenderPass(label, color, Optional.empty(),
                                 depth, OptionalDouble.empty())) {
                     pass.setPipeline(pipeline);
-                    pass.setVertexBuffer(0, vertexBuffer);
+                    pass.setVertexBuffer(0, geometry.vertexBuffer().slice());
                     bindings.accept(pass);
-                    pass.setIndexBuffer(indexBuffer, indices.type());
-                    pass.drawIndexed(0, 0, 6, 1);
+                    pass.setIndexBuffer(geometry.indexBuffer(), geometry.indexType());
+                    pass.drawIndexed(geometry.indexCount(), 1,
+                            geometry.firstIndex(), geometry.baseVertex(), 0);
                 }
+                endUpload();
             }
         }
     }
@@ -353,24 +361,9 @@ public class RenderShaderHelper {
         try (mesh) {
             GpuBufferSlice transforms = writeTransform(colorModulator);
 
-            VertexFormat format = pipeline.getVertexFormat();
-            GpuBuffer vertexBuffer = format.uploadImmediateVertexBuffer(mesh.vertexBuffer());
+            StagedVertexBuffer.ExecuteInfo geometry = upload(mesh);
 
-            MeshData.DrawState draw = mesh.drawState();
-            GpuBuffer indexBuffer;
-            VertexFormat.IndexType indexType;
-            if (mesh.indexBuffer() == null) {
-                // No sorted index data: the shared sequential buffer already indexes this mode.
-                RenderSystem.AutoStorageIndexBuffer sequential =
-                        RenderSystem.getSequentialBuffer(draw.mode());
-                indexBuffer = sequential.getBuffer(draw.indexCount());
-                indexType = sequential.type();
-            } else {
-                indexBuffer = format.uploadImmediateIndexBuffer(mesh.indexBuffer());
-                indexType = draw.indexType();
-            }
-
-            RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+            RenderTarget main = Minecraft.getInstance().gameRenderer.mainRenderTarget();
             GpuTextureView color = RenderSystem.outputColorTextureOverride != null
                     ? RenderSystem.outputColorTextureOverride
                     : main.getColorTextureView();
@@ -379,20 +372,73 @@ public class RenderShaderHelper {
                     : main.getDepthTextureView();
 
             try (RenderPass pass = RenderSystem.getDevice().createCommandEncoder()
-                    .createRenderPass(label, color, OptionalInt.empty(),
+                    .createRenderPass(label, color, Optional.empty(),
                             depth, OptionalDouble.empty())) {
                 pass.setPipeline(pipeline);
                 ScissorState scissor = RenderSystem.getScissorStateForRenderTypeDraws();
                 if (scissor.enabled()) {
-                    pass.enableScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height());
+                    // PORT-26.2: the pass validates the scissor against its render area and
+                    // throws where 26.1 silently clipped. The render-type scissor can be in
+                    // another target's space while this draws into the current pass target,
+                    // so intersect it with the target first.
+                    int x0 = Math.max(0, scissor.x());
+                    int y0 = Math.max(0, scissor.y());
+                    int x1 = Math.min(scissor.x() + scissor.width(), color.getWidth(0));
+                    int y1 = Math.min(scissor.y() + scissor.height(), color.getHeight(0));
+                    if (x0 < x1 && y0 < y1) {
+                        pass.enableScissor(x0, y0, x1 - x0, y1 - y0);
+                    }
                 }
                 bindTransformUniforms(pass, transforms);
-                pass.setVertexBuffer(0, vertexBuffer);
+                pass.setVertexBuffer(0, geometry.vertexBuffer().slice());
                 bindings.accept(pass);
-                pass.setIndexBuffer(indexBuffer, indexType);
-                pass.drawIndexed(0, 0, draw.indexCount(), 1);
+                pass.setIndexBuffer(geometry.indexBuffer(), geometry.indexType());
+                pass.drawIndexed(geometry.indexCount(), 1,
+                        geometry.firstIndex(), geometry.baseVertex(), 0);
             }
+            endUpload();
         }
+    }
+
+    /**
+     * PORT-26.2: {@code VertexFormat.uploadImmediateVertexBuffer} and its index-buffer twin are
+     * gone, and nothing replaced them in place - 26.2 routes every mesh through a
+     * {@link StagedVertexBuffer}, which pools the GPU buffers and hands back an
+     * {@code ExecuteInfo} saying where the draw landed. {@code GuiRenderer} owns one of these for
+     * exactly this reason, and so does Visor: sharing {@code RenderBuffers}' would interleave
+     * these draws with whatever vanilla has staged but not yet uploaded.
+     * <p>
+     * The old code also picked the index buffer by hand, falling back to the shared sequential
+     * buffer when the mesh carried no sorted indices. The staged buffer does that itself, so the
+     * branch is gone; a mesh that genuinely needs quad sorting wants the
+     * {@code appendDraw(format, topology, VertexSorting)} overload instead. Nothing in Visor sorts
+     * - no call site calls {@code MeshData.sortQuads} - so the plain overload is used.
+     */
+    private static StagedVertexBuffer.ExecuteInfo upload(@NotNull MeshData mesh) {
+        MeshData.DrawState state = mesh.drawState();
+        StagedVertexBuffer staged = stagedBuffer();
+        StagedVertexBuffer.Draw draw = staged.appendDraw(state.format(), state.primitiveTopology());
+        draw.append(mesh);
+        // NB: no endDraw() here - it resets the batch (clears the draw list and the GPU buffers),
+        // so before upload() there is nothing left to upload. endUpload()'s endFrame() does it.
+        staged.upload();
+        return staged.getExecuteInfo(draw);
+    }
+
+    /** Recycles the pooled GPU buffers once the draw that used them has been issued. */
+    private static void endUpload() {
+        if (stagedBuffer != null) {
+            stagedBuffer.endFrame();
+        }
+    }
+
+    private static StagedVertexBuffer stagedBuffer;
+
+    private static StagedVertexBuffer stagedBuffer() {
+        if (stagedBuffer == null) {
+            stagedBuffer = new StagedVertexBuffer(() -> "Visor shader helper", 4096);
+        }
+        return stagedBuffer;
     }
 
     /**
@@ -403,8 +449,10 @@ public class RenderShaderHelper {
      * {@code bindings} lambda. See the contract on {@link #renderFullscreenQuad}.
      */
     public static GpuBufferSlice writeTransform(@NotNull Vector4fc colorModulator) {
+        // PORT-26.2: writeTransform takes the concrete joml types now, not the read-only
+        // interfaces, so the modulator is copied into one. Visor's own API keeps Vector4fc.
         return RenderSystem.getDynamicUniforms().writeTransform(
-                RenderSystem.getModelViewMatrix(), colorModulator,
+                RenderSystem.getModelViewMatrixCopy(), new Vector4f(colorModulator),
                 ZERO_OFFSET, IDENTITY);
     }
 
@@ -420,16 +468,23 @@ public class RenderShaderHelper {
     }
 
     /** {@code ModelOffset} - Visor never uses it, but the std140 block still has the slot. */
-    private static final Vector3fc ZERO_OFFSET = new Vector3f();
+    private static final Vector3f ZERO_OFFSET = new Vector3f();
 
     /** An identity matrix: {@code TextureMat} on every Visor draw (none transforms UVs). */
-    private static final Matrix4fc IDENTITY = new Matrix4f();
+    private static final Matrix4f IDENTITY = new Matrix4f();
 
     /** The {@code ColorModulator} a plain untinted draw wants. */
     public static final Vector4fc NO_TINT = new Vector4f(1f, 1f, 1f, 1f);
 
 
     // ---------- targets ----------
+
+    /**
+     * PORT-26.2: what an empty depth buffer holds. The depth buffer is reversed now - the far
+     * plane maps to 0.0 and the near plane to 1.0 - so a cleared buffer is all zeros, exactly
+     * as vanilla clears it everywhere.
+     */
+    public static final double CLEAR_DEPTH_FAR = 0.0;
 
     /**
      * Clears {@code target}'s colour and depth attachments.
@@ -440,8 +495,9 @@ public class RenderShaderHelper {
      */
     public static void clearColorAndDepth(@NotNull RenderTarget target, int argb, double depth) {
         RenderSystem.getDevice().createCommandEncoder()
-                .clearColorAndDepthTextures(target.getColorTexture(), argb,
-                        target.getDepthTexture(), depth);
+                // PORT-26.2: the clear colour is a Vector4fc now, not a packed ARGB int.
+                .clearColorAndDepthTextures(target.getColorTexture(),
+                        ARGB.vector4fFromARGB32(argb), target.getDepthTexture(), depth);
     }
 
     /**
@@ -456,7 +512,7 @@ public class RenderShaderHelper {
             clearColorAndDepth(target, argb, depth);
         } else {
             RenderSystem.getDevice().createCommandEncoder()
-                    .clearColorTexture(target.getColorTexture(), argb);
+                    .clearColorTexture(target.getColorTexture(), ARGB.vector4fFromARGB32(argb));
         }
     }
 

@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.render.decoration.effects.hand;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.vertex.*;
 import org.vmstudio.visor.api.client.ClientFeature;
 import org.vmstudio.visor.api.client.player.pose.VRPlayerPoseClient;
@@ -13,6 +14,8 @@ import org.vmstudio.visor.api.common.addon.VisorAddon;
 import org.vmstudio.visor.api.server.VRServerSettings;
 import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.core.client.ClientContext;
+import org.vmstudio.visor.core.client.render.helpers.VRMeshDrawer;
+import org.vmstudio.visor.core.client.render.helpers.VRTesselator;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtils;
@@ -102,23 +105,23 @@ public class HandEffectCrosshair extends VRHandEffect {
 
         // The inverting blend keeps the crosshair readable on any backdrop; it is the one
         // Visor draw that is not translucent or additive.
-        VisorPipelines.positionTexColorInvert(ICONS_LOC)
-                .draw(buildCrosshairQuad(mat, brightness));
+        VRMeshDrawer.draw(VisorPipelines.positionTexColorInvert(ICONS_LOC),
+                buildCrosshairQuad(mat, brightness));
 
         // 1.21.4 drew this quad with GL_ALWAYS and depth WRITES on; the write is what kept the
         // entities rendered after this stage from drawing over the crosshair. One pipeline
         // cannot express that any more (see VisorPipelines.CROSSHAIR_DEPTH_CARVE), so the same
         // quad goes through a second, colour-masked pass that only stamps the depth.
-        VisorPipelines.crosshairDepthCarve(ICONS_LOC)
-                .draw(buildCrosshairQuad(mat, brightness));
+        VRMeshDrawer.draw(VisorPipelines.crosshairDepthCarve(ICONS_LOC),
+                buildCrosshairQuad(mat, brightness));
 
         // --- Restore pose ---
         poseStack.popPose();
     }
 
     private MeshData buildCrosshairQuad(Matrix4f mat, float brightness) {
-        BufferBuilder buf = Tesselator.getInstance()
-                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        BufferBuilder buf = VRTesselator
+                .begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         buf.addVertex(mat, -1f,1f,0f)
                 .setUv(UV_SIZE, 0f)
                 .setColor(brightness, brightness, brightness, 1f)

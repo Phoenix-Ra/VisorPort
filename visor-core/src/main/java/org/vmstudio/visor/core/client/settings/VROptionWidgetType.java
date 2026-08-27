@@ -120,7 +120,7 @@ public enum VROptionWidgetType {
                 ).setOnChanged(
                         ()->{
                             //reinit screen
-                            MC.setScreen(MC.screen);
+                            MC.gui.setScreen(MC.gui.screen());
                         }
                 ).build();
             }

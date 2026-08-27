@@ -36,7 +36,7 @@ public abstract class FishingHookRendererMixin extends EntityRenderer<FishingHoo
     @Inject(at = @At(value = "HEAD"), method = "submit(Lnet/minecraft/client/renderer/entity/state/FishingHookRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
     cancellable = true)
     private void visor$noRenderOnGameScreen(CallbackInfo ci) {
-        if(MC.screen != null){
+        if(MC.gui.screen() != null){
             ci.cancel();
         }
     }

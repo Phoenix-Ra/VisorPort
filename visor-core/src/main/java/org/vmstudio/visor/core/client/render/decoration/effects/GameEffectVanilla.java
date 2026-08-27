@@ -7,6 +7,7 @@ import org.vmstudio.visor.api.client.render.decoration.annotations.RegisterVRGam
 import org.vmstudio.visor.api.client.render.decoration.effects.VRGameEffect;
 import org.vmstudio.visor.api.common.addon.VisorAddon;
 import org.jetbrains.annotations.NotNull;
+import org.vmstudio.visor.core.client.render.helpers.VRFeatureRenderer;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
@@ -33,13 +34,15 @@ public class GameEffectVanilla extends VRGameEffect {
         MC.gameRenderer.screenEffectRenderer.renderItemActivationAnimation(
                 poseStack,
                 partialTicks,
-                MC.gameRenderer.getSubmitNodeStorage()
+                VRFeatureRenderer.collector()
         );
         // renderAllFeatures() only buffers the vertices; the draw happens at endBatch() and
         // samples the matrices bound then. Both calls, inside this stage's state bracket,
         // is the same contract vanilla's renderHandsWithItems follows.
-        MC.gameRenderer.getFeatureRenderDispatcher().renderAllFeatures();
-        MC.renderBuffers().bufferSource().endBatch();
+        // PORT-26.2: renderAllFeatures takes the storage to drain, and RenderBuffers no longer
+        // has a bufferSource to flush - MultiBufferSource is gone with the submit/extract split.
+        // Visor's own dispatcher, for the same reason as the VR hands. See VRFeatureRenderer.
+        VRFeatureRenderer.drain();
     }
 
     @Override

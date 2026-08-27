@@ -128,7 +128,7 @@ public class TaskRoomConsume extends VisorTask {
                 || !player.isAlive() || player.isSleeping() || player.isSpectator()) {
             return false;
         }
-        if(MC.screen != null){
+        if(MC.gui.screen() != null){
             return false;
         }
         return isConsumable(player.getMainHandItem())

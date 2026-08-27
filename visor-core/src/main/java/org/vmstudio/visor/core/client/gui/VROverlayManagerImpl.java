@@ -134,8 +134,9 @@ public class VROverlayManagerImpl implements VROverlayManager {
 
             if(overlay instanceof VROverlayScreen overlayScreen) {
                 //apply clean render target
-                MC.mainRenderTarget = target;
-                RenderShaderHelper.clearColorAndDepth(target, 0, 1.0);
+                MC.gameRenderer.mainRenderTarget = target;
+                RenderShaderHelper.clearColorAndDepth(target, 0,
+                        RenderShaderHelper.CLEAR_DEPTH_FAR);
 
                 // The replay projects and scales off the Window, so the Window has to speak this
                 // overlay's resolution while it runs - see texturingOverlay/WindowMixin.
@@ -171,7 +172,7 @@ public class VROverlayManagerImpl implements VROverlayManager {
         // --- Restore ---
         // The loop left mainRenderTarget on the last overlay; put the phase's target back so
         // everything between here and the next phase switch draws where it thinks it does.
-        MC.mainRenderTarget = VRRenderState.getTargetForPass(VRRenderState.getRenderPass());
+        MC.gameRenderer.mainRenderTarget = VRRenderState.getTargetForPass(VRRenderState.getRenderPass());
 
         RenderSystem.restoreProjectionMatrix();
 

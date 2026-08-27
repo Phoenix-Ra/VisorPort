@@ -190,7 +190,7 @@ public class VRLocalPlayerImpl implements VRLocalPlayer {
         );
 
         this.updatePlayerLook(MC.player, PlayerPoseType.TICK);
-        this.overlayFocused = MC.screen != null || ClientContext.cursorHandler.isAnyHandFocused(false);
+        this.overlayFocused = MC.gui.screen() != null || ClientContext.cursorHandler.isAnyHandFocused(false);
 
         ClientNetworking.sendVRPlayerState();
 

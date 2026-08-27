@@ -108,17 +108,21 @@ public abstract class Common_LivingEntityMixin extends Common_EntityMixin {
     }
 
 
-    @WrapOperation(method = "hurtServer", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/world/entity/LivingEntity;knockback(DDD)V"))
+    // PORT-26.2: hurtServer no longer knocks back inline - the default knockback was extracted
+    // into dealDefaultKnockback(DamageSource, float, boolean), which calls the five-argument
+    // knockback overload (the six-argument one is what causeExtraKnockback uses). The damage
+    // source is an explicit argument of that call now, so the @Local capture is gone with it.
+    @WrapOperation(method = "dealDefaultKnockback", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/world/entity/LivingEntity;knockback(DDDLnet/minecraft/world/damagesource/DamageSource;F)V"))
     private void visor$vrHurtKnockbackDirection(LivingEntity instance, double strength, double x, double z,
-                                                Operation<Void> original,
-                                                @Local(argsOnly = true) DamageSource damageSource) {
+                                                DamageSource damageSource, float f,
+                                                Operation<Void> original) {
         Vec3 knockBack = CommonUtils.calcVRKnockback(damageSource.getEntity(), instance);
         if (knockBack != null) {
             x = knockBack.x;
             z = knockBack.z;
         }
-        original.call(instance, strength, x, z);
+        original.call(instance, strength, x, z, damageSource, f);
     }
 
 

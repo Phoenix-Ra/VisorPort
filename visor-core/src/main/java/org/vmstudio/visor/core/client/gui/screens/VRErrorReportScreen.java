@@ -53,7 +53,7 @@ public class VRErrorReportScreen extends Screen {
         // Back
         addRenderableWidget(Button.builder(
                         Component.translatable("gui.back"),
-                        b -> Minecraft.getInstance().setScreen(new TitleScreen()))
+                        b -> Minecraft.getInstance().gui.setScreen(new TitleScreen()))
                 .size(btnW, btnH)
                 .pos(startX, bottomY)
                 .build()
@@ -105,7 +105,7 @@ public class VRErrorReportScreen extends Screen {
                 : Component.translatable("visor.messages.error.generic");
 
         Minecraft.getInstance().execute(() ->
-                Minecraft.getInstance().setScreen(new VRErrorReportScreen(title, t))
+                Minecraft.getInstance().gui.setScreen(new VRErrorReportScreen(title, t))
         );
     }
 }

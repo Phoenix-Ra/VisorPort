@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.render.decoration.effects;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import org.vmstudio.visor.api.client.player.pose.VRPlayerPoseClient;
@@ -10,6 +11,8 @@ import org.vmstudio.visor.api.client.render.decoration.annotations.RegisterVRGam
 import org.vmstudio.visor.api.client.render.decoration.effects.VRGameEffect;
 import org.vmstudio.visor.api.common.addon.VisorAddon;
 import org.vmstudio.visor.core.client.ClientContext;
+import org.vmstudio.visor.core.client.render.helpers.VRMeshDrawer;
+import org.vmstudio.visor.core.client.render.helpers.VRTesselator;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -74,7 +77,7 @@ public class GameEffectOnFire extends VRGameEffect {
         // --- Render ---
         // One buffer for all four faces: they only differ by the matrix baked into the vertices,
         // so splitting them would open four render passes for no reason.
-        BufferBuilder buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        BufferBuilder buf = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         for (int i = 0; i < 4; i++) {
             stack.pushPose();
             // spin quad around player
@@ -95,7 +98,7 @@ public class GameEffectOnFire extends VRGameEffect {
 
             stack.popPose();
         }
-        type.draw(buf.buildOrThrow());
+        VRMeshDrawer.draw(type, buf.buildOrThrow());
 
         // --- Restore pose ---
         stack.popPose();

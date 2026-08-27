@@ -33,7 +33,7 @@ public class OptionsScreenVRMixin extends Screen {
         var button = new Button.Builder(Component.translatable("visor.options.main.button"),
                 (p) -> {
                     Minecraft.getInstance().options.save();
-                    Minecraft.getInstance().setScreen(new VRSettingsScreen(this));
+                    Minecraft.getInstance().gui.setScreen(new VRSettingsScreen(this));
                 }).build();
         header.addChild(button, header.newCellSettings().paddingTop(-4));
     }

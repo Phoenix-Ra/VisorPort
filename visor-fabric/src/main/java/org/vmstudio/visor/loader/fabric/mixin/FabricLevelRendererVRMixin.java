@@ -32,7 +32,7 @@ import org.vmstudio.visor.loader.fabric.FabricModLoader;
 @Mixin(LevelRenderer.class)
 public class FabricLevelRendererVRMixin {
 
-    @Inject(method = "renderLevel", at = @At("TAIL"))
+    @Inject(method = "render", at = @At("TAIL"))
     private void visor$afterLevel(CallbackInfo ci) {
         FabricModLoader.fireRenderPipelineStage(
                 RenderPipelineStage.AFTER_WORLD, new PoseStack(), visor$partialTicks());

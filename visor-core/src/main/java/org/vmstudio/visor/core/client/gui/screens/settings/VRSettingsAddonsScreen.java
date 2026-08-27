@@ -93,7 +93,7 @@ public class VRSettingsAddonsScreen extends Screen {
         //Back button
         this.addRenderableWidget(
                 Button.builder(Component.translatable("gui.back"), btn -> {
-                            MC.setScreen(this.previousScreen);
+                            MC.gui.setScreen(this.previousScreen);
                         })
                         .bounds(this.width / 2 - 100, this.height - 27, 200, 20)
                         .build()
@@ -106,7 +106,7 @@ public class VRSettingsAddonsScreen extends Screen {
         int scanCode = event.scancode();
         if (keyCode == InputConstants.KEY_ESCAPE) {
             ClientContext.settingsManager.saveOptions();
-            MC.setScreen(this.previousScreen);
+            MC.gui.setScreen(this.previousScreen);
             return true;
         }
         return super.keyPressed(event);
@@ -167,7 +167,7 @@ public class VRSettingsAddonsScreen extends Screen {
 
             this.leftButton = Button.builder(
                             left.getAddonName().copy().append("..."),
-                            b -> MC.setScreen(leftScreen)
+                            b -> MC.gui.setScreen(leftScreen)
                     )
                     .bounds(0, 0, buttonWidth, buttonH)
                     .build();
@@ -175,7 +175,7 @@ public class VRSettingsAddonsScreen extends Screen {
             if (right != null) {
                 this.rightButton = Button.builder(
                                 right.getAddonName().copy().append("..."),
-                                b -> MC.setScreen(rightScreen)
+                                b -> MC.gui.setScreen(rightScreen)
                         )
                         .bounds(0, 0, buttonWidth, buttonH)
                         .build();

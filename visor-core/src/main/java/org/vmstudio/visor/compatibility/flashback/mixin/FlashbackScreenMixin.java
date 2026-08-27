@@ -24,8 +24,8 @@ public class FlashbackScreenMixin {
         if (!VisorState.get().isInitialized()) return;
 
         Minecraft.getInstance().execute(() -> {
-            Minecraft.getInstance().setScreen(new AlertScreen(
-                    () -> Minecraft.getInstance().setScreen(null),
+            Minecraft.getInstance().gui.setScreen(new AlertScreen(
+                    () -> Minecraft.getInstance().gui.setScreen(null),
                     Component.literal("§cReplay editor is disabled in VR mode or WORLD_ONLY playMode"),
                     Component.literal("Replay editing is disabled in VR.\n" +
                             "Please switch back to PC (NonVR to use Replay editor")

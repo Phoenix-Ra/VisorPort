@@ -26,6 +26,7 @@ import org.vmstudio.visor.api.common.utils.VRMathUtils;
 import org.vmstudio.visor.compatibility.ShadersHelper;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.api.client.settings.enums.MirrorMode;
+import org.vmstudio.visor.core.client.render.helpers.VRFeatureRenderer;
 import org.vmstudio.visor.core.client.utils.ModelUtils;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 import org.vmstudio.visor.core.client.render.decoration.registry.VRHandEffectRegistry;
@@ -408,13 +409,15 @@ public class VRHandRenderer {
 
         InteractionHand interactionHand = hand.asInteractionHand();
         ItemStack item = MC.player.getItemInHand(interactionHand);
-        if(MC.screen != null){
+        if(MC.gui.screen() != null){
             item = ItemStack.EMPTY;
         }
 
         poseStack.pushPose();
 
-        SubmitNodeCollector collector = MC.gameRenderer.getSubmitNodeStorage();
+        // PORT-26.2: Visor's own collector, drained by its own dispatcher below - vanilla's
+        // dispatcher has a PreparedFrame open for the level for the whole of this pass.
+        SubmitNodeCollector collector = VRFeatureRenderer.collector();
 
         renderWorldArmWithItem(
                 MC.player,
@@ -433,8 +436,11 @@ public class VRHandRenderer {
         // next flush - which runs under the flat hud3d projection and the level's model-view -
         // so the hand rendered through someone else's matrices. Same pair, same bracket, as
         // vanilla's own renderHandsWithItems.
-        MC.gameRenderer.getFeatureRenderDispatcher().renderAllFeatures();
-        MC.renderBuffers().bufferSource().endBatch();
+        // PORT-26.2: renderAllFeatures takes the storage to drain, and RenderBuffers no longer
+        // has a bufferSource to flush - MultiBufferSource is gone with the submit/extract split.
+        // It goes through Visor's own dispatcher: draining vanilla's from inside the level pass
+        // throws "PreparedFrame already in use". See VRFeatureRenderer.
+        VRFeatureRenderer.drain();
 
         poseStack.popPose();
 

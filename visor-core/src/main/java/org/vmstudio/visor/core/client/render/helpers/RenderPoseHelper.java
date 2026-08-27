@@ -145,7 +145,7 @@ public class RenderPoseHelper {
         // split moved into the instance method Lighting.updateLevel(CardinalLightType), which
         // vanilla runs when the dimension changes - so the LEVEL entry already holds the correct
         // pair and restoring is just pointing setShaderLights back at it.
-        MC.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
+        MC.gameRenderer.lighting().setupFor(Lighting.Entry.LEVEL);
     }
 
     public static void applyCameraTranslation(VRRenderPass renderPass,

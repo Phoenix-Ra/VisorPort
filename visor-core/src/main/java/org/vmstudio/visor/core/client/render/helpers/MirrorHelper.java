@@ -41,12 +41,12 @@ public class MirrorHelper {
 
 
     public static void drawMirror() {
-        RenderTarget mirror = MC.getMainRenderTarget();
+        RenderTarget mirror = MC.gameRenderer.mainRenderTarget();
         if (mirror == null || mirror.getColorTexture() == null) {
             return;
         }
         // Opaque black underneath everything; depth too, the text mode draws GUI text over it.
-        RenderShaderHelper.clear(mirror, MIRROR_CLEAR_COLOR, 1.0);
+        RenderShaderHelper.clear(mirror, MIRROR_CLEAR_COLOR, RenderShaderHelper.CLEAR_DEPTH_FAR);
 
         switch (VRClientSettings.getMirrorMode()){
             case OFF -> drawTextMirror("Mirror is OFF");
@@ -147,7 +147,7 @@ public class MirrorHelper {
         blit(
                 rightEye,
                 screenWidth,0,
-                MC.mainRenderTarget.width, screenHeight
+                MC.gameRenderer.mainRenderTarget.width, screenHeight
         );
 
     }
@@ -216,7 +216,7 @@ public class MirrorHelper {
         RenderShaderHelper.blit(
                 () -> "visor mirror blit",
                 source, 0, 0, source.width, source.height,
-                MC.getMainRenderTarget(), left, top, right, bottom,
+                MC.gameRenderer.mainRenderTarget(), left, top, right, bottom,
                 FilterMode.LINEAR);
     }
 
@@ -233,7 +233,7 @@ public class MirrorHelper {
         if (source == null) {
             return;
         }
-        RenderTarget mirror = MC.getMainRenderTarget();
+        RenderTarget mirror = MC.gameRenderer.mainRenderTarget();
         if (keepAspect) {
             float targetAspect = (float) mirror.width / (float) mirror.height;
             float sourceAspect = (float) source.width / (float) source.height;

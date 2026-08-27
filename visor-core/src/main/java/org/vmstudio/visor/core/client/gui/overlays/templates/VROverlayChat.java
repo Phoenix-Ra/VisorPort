@@ -45,11 +45,11 @@ public class VROverlayChat extends VROverlayTemplateScreen {
         // PORT-26.1: render(...) became extractRenderState(...) and the "focused" flag turned
         // into ChatComponent.DisplayMode (FOREGROUND while the chat screen is open, BACKGROUND
         // for the HUD).
-        minecraft.gui.getChat().extractRenderState(
+        minecraft.gui.hud.getChat().extractRenderState(
                 guiGraphics,
                 minecraft.font,
-                minecraft.gui.getGuiTicks(),0, 0,
-                minecraft.screen instanceof ChatScreen
+                minecraft.gui.hud.getGuiTicks(),0, 0,
+                minecraft.gui.screen() instanceof ChatScreen
                         ? ChatComponent.DisplayMode.FOREGROUND
                         : ChatComponent.DisplayMode.BACKGROUND,
                 false
@@ -63,7 +63,7 @@ public class VROverlayChat extends VROverlayTemplateScreen {
         if(minecraft.isPaused()
                 || ClientContext.overlayManager.getKeyboardAccessor().isVisible()) return false;
 
-        return !minecraft.gui.getChat().trimmedMessages.isEmpty() &&
+        return !minecraft.gui.hud.getChat().trimmedMessages.isEmpty() &&
                 minecraft.options.chatVisibility().get() != ChatVisiblity.HIDDEN;
     }
 

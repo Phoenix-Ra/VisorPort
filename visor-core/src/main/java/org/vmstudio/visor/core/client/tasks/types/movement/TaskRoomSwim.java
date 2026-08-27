@@ -118,7 +118,7 @@ public class TaskRoomSwim extends VisorTask {
             return false;
         }
         if(!VRClientSettings.isRoomSwimEnabled()) return false;
-        if (MC.screen != null) return false;
+        if (MC.gui.screen() != null) return false;
         if (MC.gameMode == null) return false;
         if (p == null || !p.isAlive()) return false;
         if (p.isPassenger()) return false;

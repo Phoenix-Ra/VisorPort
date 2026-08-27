@@ -21,6 +21,7 @@ import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.player.VRClientPlayers;
 import org.vmstudio.visor.core.client.render.helpers.CullFrustumHelper;
+import org.vmstudio.visor.core.client.render.helpers.ProjectionHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.extensions.client.render.GameRendererExtension;
 
@@ -115,10 +116,17 @@ public class VRGameCamera extends Camera {
         this.fov = calculateVRFov(partialTicks);
         this.hudFov = modifyFovBasedOnDeathOrFluid(partialTicks, HUD_FOV);
 
-        Matrix4f passProjection = new Matrix4f(visor$passProjection());
+        // PORT-26.2: the pass projection is reverse-depth now; Frustum wants classic depth
+        // (vanilla's createProjectionMatrixForCulling stays classic for the same reason - the
+        // view vector it derives from the z row flips direction on a reversed matrix).
+        Matrix4f cullProjection = ProjectionHelper.toCullProjection(
+                visor$passProjection(),
+                gameRenderer.visor$getNearClipPlane(),
+                this.depthFar
+        );
         this.prepareCullFrustum(
                 this.getViewRotationMatrix(new Matrix4f()),
-                CullFrustumHelper.widenCullProjection(passProjection),
+                CullFrustumHelper.widenCullProjection(cullProjection),
                 this.position()
         );
         float width = Math.max(1, MC.getWindow().getWidth());

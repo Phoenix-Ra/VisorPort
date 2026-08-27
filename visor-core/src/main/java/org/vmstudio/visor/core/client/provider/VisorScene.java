@@ -88,6 +88,27 @@ public class VisorScene implements AtumVRScene {
             );
             GLUtils.checkGLError("post VR render pass: " + renderPass.name());
 
+            // PORT-26.2: end the GPU frame for this pass.
+            //
+            // 26.2 tied fences to the command encoder's submit index: a GlFence now records
+            // which submit produced it, and awaiting one from the *current* submit throws
+            // "Cannot wait on a fence for the current submit". Vanilla's per-frame ring
+            // buffers (MappableRingBuffer, BUFFER_COUNT = 3) rotate once per pass and assume
+            // each rotation crosses a submit. Visor renders three passes - both eyes and the
+            // mirror - inside one vanilla frame, so the third landed back on a fence created
+            // during this submit and CloudRenderer took the whole frame down.
+            //
+            // On 26.1 this was invisible: GlFence was a bare GL sync object and awaiting it
+            // mid-frame merely blocked. Submitting per pass restores the invariant the ring
+            // buffers were written against, and is what a pass boundary means now.
+            //
+            // The ring's actual contract is only "at most BUFFER_COUNT - 1 rotations may share
+            // a submit", so one submit before the loop plus one every other pass would also
+            // satisfy it and would spare the per-eye CPU/GPU stall this costs. Left per-pass
+            // for now: it is the conservative reading and this is not the frame budget's
+            // current problem.
+            RenderSystem.getDevice().createCommandEncoder().submit();
+
 
             if (ClientContext.renderer.isAskedForScreenShot()) {
                 takeScreenshot(renderPass);
@@ -119,11 +140,13 @@ public class VisorScene implements AtumVRScene {
         }
 
         if (flag) {
-            RenderTarget rendertarget = MC.mainRenderTarget;
+            RenderTarget rendertarget = MC.gameRenderer.mainRenderTarget;
 
             ClientUtils.takeScreenshot(rendertarget);
             // PORT-26.1: Window.updateDisplay() is gone; the swap is RenderSystem.flipFrame() now
-            RenderSystem.flipFrame(null);
+            // PORT-26.2: and flipFrame is gone in turn - presentation moved onto the swapchain,
+            // so the frame is handed over by the window's own GpuSurface.
+            MC.windowSurface().present();
             ClientContext.renderer.setAskedForScreenShot(false);
         }
     }
@@ -138,17 +161,18 @@ public class VisorScene implements AtumVRScene {
     ) {
         VRRenderState.startVRWorldPhase(renderPass);
 
-        if (MC.mainRenderTarget == null) {
+        if (MC.gameRenderer.mainRenderTarget == null) {
             LOGGER.warn("Visor: no render target for pass {}; requesting renderer reinit.", renderPass);
             VRRenderState.startVanillaPhase();
             ClientContext.renderer.prepareReinit("Missing target for pass " + renderPass);
             return;
         }
 
-        // Opaque black, full depth. The old sequence set a clear colour, cleared colour only,
+        // Opaque black, empty depth. The old sequence set a clear colour, cleared colour only,
         // and re-enabled the depth test; clearing is a command on the encoder now and the depth
         // test belongs to whichever pipeline draws next.
-        RenderShaderHelper.clearColorAndDepth(MC.mainRenderTarget, 0xFF000000, 1.0);
+        RenderShaderHelper.clearColorAndDepth(MC.gameRenderer.mainRenderTarget, 0xFF000000,
+                RenderShaderHelper.CLEAR_DEPTH_FAR);
 
         ShadersHelper.bridge().beginEye(renderPass.getEyeOrLeft());
 
@@ -160,9 +184,22 @@ public class VisorScene implements AtumVRScene {
         var gameRenderer = (GameRendererExtension) MC.gameRenderer;
         gameRenderer.visor$beginWorldPass(context.partialTicks());
         try {
-            MC.gameRenderer.update(MC.getDeltaTracker(), context.renderLevel());
-            MC.gameRenderer.extract(MC.getDeltaTracker(), context.renderLevel());
-            MC.gameRenderer.render(MC.getDeltaTracker(), context.renderLevel());
+            // PORT-26.2: gizmos are collected through a ThreadLocal that is only installed for
+            // the duration of a Gizmos.TemporaryCollection, and Gizmos.addGizmo throws
+            // "Gizmos cannot be created here! No GizmoCollector has been registered." when it is
+            // not. Minecraft.renderFrame wraps its own update/extract in the extractor's
+            // main-thread collection and render() in the level renderer's render-thread one; a VR
+            // pass drives those three calls itself, so it has to open the same two scopes or any
+            // emitter reached from them (DebugRenderer.emitGizmos, GameTestBlockHighlightRenderer)
+            // takes the pass down.
+            try (var ignored = MC.levelExtractor.collectPerFrameMainThreadGizmos()) {
+                // PORT-26.2: update() takes only the DeltaTracker now.
+                MC.gameRenderer.update(MC.getDeltaTracker());
+                MC.gameRenderer.extract(MC.getDeltaTracker(), context.renderLevel());
+            }
+            try (var ignored = MC.levelRenderer.collectPerFrameRenderThreadGizmos()) {
+                MC.gameRenderer.render(MC.getDeltaTracker(), context.renderLevel());
+            }
         } finally {
             gameRenderer.visor$endWorldPass();
         }
@@ -186,7 +223,7 @@ public class VisorScene implements AtumVRScene {
             VRShaders.getPostProcess().finishEye(
                     renderPass == VRRenderPass.EYE_LEFT
                             ? EyeType.LEFT : EyeType.RIGHT,
-                    MC.mainRenderTarget,
+                    MC.gameRenderer.mainRenderTarget,
                     eyeTarget,
                     context.partialTicks()
             );

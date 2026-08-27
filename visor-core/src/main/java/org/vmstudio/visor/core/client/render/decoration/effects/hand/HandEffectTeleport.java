@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.render.decoration.effects.hand;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.*;
@@ -17,6 +18,8 @@ import org.vmstudio.visor.core.client.ClientContext;
 import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.render.VRShaders;
 import org.vmstudio.visor.core.client.render.VisorPipelines;
+import org.vmstudio.visor.core.client.render.helpers.VRMeshDrawer;
+import org.vmstudio.visor.core.client.render.helpers.VRTesselator;
 import org.vmstudio.visor.core.client.render.shaders.VRShaderTeleportPoint;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
@@ -93,7 +96,7 @@ public class HandEffectTeleport extends VRHandEffect {
                                    PoseStack poseStack) {
         Profiler.get().push("teleportArc");
 
-        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS,
+        BufferBuilder builder = VRTesselator.begin(PrimitiveTopology.QUADS,
                 DefaultVertexFormat.POSITION_COLOR_NORMAL);
 
         double VOffset = lastArcDisplayOffset;
@@ -182,7 +185,7 @@ public class HandEffectTeleport extends VRHandEffect {
         }
         // One upload for every segment of the arc, as before - do not let this become a draw
         // per segment.
-        VisorPipelines.POSITION_COLOR_NORMAL_TYPE.draw(builder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_NORMAL_TYPE, builder.buildOrThrow());
 
         // Custom Shader Landing Pad Effect using our own shader
         if (validLocation && TaskTeleport.getInstance().isArcActive()) {
@@ -206,7 +209,7 @@ public class HandEffectTeleport extends VRHandEffect {
     private void drawQuad(VRShaderTeleportPoint shader, Vec3 center, float size, PoseStack poseStack) {
         float halfSize = size / 2.0F;
         Matrix4f matrix = poseStack.last().pose();
-        RenderTarget target = MC.getMainRenderTarget();
+        RenderTarget target = MC.gameRenderer.mainRenderTarget();
 
         // bindDefaultUniforms covers Projection/Fog/Globals/Lighting but not DynamicTransforms,
         // which is where the model-view the shader reads lives.

@@ -50,6 +50,7 @@ public class VRSettingsGui extends VROptionsSet {
     @Override
     public void loadDefaults() {
         super.loadDefaults();
-        MC.options.hideGui = false;
+        // PORT-26.2: the flag moved from Options onto the new Hud class.
+        MC.gui.hud.isHidden = false;
     }
 }

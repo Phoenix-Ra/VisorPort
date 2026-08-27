@@ -224,7 +224,7 @@ public class VisorClientImpl implements VisorClient {
             ClientContext.inputManager.update();
             VRClientPlayers.onGameLoopStart();
 
-            if (!(MC.screen instanceof OptionsScreen)
+            if (!(MC.gui.screen() instanceof OptionsScreen)
                     && VRClientSettings.getEyeFovScaleCurrent() != VRClientSettings.getEyesFovScale()) {
                 VRClientSettings.setEyeFovScaleCurrent(
                         VRClientSettings.getEyesFovScale()

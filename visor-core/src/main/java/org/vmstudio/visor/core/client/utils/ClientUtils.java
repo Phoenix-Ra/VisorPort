@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
+import net.minecraft.util.LightCoordsUtil;
 import org.joml.Vector2f;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.api.common.player.VRPlayer;
@@ -28,7 +29,7 @@ public class ClientUtils {
     }
 
     public static int getCombinedLightWithMin(BlockAndTintGetter lightReader, BlockPos pos, int minLight) {
-        int i = LevelRenderer.getLightCoords(lightReader, pos);
+        int i = LightCoordsUtil.getLightCoords(lightReader, pos);
         int j = i >> 4 & 15;
 
         if (j < minLight) {
@@ -107,7 +108,7 @@ public class ClientUtils {
     public static int getCombinedLight(BlockAndTintGetter lightReader,
                                        BlockPos pos,
                                        int minLight) {
-        int i = LevelRenderer.getLightCoords(lightReader, pos);
+        int i = LightCoordsUtil.getLightCoords(lightReader, pos);
         int j = i >> 4 & 15;
 
         if (j < minLight) {
@@ -123,7 +124,7 @@ public class ClientUtils {
         Screenshot.grab(minecraft.gameDirectory, fb, (text) ->
         {
             minecraft.execute(() -> {
-                minecraft.gui.getChat().addClientSystemMessage(text);
+                minecraft.gui.hud.getChat().addClientSystemMessage(text);
             });
         });
     }
@@ -146,7 +147,7 @@ public class ClientUtils {
                 * VRClientSettings.getFullHeight()
                 / VRPlayer.DEFAULT_FULL_HEIGHT
         ));
-        Minecraft.getInstance().gui.getChat()
+        Minecraft.getInstance().gui.hud.getChat()
                 .addClientSystemMessage(
                         Component.literal(
                                 LangHelper.getText(
@@ -160,7 +161,7 @@ public class ClientUtils {
 
     public static void calibrateHeight() {
         if (!tryCalibrateHeight()) {
-            Minecraft.getInstance().gui.getChat()
+            Minecraft.getInstance().gui.hud.getChat()
                     .addClientSystemMessage(
                             Component.literal(
                                     LangHelper.getText(
@@ -194,11 +195,11 @@ public class ClientUtils {
 
         TitleScreen titleScreen = new TitleScreen();
         if (bl) {
-            minecraft.setScreen(titleScreen);
+            minecraft.gui.setScreen(titleScreen);
         } else if (bl2) {
-            minecraft.setScreen(new RealmsMainScreen(titleScreen));
+            minecraft.gui.setScreen(new RealmsMainScreen(titleScreen));
         } else {
-            minecraft.setScreen(new JoinMultiplayerScreen(titleScreen));
+            minecraft.gui.setScreen(new JoinMultiplayerScreen(titleScreen));
         }
     }
 }

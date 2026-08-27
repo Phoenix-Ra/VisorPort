@@ -1,6 +1,7 @@
 package org.vmstudio.visor.core.client.render.helpers;
 
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -83,8 +84,8 @@ public class RenderHelper {
 
 
         // --- Render ---
-        BufferBuilder bufferBuilder = Tesselator.getInstance().begin(
-                VertexFormat.Mode.QUADS,
+        BufferBuilder bufferBuilder = VRTesselator.begin(
+                PrimitiveTopology.QUADS,
                 DefaultVertexFormat.POSITION_COLOR_NORMAL
         );
         for (int f = 0; f < faceIndices.length; f++) {
@@ -97,7 +98,7 @@ public class RenderHelper {
                 addVertex(bufferBuilder, poseMatrix, pos, color, normal);
             }
         }
-        type.draw(bufferBuilder.buildOrThrow());
+        VRMeshDrawer.draw(type, bufferBuilder.buildOrThrow());
     }
 
 
@@ -128,7 +129,7 @@ public class RenderHelper {
 
 
         // --- Render ---
-        BufferBuilder bufferBuilder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS,
+        BufferBuilder bufferBuilder = VRTesselator.begin(PrimitiveTopology.QUADS,
                 DefaultVertexFormat.POSITION_COLOR_NORMAL);
         for (float[] vertex : vertices) {
             bufferBuilder.addVertex(poseMatrix, vertex[0], vertex[1], vertex[2])
@@ -136,7 +137,7 @@ public class RenderHelper {
                     .setNormal(normal.x(), normal.y(), normal.z())
             ;
         }
-        type.draw(bufferBuilder.buildOrThrow());
+        VRMeshDrawer.draw(type, bufferBuilder.buildOrThrow());
 
     }
 
@@ -172,7 +173,7 @@ public class RenderHelper {
 
         // --- Render ---
         BufferBuilder buf;
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS,
+        buf = VRTesselator.begin(PrimitiveTopology.QUADS,
                 DefaultVertexFormat.POSITION_TEX);
 
         for (float[] vertex : vertices) {
@@ -234,7 +235,7 @@ public class RenderHelper {
 
         // --- Render ---
         BufferBuilder buf;
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.ENTITY);
+        buf = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.ENTITY);
 
         for (int i = 0; i < 4; i++) {
             float x = pos[i][0], y = pos[i][1];

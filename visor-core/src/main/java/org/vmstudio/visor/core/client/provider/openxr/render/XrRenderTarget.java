@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.provider.openxr.render;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import org.vmstudio.visor.extensions.client.render.RenderTargetExtension;
@@ -16,7 +17,7 @@ import org.vmstudio.visor.extensions.client.render.RenderTargetExtension;
 public class XrRenderTarget extends RenderTarget {
 
     public XrRenderTarget(int width, int height, int colorId, int index) {
-        super("Visor XR Eye " + index, false);
+        super("Visor XR Eye " + index, false, GpuFormat.RGBA8_UNORM);
         RenderSystem.assertOnRenderThread();
 
         // must be set before resize(), which is what triggers createBuffers()

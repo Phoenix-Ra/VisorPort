@@ -41,9 +41,14 @@ accessible method net/minecraft/world/entity/Entity collide (Lnet/minecraft/worl
 #accessible method net/minecraft/client/renderer/entity/ItemRenderer renderQuadList (Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Ljava/util/List;[III)V
 
 #Vertex
-accessible class net/minecraft/client/renderer/OutlineBufferSource$EntityOutlineGenerator
-accessible class com/mojang/blaze3d/vertex/VertexMultiConsumer$Double
-accessible class com/mojang/blaze3d/vertex/VertexMultiConsumer$Multiple
+# PORT-26.2: both outer classes are gone from the jar entirely (verified with a positive control:
+# the same search finds OutlineBufferSource, VertexMultiConsumer and all three inner classes in
+# 26.1.2). Entity outlines are now a feature renderer - renderer/feature/ShapeOutlineFeatureRenderer
+# plus rendertype/RenderSetup$OutlineProperty - and the multi-consumer wrappers went away with the
+# submit/extract pipeline. Nothing in Visor referenced either class, so there is nothing to retarget.
+#accessible class net/minecraft/client/renderer/OutlineBufferSource$EntityOutlineGenerator
+#accessible class com/mojang/blaze3d/vertex/VertexMultiConsumer$Double
+#accessible class com/mojang/blaze3d/vertex/VertexMultiConsumer$Multiple
 
 mutable field com/mojang/blaze3d/vertex/SheetedDecalTextureGenerator cameraInversePose Lorg/joml/Matrix4f;
 mutable field com/mojang/blaze3d/vertex/SheetedDecalTextureGenerator normalInversePose Lorg/joml/Matrix3f;
@@ -81,8 +86,11 @@ accessible field net/minecraft/network/Connection channel Lio/netty/channel/Chan
 accessible method net/minecraft/client/Minecraft startUseItem ()V
 
 # to switch rendertargets for VR cameras
-mutable field net/minecraft/client/Minecraft mainRenderTarget Lcom/mojang/blaze3d/pipeline/RenderTarget;
-accessible field net/minecraft/client/Minecraft mainRenderTarget Lcom/mojang/blaze3d/pipeline/RenderTarget;
+# PORT-26.2: the field moved off Minecraft onto GameRenderer - Minecraft has no RenderTarget-typed
+# member left at all. Same name, same descriptor, and still `private final`, so both lines are still
+# needed. Vanilla reads it through the new public accessor GameRenderer.mainRenderTarget().
+mutable field net/minecraft/client/renderer/GameRenderer mainRenderTarget Lcom/mojang/blaze3d/pipeline/RenderTarget;
+accessible field net/minecraft/client/renderer/GameRenderer mainRenderTarget Lcom/mojang/blaze3d/pipeline/RenderTarget;
 
 
 # XR Camera
@@ -116,6 +124,28 @@ accessible field net/minecraft/client/renderer/GameRenderer useUiLightmap Z
 # still needs to call the vanilla raycast.
 accessible method net/minecraft/client/Minecraft pick (F)V
 
+# PORT-26.2: entityOutlineTarget became final. LevelRendererMixin swaps in a per-eye outline
+# target for the duration of a VR pass, and a @Shadow write to a final field is an
+# IllegalAccessError at first use - the mixin applies cleanly and the crash waits until a level
+# is actually rendered.
+mutable field net/minecraft/client/renderer/LevelRenderer entityOutlineTarget Lcom/mojang/blaze3d/pipeline/RenderTarget;
+
+# PORT-26.2: LevelRenderer.cullTerrain is gone and the frustum-update skip moved to
+# LevelExtractor.extract, so the no-Sodium cull hook injects there - but sectionOcclusionGraph
+# stayed private on LevelRenderer, and a @Shadow cannot reach across target classes.
+accessible field net/minecraft/client/renderer/LevelRenderer sectionOcclusionGraph Lnet/minecraft/client/renderer/SectionOcclusionGraph;
+
+# PORT-26.2: Options.hideGui is gone. 26.2 split the HUD off Gui into its own Hud class and moved
+# the flag there as a private field with a read-only accessor. It is not final, so `accessible`
+# alone is enough - a `mutable` line here would be a no-op.
+accessible field net/minecraft/client/gui/Hud isHidden Z
+
+# PORT-26.2: RenderType.draw(MeshData) is gone; a mesh now goes through a StagedVertexBuffer and
+# is executed with PreparedRenderType.drawFromBuffer (see VRMeshDrawer). Vanilla only ever feeds
+# that buffer through getVertexBuilder(), so the one entry point that takes a finished MeshData -
+# Draw.append - is private. Visor builds its meshes with a BufferBuilder, so it needs that door.
+accessible method net/minecraft/client/renderer/StagedVertexBuffer$Draw append (Lcom/mojang/blaze3d/vertex/MeshData;)V
+
 # for pausemenu buttons
 accessible method net/minecraft/client/Minecraft isMultiplayerServer ()Z
 
@@ -131,7 +161,9 @@ accessible method net/minecraft/client/KeyMapping release ()V
 accessible field net/minecraft/client/KeyMapping key Lcom/mojang/blaze3d/platform/InputConstants$Key;
 
 # to get the current blend state
-accessible field com/mojang/blaze3d/opengl/GlStateManager BLEND Lcom/mojang/blaze3d/opengl/GlStateManager$BlendState;
+# PORT-26.2: blend state is per draw buffer now - BLEND became an array, and _enableBlend/
+# _disableBlend take the buffer index. Only the descriptor changes here; a reader has to pick a slot.
+accessible field com/mojang/blaze3d/opengl/GlStateManager BLEND [Lcom/mojang/blaze3d/opengl/GlStateManager$BlendState;
 accessible class com/mojang/blaze3d/opengl/GlStateManager$BlendState
 
 # PORT-26.1: the raw framebuffer blit in RenderShaderHelper needs DirectStateAccess, and both
@@ -142,8 +174,17 @@ accessible class com/mojang/blaze3d/opengl/GlStateManager$BlendState
 accessible class com/mojang/blaze3d/opengl/GlDevice
 accessible field com/mojang/blaze3d/systems/GpuDevice backend Lcom/mojang/blaze3d/systems/GpuDeviceBackend;
 
+# PORT-26.2: framebuffer objects live in a device-wide FrameBufferCache now, keyed per attachment
+# list, and are only destroyed from GlTexture.destroyImmediately - which an external-texture
+# wrapper must never reach (it would glDeleteTexture the XR runtime's swapchain image, and a
+# recycled GL name would then be served a stale FBO from the cache). VRExternalGlTexture purges
+# its own cache entries on close instead, which needs the texture's key list and its cache.
+accessible field com/mojang/blaze3d/opengl/GlTexture fboKeys Ljava/util/List;
+accessible field com/mojang/blaze3d/opengl/GlTexture frameBufferCache Lcom/mojang/blaze3d/opengl/FrameBufferCache;
+
 # to render vr hands
-accessible method net/minecraft/client/renderer/ItemInHandRenderer renderArmWithItem (Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V
+# PORT-26.2: renamed renderArmWithItem -> submitArmWithItem; the descriptor is unchanged.
+accessible method net/minecraft/client/renderer/ItemInHandRenderer submitArmWithItem (Lnet/minecraft/client/player/AbstractClientPlayer;FFLnet/minecraft/world/InteractionHand;FLnet/minecraft/world/item/ItemStack;FLcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;I)V
 
 # to create custom END shader
 accessible method net/minecraft/client/renderer/rendertype/RenderType create (Ljava/lang/String;Lnet/minecraft/client/renderer/rendertype/RenderSetup;)Lnet/minecraft/client/renderer/rendertype/RenderType;

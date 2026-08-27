@@ -51,7 +51,7 @@ public class MenuActionSet extends VRActionSet {
 
     @Override
     public boolean canActivate() {
-        return MC.screen != null;
+        return MC.gui.screen() != null;
     }
 
     @Override

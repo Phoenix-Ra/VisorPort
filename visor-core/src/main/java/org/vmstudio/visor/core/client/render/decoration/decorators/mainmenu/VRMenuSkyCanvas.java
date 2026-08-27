@@ -1,9 +1,9 @@
 package org.vmstudio.visor.core.client.render.decoration.decorators.mainmenu;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
@@ -38,6 +38,8 @@ import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.api.client.settings.VRClientSettings;
 import org.vmstudio.visor.api.client.settings.enums.MainMenuSceneMode;
 
+import org.vmstudio.visor.core.client.render.helpers.VRMeshDrawer;
+import org.vmstudio.visor.core.client.render.helpers.VRTesselator;
 import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 import org.vmstudio.visor.api.compatibility.mcversion.McVersionUtilsClient;
 
@@ -258,7 +260,7 @@ public final class VRMenuSkyCanvas implements VREventListener {
 
             float hitDistance = aim.distance;
             float seconds = (float) ((Util.getMillis() % 100_000L) / 1000.0);
-            builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            builder = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
             float ringRadius = hitDistance * ERASE_RING_SIN;
             float spinAngle = seconds * ERASE_RING_SPIN;
             for (int i = 0; i < ERASE_RING_DOTS; i++) {
@@ -269,7 +271,7 @@ public final class VRMenuSkyCanvas implements VREventListener {
             }
             markerQuad(builder, poseMatrix, 0, 0, -hitDistance, 0.35f, colorInt, 120);
 
-            VisorPipelines.positionTexColorNoDepth(glowSprite).draw(builder.buildOrThrow());
+            VRMeshDrawer.draw(VisorPipelines.positionTexColorNoDepth(glowSprite), builder.buildOrThrow());
         }
 
         poseStack.popPose();

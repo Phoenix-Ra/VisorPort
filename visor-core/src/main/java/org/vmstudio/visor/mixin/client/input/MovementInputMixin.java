@@ -34,7 +34,7 @@ public class MovementInputMixin extends ClientInput {
             return;
         }
 
-        boolean noScreen = Minecraft.getInstance().screen == null;
+        boolean noScreen = Minecraft.getInstance().gui.screen() == null;
 
         boolean jumping = this.keyPresses.jump()
                 && noScreen

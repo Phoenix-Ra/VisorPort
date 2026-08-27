@@ -13,6 +13,7 @@ import me.phoenixra.atumvr.core.input.device.XRDeviceHMD;
 import org.vmstudio.visor.core.client.provider.VisorScene;
 import org.vmstudio.visor.core.client.provider.openxr.XrProvider;
 import org.vmstudio.visor.core.client.render.VRRendererBase;
+import org.vmstudio.visor.core.client.render.helpers.ProjectionHelper;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 import org.lwjgl.PointerBuffer;
@@ -296,15 +297,15 @@ public class XrRenderer extends VRRendererBase {
                 .getDevice(AtumVRDeviceHMD.ID, XRDeviceHMD.class)
                 .getXrView(eyeType).fov();
 
-        return new Matrix4f()
-                .setPerspectiveOffCenterFov(
-                        fov.angleLeft(),
-                        fov.angleRight(),
-                        fov.angleDown(),
-                        fov.angleUp(),
-                        nearClip,
-                        farClip
-                );
+        // PORT-26.2: reverse-depth, matching vanilla's Projection.getMatrix convention.
+        return ProjectionHelper.perspectiveOffCenterFov(
+                fov.angleLeft(),
+                fov.angleRight(),
+                fov.angleDown(),
+                fov.angleUp(),
+                nearClip,
+                farClip
+        );
     }
 
     @Override

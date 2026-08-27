@@ -58,7 +58,7 @@ public class GameActionSet extends VRActionSet {
 
     @Override
     public boolean canActivate() {
-        return MC.screen == null && MC.player != null;
+        return MC.gui.screen() == null && MC.player != null;
     }
 
     @Override

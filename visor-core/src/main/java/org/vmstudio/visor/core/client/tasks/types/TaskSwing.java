@@ -266,7 +266,7 @@ public class TaskSwing extends VisorTask {
                 && !p.isSpectator()
                 && p.getVehicle() == null
                 && !TaskRoomClimb.getInstance().isGrabbed()
-                && MC.screen == null
+                && MC.gui.screen() == null
                 && (VRServerSettings.isAttacksWhileBlocking() || !p.isBlocking());
     }
 

@@ -38,7 +38,7 @@ public abstract class ChatScreenMixin extends Screen {
      * the user in a chat screen Escape cannot dismiss. Going 2 matches -> 1 is safe: @Inject's
      * default require is 1.
      */
-    @Inject(method = "keyPressed", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;setScreen(Lnet/minecraft/client/gui/screens/Screen;)V"),cancellable = true)
+    @Inject(method = "keyPressed", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;setScreenAndShow(Lnet/minecraft/client/gui/screens/Screen;)V"),cancellable = true)
     private void visor$clearInputOnClose(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
         if(VisorState.get().isNotActive()) return;
         input.setValue("");

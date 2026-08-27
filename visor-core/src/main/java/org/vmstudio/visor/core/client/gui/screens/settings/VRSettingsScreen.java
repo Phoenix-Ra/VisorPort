@@ -237,7 +237,7 @@ public class VRSettingsScreen extends Screen {
                         .setHighlightSelected(OptionTextures.SELECTED_HIGHLIGHT),
                 (it)->{
                     ClientContext.settingsManager.saveOptions();
-                    MC.setScreen(this.previousScreen);
+                    MC.gui.setScreen(this.previousScreen);
                 }
         );
         buttonBack = new ButtonImaged(
@@ -303,7 +303,7 @@ public class VRSettingsScreen extends Screen {
                         .setHighlightSelected(OptionTextures.SELECTED_HIGHLIGHT)
                         .setText(Component.translatable("visor.options.main.addons")),
                 (it)->{
-                    MC.setScreen(new VRSettingsAddonsScreen(this));
+                    MC.gui.setScreen(new VRSettingsAddonsScreen(this));
                 }
         );
         buttonJoinCommunity = new ButtonImaged(

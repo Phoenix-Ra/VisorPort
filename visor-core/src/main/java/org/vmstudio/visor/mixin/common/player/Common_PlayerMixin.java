@@ -273,15 +273,18 @@ public abstract class Common_PlayerMixin extends Common_LivingEntityMixin
 
     // knockback for living entities targets
     @WrapOperation(method = "causeExtraKnockback", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/world/entity/LivingEntity;knockback(DDD)V"))
+            target = "Lnet/minecraft/world/entity/LivingEntity;knockback(DDDLnet/minecraft/world/damagesource/DamageSource;FZ)V"))
+    // PORT-26.2: knockback gained (DamageSource, float, boolean); a WrapOperation handler has to
+    // mirror the wrapped call exactly, so they are threaded straight through.
     private void visor$vrKnockbackDirection(LivingEntity target, double strength, double x, double z,
+                                            DamageSource damageSource, float f, boolean b,
                                             Operation<Void> original) {
         Vec3 knockBack = CommonUtils.calcVRKnockback((Player) (Object) this, target);
         if (knockBack != null) {
             x = knockBack.x;
             z = knockBack.z;
         }
-        original.call(target, strength, x, z);
+        original.call(target, strength, x, z, damageSource, f, b);
     }
 
     // knockback for non-living entities targets

@@ -58,7 +58,7 @@ public class VROverlayItemPoseTest extends VROverlayScreen {
 
     @Override
     protected boolean updateVisibility() {
-        if(MC.screen != null){
+        if(MC.gui.screen() != null){
             return false;
         }
         return MC.player != null;

@@ -29,7 +29,7 @@ import org.vmstudio.visor.loader.forge.ForgeModLoader;
 @Mixin(LevelRenderer.class)
 public class ForgeLevelRendererVRMixin {
 
-    @Inject(method = "renderLevel", at = @At("TAIL"))
+    @Inject(method = "render", at = @At("TAIL"))
     private void visor$afterLevel(CallbackInfo ci) {
         ForgeModLoader.fireRenderPipelineStage(
                 RenderPipelineStage.AFTER_WORLD, new PoseStack(), visor$partialTicks());

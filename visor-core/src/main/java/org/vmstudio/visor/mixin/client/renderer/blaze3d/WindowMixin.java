@@ -21,10 +21,10 @@ import static org.vmstudio.visor.core.client.VisorClientImpl.MC;
 public abstract class WindowMixin implements WindowExtension {
 
     @Shadow
-    private int width;
+    private int framebufferWidth;
 
     @Shadow
-    private int height;
+    private int framebufferHeight;
 
 
     /* ********************************** *\
@@ -66,7 +66,7 @@ public abstract class WindowMixin implements WindowExtension {
                 );
             } else {
                 cir.setReturnValue(
-                        MC.mainRenderTarget.width
+                        MC.gameRenderer.mainRenderTarget.width
                 );
             }
         }
@@ -87,7 +87,7 @@ public abstract class WindowMixin implements WindowExtension {
                 );
             } else {
                 cir.setReturnValue(
-                        MC.mainRenderTarget.height
+                        MC.gameRenderer.mainRenderTarget.height
                 );
             }
         }
@@ -187,31 +187,41 @@ public abstract class WindowMixin implements WindowExtension {
     }
 
     /**
-     * No Vsync in VR
-     * @param v s
-     * @return s
+     * PORT-26.2: everything size-related runs off the framebuffer callback now - it is what
+     * reconfigures the swapchain, and a DPI change can fire it without any window resize. The
+     * mirror target has to follow it, or the present crops/offsets (26.2's blit is
+     * crop-and-anchor against the swapchain, which is sized from the raw framebuffer size).
      */
-    @ModifyVariable(method = "updateVsync", ordinal = 0, at = @At("HEAD"), argsOnly = true)
-    boolean visor$noVsync(boolean v) {
+    @Inject(method = "onFramebufferResize", at = @At("HEAD"))
+    private void visor$onFramebufferResize(long l, int i, int j, CallbackInfo ci) {
         if (VisorState.get().isActive()) {
-            return false;
+            ClientContext.renderer.prepareResize(
+                    "Main Framebuffer Resized"
+            );
         }
-        return v;
     }
+
+    // PORT-26.2: Window.updateVsync is gone - vsync is a swapchain present mode now, chosen in
+    // Minecraft.renderFrame from options.enableVsync(). "No vsync in VR" moved to MinecraftMixin,
+    // which suppresses that flag where the present mode is picked.
 
 
     /* ************************ *\
   //--------PUBLIC METHODS--------\\
     \* ************************ */
+    // PORT-26.2: these size the mirror/desktop-facing targets, and the desktop present is a
+    // crop-and-anchor blit against a swapchain configured from the raw framebuffer size - so
+    // "actual" means framebuffer pixels, not the screen-coordinate width/height (they differ on
+    // any scaled display).
     @Override
     @Unique
     public int visor$getActualScreenHeight() {
-        return height;
+        return framebufferHeight;
     }
 
     @Override
     @Unique
     public int visor$getActualScreenWidth() {
-        return width;
+        return framebufferWidth;
     }
 }

@@ -146,7 +146,7 @@ public class OptionWidgetEntry {
                 try {
 
                     ClientContext.settingsManager.saveOptions();
-                    Minecraft.getInstance().setScreen(
+                    Minecraft.getInstance().gui.setScreen(
                             opensScreen
                                     .getConstructor(Screen.class)
                                     .newInstance(owner.getScreen())

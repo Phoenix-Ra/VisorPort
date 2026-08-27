@@ -333,8 +333,8 @@ public final class IrisCompatHelper {
                 }
 
                 Minecraft mc = Minecraft.getInstance();
-                RenderTarget previousMain = mc.mainRenderTarget;
-                mc.mainRenderTarget = eye;
+                RenderTarget previousMain = mc.gameRenderer.mainRenderTarget;
+                mc.gameRenderer.mainRenderTarget = eye;
                 try {
                     destroyPipeline.invoke(pipelineManager);
                     Object dimension = getCurrentDimension.invoke(null);
@@ -343,7 +343,7 @@ public final class IrisCompatHelper {
                     LoggerUtils.getLogger().info(
                             "Visor: rebuilt the Iris pipeline against the eye target");
                 } finally {
-                    mc.mainRenderTarget = previousMain;
+                    mc.gameRenderer.mainRenderTarget = previousMain;
                 }
             } catch (Throwable t) {
                 LoggerUtils.printError(t);

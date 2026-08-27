@@ -165,7 +165,7 @@ public class InputHelper {
             return true;
         }
         Minecraft mc = Minecraft.getInstance();
-        if(mc.screen != null) {
+        if(mc.gui.screen() != null) {
             Minecraft.getInstance().keyboardHandler.charTyped(Minecraft.getInstance().getWindow().handle(),
                     new CharacterEvent(character));
 

@@ -47,7 +47,7 @@ public class MouseScrollHandler {
 
         HandType handType;
         if(!ClientContext.cursorHandler.isCursorHandFocused()
-                && MC.screen == null && MC.player != null){
+                && MC.gui.screen() == null && MC.player != null){
             handType = ClientContext.localPlayer.getActiveHand();
         }else {
             handType = ClientContext.cursorHandler.getCursorHand();

@@ -3,7 +3,6 @@ package org.vmstudio.visor.mixin.client.renderer.entity.player;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
@@ -47,7 +46,7 @@ public abstract class ItemInHandRendererMixin implements ItemInHandRendererExten
     // PORT-1.21.11: renderHandsWithItems' third parameter went MultiBufferSource.BufferSource ->
     // SubmitNodeCollector with the extract/submit split. An @Inject handler's parameters must
     // mirror the target's exactly, so the stale type was an apply-time crash, not a warning.
-    @Inject(method = "renderHandsWithItems", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "submitHandsWithItems", at = @At("HEAD"), cancellable = true)
     private void visor$noFirstPersonHandsInVR(float tickDelta,
                                               PoseStack poseStack,
                                               SubmitNodeCollector collector,

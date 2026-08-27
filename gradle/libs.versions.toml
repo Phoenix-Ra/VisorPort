@@ -23,33 +23,49 @@ jetbrains              = "26.1.0"
 # names, Mojang no longer publishes client_mappings/server_mappings, Fabric retired intermediary
 # (26.x resolves to a header-only intermediary:0.0.0 stub) and yarn stopped at 1.21.11. There is
 # no mappings layer left to configure - see the removed `mappings` block in build.gradle.
-# 26.1.2 is the newest patch of the 26.1 line and the one Forge/NeoForge/Sodium/Iris build against.
-minecraftVersion       = "26.1.2"
+# PORT-26.2: still unobfuscated (26.2 has `client`/`server` downloads only) and still Java 25
+# (javaVersion.majorVersion 25), so the toolchain, the loom-no-remap id and the whole mapping-free
+# setup carry over unchanged. "26.2" has no patch releases yet - it IS the full version string,
+# which is also what the Forge coordinate `26.2-65.1.2` is built from.
+minecraftVersion       = "26.2"
 # PORT-26.1: parchment removed - parchmentmc publishes nothing for 26.x (parchment-26.1* is a 404),
 # and it has nothing left to add now that the jar carries real names and parameter names.
+
+# PORT-26.2: LWJGL is unchanged at 3.4.1, but 26.2 now SHIPS lwjgl-vulkan (plus -vma, -shaderc
+# and -spvc) as game libraries, for the new opt-in Vulkan renderer. lwjgl-vulkan therefore must
+# no longer be bundled/JiJ'd by Visor - see the removed include/bundle/forgeRuntimeLibrary lines.
+# lwjgl-openxr is still absent from the game libraries, so Visor keeps shipping that one.
 lwjgl                  = "3.4.1"
 atum-vr                = "1.13.0beta"
 atum-config            = '1.2.0pre3'
 
 #Fabric
 fabric-loader          = "0.19.3"
-fabric_api             = "0.155.2"
+# PORT-26.2: newest fabric-api built for 26.2 (the +26.2 line tops out here; 0.158.0+26.3 is the
+# snapshot build of the same release).
+fabric_api             = "0.158.0"
 mixinExtras            = "0.5.4"
 
 #Forge
 # PORT-26.1: full coordinate is 26.1.2-64.1.2
-forgeVersion           = "64.1.2"
+# PORT-26.2: the 26.2 line is Forge 65.x - full coordinate 26.2-65.1.2 (promotions_slim:
+# `26.2-latest` = 65.1.2, `26.2-recommended` = 65.1.0; this branch tracked -latest on 26.1 too).
+forgeVersion           = "65.1.2"
 
 #NeoForge
 # PORT-26.1: NeoForge now versions off the MC version directly (26.1.2.x tracks MC 26.1.2)
-neoforgeVersion        = "26.1.2.97"
+# PORT-26.2: MC 26.2 has no patch component, so the NeoForge line is 26.2.0.x - newest is .67.
+neoforgeVersion        = "26.2.0.67"
 
 #Other mods
 # PORT-26.1: both rebuilt for the unobfuscated 26.1.2. Sodium 0.9.1 is the newest stable for
 # 26.1.2 (0.9.2 is still alpha); this is compileOnly, so it only sets what the sodium compat
 # mixins compile against.
-mods_sodium                 = "mc26.1.2-0.9.1-fabric"
-mods_iris                   = "1.11.3+26.1-fabric"
+# PORT-26.2: same policy on 26.2 - sodium 0.9.1 is the newest release for 26.2 (0.9.2 is still
+# alpha there as well), and iris 1.11.2+26.2 is the newest release of the 26.2 branch (the 26.1
+# branch went one patch further, to 1.11.3+26.1 - the numbers are per-MC-line, not a downgrade).
+mods_sodium                 = "mc26.2-0.9.1-fabric"
+mods_iris                   = "1.11.2+26.2-fabric"
 
 
 [plugins]

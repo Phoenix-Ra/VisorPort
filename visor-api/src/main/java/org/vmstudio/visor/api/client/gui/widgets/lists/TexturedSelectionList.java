@@ -266,7 +266,7 @@ public class TexturedSelectionList extends McSelectionList<TexturedSelectionList
         if (overlay != null) {
             return overlay;
         }
-        return Minecraft.getInstance().screen;
+        return Minecraft.getInstance().gui.screen();
     }
 
     //Entry management

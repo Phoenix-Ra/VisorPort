@@ -1,7 +1,6 @@
 package org.vmstudio.visor.core.client.render.decoration.effects;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.Tesselator;
 import me.phoenixra.atumvr.api.misc.color.AtumColorImmutable;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
 import org.vmstudio.visor.api.client.render.VRRenderPass;

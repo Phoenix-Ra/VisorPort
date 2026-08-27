@@ -1,5 +1,6 @@
 package org.vmstudio.visor.mixin.client.renderer;
 
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.ProjectionType;
@@ -59,6 +60,7 @@ import org.vmstudio.visor.core.client.VisorState;
 import org.vmstudio.visor.core.client.render.VRCameraEntityCache;
 import org.vmstudio.visor.core.client.render.VRGameCamera;
 import org.vmstudio.visor.core.client.render.VRRenderState;
+import org.vmstudio.visor.core.client.render.helpers.ProjectionHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderHelper;
 import org.vmstudio.visor.core.client.render.helpers.RenderPoseHelper;
 import org.vmstudio.visor.core.client.render.helpers.VREffectsHelper;
@@ -100,7 +102,7 @@ public abstract class GameRendererMixin
     }
 
     @Shadow
-    public abstract GameRenderState getGameRenderState();
+    public abstract GameRenderState gameRenderState();
 
     @Unique
     public Matrix4f visor$thirdPersonProjection = new Matrix4f();
@@ -175,6 +177,10 @@ public abstract class GameRendererMixin
         }
         // render() pushed "render" on the profiler; balance it before leaving early
         Profiler.get().pop();
+        // PORT-26.2: 26.2 recycles the shared StagedVertexBuffer pools in renderBuffers.endFrame()
+        // at render()'s tail, which this cancel skips. Without it every VR pass allocates fresh
+        // GPU buffers for its entities that only come back at the next vanilla-frame tail.
+        ((GameRenderer) (Object) this).renderBuffers().endFrame();
         info.cancel();
         if (VRRenderState.getSceneType().isMainMenu()) {
             GL11.glDisable(GL11.GL_STENCIL_TEST);
@@ -211,8 +217,10 @@ public abstract class GameRendererMixin
      * into the GUI target's frame, but the HUD still has to be extracted when there is a world
      * behind the GUI. 1.21.11 did the same by rewriting the renderLevel local before the GUI
      * extraction; 26.1 hands that flag to extractGui() as an argument.
+     * PORT-26.2: GameRenderer.extractGui is gone - extract() calls Gui.extractRenderState with the
+     * same (DeltaTracker, boolean, boolean) shape, so the same argument is modified one call down.
      */
-    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;extractGui(Lnet/minecraft/client/DeltaTracker;ZZ)V"), method = "extract(Lnet/minecraft/client/DeltaTracker;Z)V", index = 1)
+    @ModifyArg(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/Gui;extractRenderState(Lnet/minecraft/client/DeltaTracker;ZZ)V"), method = "extract(Lnet/minecraft/client/DeltaTracker;Z)V", index = 1)
     private boolean visor$extractGuiWithWorld(boolean shouldRenderLevel) {
         if (VRRenderState.getPhase().isVanilla()) {
             return shouldRenderLevel;
@@ -220,39 +228,57 @@ public abstract class GameRendererMixin
         return visor$isVRGuiVisible();
     }
 
-    /**
-     * World passes never render the GUI (see {@link #visor$onRenderGUI}), so extracting it per
-     * pass would only burn time and wipe the state the GUI phase already recorded.
-     */
-    @Inject(at = @At("HEAD"), method = "extractGui", cancellable = true)
-    private void visor$noGuiExtractionInWorldPass(CallbackInfo ci) {
-        if (VRRenderState.getPhase().isVRWorld()) {
-            ci.cancel();
-        }
-    }
+    // PORT-26.2: the "no GUI extraction in a world pass" cancel moved to GuiMixin - extractGui
+    // is gone and Gui.extractRenderState is the method to stop now.
 
     /**
      * 26.1 resizes the main render target from render() whenever the window reports a resize.
      * In VR "the main render target" is whichever Visor target the current pass draws into, and
      * those are sized by Visor (WindowMixin#visor$onResize -> prepareResize), not by the window.
      */
+    /**
+     * PORT-26.2: 26.1 gated its resize on windowRenderState.isResized, which the 26.1 port
+     * cleared to veto it. That flag is gone - render() now fires resize(II) whenever the
+     * extracted window size disagrees with the live mainRenderTarget. In VR the two only agree
+     * because WindowMixin reports the current pass target's size; any transient disagreement
+     * would resize a Visor target to window dimensions and invalidate the section graph every
+     * frame, so the call is vetoed explicitly while VR is active.
+     */
+    @WrapWithCondition(method = "render(Lnet/minecraft/client/DeltaTracker;Z)V",
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/GameRenderer;resize(II)V"))
+    private boolean visor$noVanillaResizeInVRRender(GameRenderer instance, int width, int height) {
+        return VisorState.get().isNotActive();
+    }
+
+    /**
+     * PORT-26.2: the hide-GUI flag moved from OptionsRenderState (extracted every pass) to
+     * GuiRenderState.isHudHidden, written only by Hud.extractRenderState - which the VR world
+     * passes cancel, so the value the item-hand / screen-effect / crosshair gates read would go
+     * stale. Refreshed here because extractOptions still runs once per pass.
+     */
+    @Inject(at = @At("TAIL"), method = "extractOptions")
+    private void visor$refreshHudHiddenFlag(CallbackInfo ci) {
+        if (VisorState.get().isNotActive()) {
+            return;
+        }
+        this.gameRenderState().guiRenderState.isHudHidden = this.minecraft.gui.hud.isHidden;
+    }
+
     @Inject(at = @At("TAIL"), method = "extractWindow")
     private void visor$noVanillaResizeInVR(CallbackInfo ci) {
         if (VisorState.get().isNotActive()) {
             return;
         }
-        var windowState = this.getGameRenderState().windowRenderState;
-        if (!windowState.isResized) {
-            return;
-        }
-        windowState.isResized = false;
+        // PORT-26.2: WindowRenderState no longer carries an isResized flag, so there is nothing
+        // to gate on or clear. The body below only resizes when the dimensions actually differ,
+        // so running it on every extractWindow is equivalent.
         // keep the vanilla target at the real window size so it is right when VR is turned off
         RenderTarget vanillaTarget = VRRenderState.getVanillaTarget();
         var window = (WindowExtension) (Object) this.minecraft.getWindow();
         int width = Math.max(1, window.visor$getActualScreenWidth());
         int height = Math.max(1, window.visor$getActualScreenHeight());
         if (vanillaTarget != null
-                && vanillaTarget != this.minecraft.getMainRenderTarget()
+                && vanillaTarget != this.minecraft.gameRenderer.mainRenderTarget()
                 && (vanillaTarget.width != width || vanillaTarget.height != height)) {
             vanillaTarget.resize(width, height);
         }
@@ -326,7 +352,8 @@ public abstract class GameRendererMixin
     }
 
     @WrapOperation(at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/renderer/ScreenEffectRenderer;renderScreenEffect(ZZFLnet/minecraft/client/renderer/SubmitNodeCollector;Z)V"),
+            // PORT-26.2: renderScreenEffect -> submit, same descriptor.
+            target = "Lnet/minecraft/client/renderer/ScreenEffectRenderer;submit(ZZFLnet/minecraft/client/renderer/SubmitNodeCollector;Z)V"),
             method = "renderLevel")
     public void visor$noVanillaScreenEffects(ScreenEffectRenderer instance, boolean firstPerson,
                                              boolean sleeping, float partialTick,
@@ -368,17 +395,18 @@ public abstract class GameRendererMixin
         if (renderPass == VRRenderPass.EYE_RIGHT) {
             return new Matrix4f(ClientContext.renderer.getEyeProjection(EyeType.RIGHT));
         }
+        // PORT-26.2: every projection here is reverse-depth, like vanilla's Projection.getMatrix.
         if (renderPass == VRRenderPass.THIRD_PERSON) {
             Matrix4f projection;
             if (VRClientSettings.getMirrorMode() == MirrorMode.MIXED_REALITY) {
-                projection = new Matrix4f().setPerspective(
+                projection = ProjectionHelper.perspective(
                         VRClientSettings.getMixedRealityFov() * Mth.DEG_TO_RAD,
                         VRClientSettings.getMixedRealityAspectRatio(),
                         this.visor$nearClipPlane,
                         this.visor$farClipPlane
                 );
             } else {
-                projection = new Matrix4f().setPerspective(
+                projection = ProjectionHelper.perspective(
                         VRClientSettings.getThirdPersonFov() * Mth.DEG_TO_RAD,
                         visor$screenAspect(),
                         this.visor$nearClipPlane,
@@ -388,7 +416,7 @@ public abstract class GameRendererMixin
             this.visor$thirdPersonProjection = new Matrix4f(projection);
             return projection;
         }
-        return new Matrix4f().setPerspective(
+        return ProjectionHelper.perspective(
                 this.mainCamera.getFov() * Mth.DEG_TO_RAD,
                 visor$screenAspect(),
                 this.visor$nearClipPlane,
@@ -485,7 +513,7 @@ public abstract class GameRendererMixin
     @Override
     @Unique
     public void visor$pick(float partialTick, VanillaPick original) {
-        if (this.minecraft.screen != null && this.minecraft.hitResult != null) {
+        if (this.minecraft.gui.screen() != null && this.minecraft.hitResult != null) {
             return;
         } else if (this.minecraft.getCameraEntity() == null) {
             if (this.minecraft.player != null) {

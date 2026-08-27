@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.render.helpers;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
@@ -65,14 +66,14 @@ public class VREffectsHelper {
 
         // The black came from setShaderColor, which no longer exists on this route, so the
         // geometry carries it: POSITION_COLOR with black vertices rather than bare POSITION.
-        BufferBuilder bufferbuilder = Tesselator.getInstance()
-                .begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder bufferbuilder = VRTesselator
+                .begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
         bufferbuilder.addVertex(mat, -1.5F, -1.5F, 0.0F).setColor(0, 0, 0, 255);
         bufferbuilder.addVertex(mat, 1.5F, -1.5F, 0.0F).setColor(0, 0, 0, 255);
         bufferbuilder.addVertex(mat, 1.5F, 1.5F, 0.0F).setColor(0, 0, 0, 255);
         bufferbuilder.addVertex(mat, -1.5F, 1.5F, 0.0F).setColor(0, 0, 0, 255);
 
-        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(bufferbuilder.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE, bufferbuilder.buildOrThrow());
     }
 
 
@@ -84,7 +85,7 @@ public class VREffectsHelper {
 
         // PORT-1.21.11: blend/depth/cull are pipeline properties now, so the GL sandwich that
         // used to wrap this draw is gone - leaving it would just be overwritten by the pass.
-        wrap.draw(proximity, MC.mainRenderTarget.getColorTextureView());
+        wrap.draw(proximity, MC.gameRenderer.mainRenderTarget.getColorTextureView());
     }
 
 
@@ -133,7 +134,7 @@ public class VREffectsHelper {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
-        RenderTarget rt = mc.getMainRenderTarget();
+        RenderTarget rt = mc.gameRenderer.mainRenderTarget();
 
         // 1) backup matrices
         RenderSystem.backupProjectionMatrix();
@@ -170,17 +171,19 @@ public class VREffectsHelper {
         GL11.glStencilMask(0xFF);
     }
 
+    // PORT-26.2: the depth clears flipped with the reversed depth buffer - "near" is 1.0 and
+    // "far" is 0.0 now. Only reachable when STENCIL_SUPPORTED is turned back on.
     private static void configureStencilWrite(boolean inverse) {
         if (inverse) {
             // clear stencil to 0xFF then write zero inside mask
             GL11.glClearStencil(0xFF);
-            GL11.glClearDepth(0);
+            GL11.glClearDepth(1);
             GL11.glStencilFunc(GL11.GL_ALWAYS, 0, 0xFF);
             GL11.glColorMask(false, false, false, true);
         } else {
             // clear stencil to 0 then write one inside mask
             GL11.glClearStencil(0);
-            GL11.glClearDepth(1);
+            GL11.glClearDepth(0);
             GL11.glStencilFunc(GL11.GL_ALWAYS, 0xFF, 0xFF);
             GL11.glColorMask(true, true, true, true);
         }
@@ -223,15 +226,15 @@ public class VREffectsHelper {
     private static void drawStencilMask(float[] verts) {
         if (verts == null || verts.length < 2) return;
 
-        BufferBuilder buf = Tesselator.getInstance()
-                .begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION);
+        BufferBuilder buf = VRTesselator
+                .begin(PrimitiveTopology.TRIANGLES, DefaultVertexFormat.POSITION);
 
         float scale = ClientContext.renderer.renderScale;
         for (int i = 0; i < verts.length; i += 2) {
             buf.addVertex(verts[i] * scale, verts[i + 1] * scale, 0f);
         }
 
-        VisorPipelines.POSITION_TRIANGLES_TYPE.draw(buf.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_TRIANGLES_TYPE, buf.buildOrThrow());
     }
 
     private static void restorePostStencilState() {

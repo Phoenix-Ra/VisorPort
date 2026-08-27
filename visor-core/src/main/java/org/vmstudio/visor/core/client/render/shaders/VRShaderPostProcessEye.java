@@ -1,8 +1,12 @@
 package org.vmstudio.visor.core.client.render.shaders;
 
+import com.mojang.blaze3d.GpuFormat;
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import com.mojang.blaze3d.pipeline.BindGroupLayout;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
 import java.util.Optional;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -13,6 +17,7 @@ import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.MappableRingBuffer;
 import org.jetbrains.annotations.NotNull;
 import me.phoenixra.atumvr.api.enums.EyeType;
@@ -37,14 +42,22 @@ public class VRShaderPostProcessEye implements VRShader{
     private static final AtumColor PUMPKIN_VIGNETTE_COLOR
             = AtumColor.ORANGE.blend(AtumColor.BLACK, 0.5f);
 
+    /** PORT-26.2: Visor's own uniform block needs a bind group layout of its own. */
+    private static final BindGroupLayout LAYOUT = BindGroupLayout.builder()
+            .withUniform("VisorPostProcess", UniformType.UNIFORM_BUFFER)
+            .build();
+
     public static final RenderPipeline PIPELINE = RenderPipeline.builder()
             .withLocation(McVersionUtils.newResourceLoc("visor", "pipeline/vr_post_process_eye"))
             .withVertexShader(McVersionUtils.newResourceLoc("visor", "core/vr_post_process_eye"))
             .withFragmentShader(McVersionUtils.newResourceLoc("visor", "core/vr_post_process_eye"))
-            .withSampler("Sampler0")
-            .withUniform("VisorPostProcess", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
-            .withColorTargetState(new ColorTargetState(Optional.empty(), ColorTargetState.WRITE_COLOR))
+            .withBindGroupLayout(LAYOUT)
+            .withBindGroupLayout(BindGroupLayouts.SAMPLER0)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
+            // PORT-26.2: ColorTargetState carries the target format now (DEFAULT uses RGBA8_UNORM).
+            .withColorTargetState(new ColorTargetState(Optional.empty(), GpuFormat.RGBA8_UNORM,
+                    ColorTargetState.WRITE_COLOR))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
             .build();
@@ -119,8 +132,7 @@ public class VRShaderPostProcessEye implements VRShader{
         }
 
         MappableRingBuffer ubo = (eye == EyeType.LEFT) ? uboLeft : uboRight;
-        try (GpuBuffer.MappedView view = RenderSystem.getDevice().createCommandEncoder()
-                .mapBuffer(ubo.currentBuffer(), false, true)) {
+        try (GpuBufferSlice.MappedView view = ubo.currentBuffer().map(false, true)) {
             Std140Builder.intoBuffer(view.data())
                     .putInt(eye == EyeType.LEFT ? 1 : -1)
                     .putFloat(redTint)

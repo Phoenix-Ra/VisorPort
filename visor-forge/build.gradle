@@ -78,14 +78,13 @@ dependencies {
     forgeRuntimeLibrary("org.lwjgl:lwjgl-openxr:$lwjglVersion:natives-linux")
     forgeRuntimeLibrary("org.lwjgl:lwjgl-openxr:$lwjglVersion:natives-windows")
 
-    //vulkan bridge rail; no natives jar - lwjgl-vulkan loads the system loader
-    forgeRuntimeLibrary(libs.lwjgl.vulkan)
+    // PORT-26.2: lwjgl-vulkan dropped from both rails - 26.2 ships it as a game library, so it is
+    // already on the dev and production classpaths (see gradle/libs.versions.toml).
 
     // shadow the natives
     bundle(libs.lwjgl.openxr) { transitive = false }
     bundle("org.lwjgl:lwjgl-openxr:$lwjglVersion:natives-linux") { transitive = false }
     bundle("org.lwjgl:lwjgl-openxr:$lwjglVersion:natives-windows") { transitive = false }
-    bundle(libs.lwjgl.vulkan) { transitive = false }
 
 }
 

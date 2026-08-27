@@ -892,7 +892,7 @@ public class TextBoxEditable extends AbstractWidget {
                         overlayBase = overlayScreen;
                     }
                     Screen screenFocused = overlayBase == null
-                            ? Minecraft.getInstance().screen
+                            ? Minecraft.getInstance().gui.screen()
                             : overlayBase;
                     keyboardAccessor.showKeyboard(screenFocused);
                 }

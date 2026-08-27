@@ -83,6 +83,10 @@ subprojects {
         // here (even the intermediary:0.0.0 stub) fails remapping against a missing `named` ns.
 
         compileOnly(libs.lwjgl.openxr)
+        // PORT-26.2: 26.2 ships lwjgl-vulkan as a game library (the new opt-in Vulkan renderer),
+        // so this is already on the compile classpath through `minecraft`. Kept explicit because
+        // it is AtumVR's XRVulkanBridge rail that needs it, and it pins the same LWJGL 3.4.1.
+        // What changed is the *shipping* side: see visor-fabric/forge/neoforge.
         compileOnly(libs.lwjgl.vulkan)
 
         compileOnly(libs.bundles.annotations)

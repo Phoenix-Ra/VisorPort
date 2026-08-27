@@ -39,7 +39,10 @@ vec3 avoidKeyColor(in vec3 color) {
 }
 
 vec3 getFragmentPosition(in vec2 uv) {
-    float z = texture(SamplerDepth, uv).r * 2.0 - 1.0;
+    // 26.2: the depth buffer is reversed and the clip volume is zero-to-one wherever the
+    // device supports it, so the raw depth value IS the clip-space z. On a device still on
+    // the -1..1 convention the Java side bakes the z remap into uInverseProjectionView.
+    float z = texture(SamplerDepth, uv).r;
     vec4 clip = vec4(uv * 2.0 - 1.0, z, 1.0);
     vec4 world = uInverseProjectionView * clip;
     return world.xyz / world.w;

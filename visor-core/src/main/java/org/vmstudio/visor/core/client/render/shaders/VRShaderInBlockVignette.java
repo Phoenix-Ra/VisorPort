@@ -1,8 +1,11 @@
 package org.vmstudio.visor.core.client.render.shaders;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import com.mojang.blaze3d.pipeline.BindGroupLayout;
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -20,12 +23,21 @@ import org.vmstudio.visor.core.client.render.helpers.RenderShaderHelper;
 
 public class VRShaderInBlockVignette implements VRShader {
 
+    /**
+     * PORT-26.2: a pipeline declares bind group layouts instead of loose uniforms, and Visor's own
+     * block has no vanilla constant to reuse, so it gets a layout of its own.
+     */
+    private static final BindGroupLayout LAYOUT = BindGroupLayout.builder()
+            .withUniform("VisorInBlockVignette", UniformType.UNIFORM_BUFFER)
+            .build();
+
     public static final RenderPipeline PIPELINE = RenderPipeline.builder()
             .withLocation(McVersionUtils.newResourceLoc("visor", "pipeline/vr_in_block_vignette"))
             .withVertexShader(McVersionUtils.newResourceLoc("visor", "core/vr_in_block_vignette"))
             .withFragmentShader(McVersionUtils.newResourceLoc("visor", "core/vr_in_block_vignette"))
-            .withUniform("VisorInBlockVignette", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.QUADS)
+            .withBindGroupLayout(LAYOUT)
+            .withVertexBinding(0, DefaultVertexFormat.POSITION_TEX)
+            .withPrimitiveTopology(PrimitiveTopology.QUADS)
             .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
             .withDepthStencilState(new DepthStencilState(CompareOp.ALWAYS_PASS, false))
             .withCull(false)
@@ -75,8 +87,7 @@ public class VRShaderInBlockVignette implements VRShader {
      * and the shared full-screen quad draws the same pixels.
      */
     public void draw(float proximity, @NotNull GpuTextureView target) {
-        try (GpuBuffer.MappedView view = RenderSystem.getDevice().createCommandEncoder()
-                .mapBuffer(ubo.currentBuffer(), false, true)) {
+        try (GpuBufferSlice.MappedView view = ubo.currentBuffer().map(false, true)) {
             Std140Builder.intoBuffer(view.data()).putFloat(proximity);
         }
 

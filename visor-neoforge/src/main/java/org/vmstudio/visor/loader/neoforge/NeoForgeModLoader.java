@@ -4,6 +4,8 @@ package org.vmstudio.visor.loader.neoforge;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.PoseStack;
 import io.netty.buffer.Unpooled;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
@@ -21,8 +23,6 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.ClientHooks;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.resources.model.sprite.SpriteGetter;
 import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -269,11 +269,17 @@ public class NeoForgeModLoader implements ModLoader {
         return Minecraft.getInstance().getAtlasManager();
     }
 
-    private static MultiBufferSource.BufferSource visor$discardBuffers;
+    /**
+     * PORT-26.2: MultiBufferSource does not exist any more - the hooks hand over a
+     * {@link SubmitNodeCollector} instead. The discard sink is the same idea in the new shape: a
+     * {@code SubmitNodeStorage} nothing ever renders, so a listener that submits geometry into it
+     * emits nothing, which is still exactly what Forge does (its hook has no collector at all).
+     */
+    private static SubmitNodeStorage visor$discardBuffers;
 
-    private static MultiBufferSource.BufferSource visor$discardBuffers() {
+    private static SubmitNodeCollector visor$discardBuffers() {
         if (visor$discardBuffers == null) {
-            visor$discardBuffers = MultiBufferSource.immediate(new ByteBufferBuilder(256));
+            visor$discardBuffers = new SubmitNodeStorage();
         }
         return visor$discardBuffers;
     }

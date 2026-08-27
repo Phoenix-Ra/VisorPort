@@ -1,5 +1,6 @@
 package org.vmstudio.visor.core.client.render.helpers;
 
+import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
@@ -58,7 +59,7 @@ public class RenderGuiHelper {
     }
 
     public static GuiGraphicsExtractor beginGui(int mouseX, int mouseY) {
-        GuiRenderState state = MC.gameRenderer.getGameRenderState().guiRenderState;
+        GuiRenderState state = MC.gameRenderer.gameRenderState().guiRenderState;
         state.reset();
         return new GuiGraphicsExtractor(MC, state, mouseX, mouseY);
     }
@@ -80,7 +81,7 @@ public class RenderGuiHelper {
         // live values into the snapshot for the duration of the flush, or every overlay whose
         // target is not exactly the GUI target's size and gui scale is drawn with the GUI
         // target's projection: its content ends up shrunk into a corner and scissored wrongly.
-        WindowRenderState windowState = MC.gameRenderer.getGameRenderState().windowRenderState;
+        WindowRenderState windowState = MC.gameRenderer.gameRenderState().windowRenderState;
         int savedWidth = windowState.width;
         int savedHeight = windowState.height;
         int savedGuiScale = windowState.guiScale;
@@ -89,8 +90,8 @@ public class RenderGuiHelper {
         windowState.height = window.getHeight();
         windowState.guiScale = window.getGuiScale();
         try {
-            gameRenderer.visor$getGuiRenderer().render(
-                    gameRenderer.visor$getFogRenderer().getBuffer(FogRenderer.FogMode.NONE));
+            // PORT-26.2: render() no longer takes the fog buffer slice.
+            gameRenderer.visor$getGuiRenderer().render();
             gameRenderer.visor$getGuiRenderer().endFrame();
         } finally {
             MC.gameRenderer.useUiLightmap = uiLightmap;
@@ -251,7 +252,7 @@ public class RenderGuiHelper {
 
         var pose = poseStack.last().pose();
         BufferBuilder buf;
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        buf = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
         float r = barColor.getRed()   * brightness;
         float g = barColor.getGreen() * brightness;
@@ -266,7 +267,7 @@ public class RenderGuiHelper {
         buf.addVertex(pose, right, top,    0f).setColor(r, g, b, a);
         buf.addVertex(pose, left,  top,    0f).setColor(r, g, b, a);
 
-        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(buf.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE, buf.buildOrThrow());
     }
 
 
@@ -318,14 +319,14 @@ public class RenderGuiHelper {
 
         var pose = poseStack.last().pose();
         BufferBuilder buf;
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        buf = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
         buf.addVertex(pose, left,  bottom, 0f).setColor(r, g, b, a);
         buf.addVertex(pose, right, bottom, 0f).setColor(r, g, b, a);
         buf.addVertex(pose, right, top,    0f).setColor(r, g, b, a);
         buf.addVertex(pose, left,  top,    0f).setColor(r, g, b, a);
 
-        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(buf.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE, buf.buildOrThrow());
     }
 
     private static void drawResizeOutline(VROverlay overlay,
@@ -345,7 +346,7 @@ public class RenderGuiHelper {
 
         var pose = poseStack.last().pose();
         BufferBuilder buf;
-        buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        buf = VRTesselator.begin(PrimitiveTopology.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
         // top edge
         emitRect(buf, pose, -halfWidth, halfHeight - thickness, halfWidth, halfHeight, r, g, b, a);
@@ -356,7 +357,7 @@ public class RenderGuiHelper {
         // right edge
         emitRect(buf, pose, halfWidth - thickness, -halfHeight + thickness, halfWidth, halfHeight - thickness, r, g, b, a);
 
-        VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE.draw(buf.buildOrThrow());
+        VRMeshDrawer.draw(VisorPipelines.POSITION_COLOR_NO_DEPTH_TYPE, buf.buildOrThrow());
     }
 
     private static void emitRect(BufferBuilder buf, Matrix4f pose,

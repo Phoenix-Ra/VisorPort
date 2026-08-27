@@ -245,7 +245,7 @@ public class VROverlayButton extends VROverlayTemplateScreen {
                 && !isVrActionSetActive()){
             return false;
         }
-        return MC.screen == null || !optionsButtonTemplate.isWorldOnly();
+        return MC.gui.screen() == null || !optionsButtonTemplate.isWorldOnly();
     }
 
     @Override

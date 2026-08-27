@@ -167,7 +167,7 @@ public class MouseClickHandler {
         }
 
         if (ClientContext.cursorHandler.isCursorHandFocused()
-                || MC.screen != null
+                || MC.gui.screen() != null
                 || MC.player == null) {
             var activeHand = ClientContext.cursorHandler.getCursorHand();
             if (handType != activeHand) {
@@ -233,7 +233,7 @@ public class MouseClickHandler {
             processOverlay(focusedOverlay);
             return;
         }
-        if (MC.screen != null) {
+        if (MC.gui.screen() != null) {
             processScreen();
             return;
         }

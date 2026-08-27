@@ -26,15 +26,15 @@ public class ActionMenu extends VRActionButton {
 
     @Override
     protected void onPress() {
-        if (MC.screen != null) {
+        if (MC.gui.screen() != null) {
             InputHelper.pressKey(GLFW.GLFW_KEY_ESCAPE);
             InputHelper.releaseKey(GLFW.GLFW_KEY_ESCAPE);
         } else {
             if(MC.level == null){
-                MC.setScreen(new TitleScreen());
+                MC.gui.setScreen(new TitleScreen());
                 return;
             }
-            MC.setScreen(new VRPauseMenuScreen());
+            MC.gui.setScreen(new VRPauseMenuScreen());
         }
     }
 

@@ -51,12 +51,7 @@ public class KeybindingsMixin {
             }
         }
     }
-    @Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Screenshot;grab(Ljava/io/File;Lcom/mojang/blaze3d/pipeline/RenderTarget;Ljava/util/function/Consumer;)V"), method = "keyPress")
-    public void visor$screenshot(File file, RenderTarget renderTarget, Consumer<Component> consumer) {
-        if (VisorState.get().isNotActive()) {
-            Screenshot.grab(file, renderTarget, consumer);
-            return;
-        }
-        ClientContext.renderer.setAskedForScreenShot(true);
-    }
+    // PORT-26.2: the screenshot hotkey no longer runs in KeyboardHandler.keyPress - it moved to
+    // Minecraft.handleGlobalKeyPress, and the overload it calls is grab(Minecraft, boolean).
+    // The redirect moved to MinecraftMixin with it.
 }

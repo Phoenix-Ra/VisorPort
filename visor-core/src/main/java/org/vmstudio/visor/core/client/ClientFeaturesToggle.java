@@ -52,7 +52,7 @@ public class ClientFeaturesToggle {
 
     private boolean checkAimEffects() {
         if (MC.level == null)               return false;
-        if (MC.screen != null)              return false;
+        if (MC.gui.screen() != null)              return false;
         return !ClientContext.cursorHandler.isCursorHandFocused();
     }
 
